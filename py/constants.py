@@ -1,4 +1,4 @@
-# copied from https://github.com/tensorflow/magenta/blob/master/magenta/models/music_vae/data.py
+# modified from https://github.com/tensorflow/magenta/blob/master/magenta/models/music_vae/data.py
 
 ROLAND_DRUM_PITCH_CLASSES = [
     # kick drum
