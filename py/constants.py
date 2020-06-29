@@ -2,7 +2,7 @@
 
 ROLAND_DRUM_PITCH_CLASSES = [
     # kick drum
-    [36],
+    [35, 36],
     # snare drum
     [38, 37, 40],
     # closed hi-hat
