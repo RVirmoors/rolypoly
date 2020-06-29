@@ -29,6 +29,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--drummidi', default='data/baron.mid', metavar='FOO.mid',
     help='drum MIDI file name')
+parser.add_argument(
+    '--offline', action='store_true',
+    help='execute offline (learn)')
 args = parser.parse_args()
 
 # load MIDI file
@@ -63,8 +66,8 @@ def processFV(featVec):
 
 def parseMIDItoFV():
     """
-    Play the drum MIDI file in real time, emitting feature vectors
-    to be processed by processFV()
+    Play the drum MIDI file in real time (or not), emitting
+    feature vectors to be processed by processFV().
     """
     start = time.monotonic()
     featVec = np.zeros(len(ROLAND_DRUM_PITCH_CLASSES))  # 9 zeros
@@ -82,7 +85,8 @@ def parseMIDItoFV():
             #client.send_message("/delay", 0)
             processFV(featVec)
             featVec = np.zeros(len(ROLAND_DRUM_PITCH_CLASSES))
-            time.sleep(sleeptime)
+            if not args.offline:
+                time.sleep(sleeptime)
 
 
 pitch_class_map = classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
