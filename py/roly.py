@@ -21,6 +21,9 @@ import mir_eval.display
 import librosa.display
 import matplotlib.pyplot as plt
 
+# OSC communication
+client = udp_client.SimpleUDPClient("127.0.0.1", 5005)
+
 # parse command line args
 parser = argparse.ArgumentParser(
     description=__doc__,
@@ -48,8 +51,6 @@ if (len(pm.instruments) > 1):
 drumtrack = pm.instruments[0]
 if (drumtrack.is_drum == False):
     sys.exit('Your MIDI file must be a DRUM track.')
-
-client = udp_client.SimpleUDPClient("127.0.0.1", 5005)
 
 feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 3
 tc = pm.get_tempo_changes()
@@ -126,7 +127,11 @@ def score_pos_in_bar():
 
 
 def processFV(featVec):
-    print(featVec[11])
+    print(featVec[9], featVec[10], featVec[11])
+    play = ["%.3f" % feat for feat in featVec]
+    play = ' '.join(play)
+    client.send_message("/play", play)
+    return 0
 
 
 def parseMIDItoFV():
@@ -143,19 +148,18 @@ def parseMIDItoFV():
             currstart = note.start
             nextstart = drumtrack.notes[index + 1].start
             sleeptime = nextstart - currstart
-        # one-hot encode feature vector
+        # one-hot encode feature vector [0...8]
         featVec[pitch_class_map[note.pitch]] = 1
         if sleeptime:
             # FV complete, process it and wait for the next one
-            #client.send_message("/delay", 0)
             featVec[9] = tempos[index]
-            num, denom = timesigs[index][0], timesigs[index][1]
-            featVec[10] = num / denom
+            # num / denom (e.g. 4/4 = 1.)
+            featVec[10] = timesigs[index][0] / timesigs[index][1]
             featVec[11] = positions_in_bar[index]
-            processFV(featVec)
+            y = processFV(featVec)
             featVec = np.zeros(feat_vec_size)
             if not args.offline:
-                time.sleep(sleeptime)
+                time.sleep(sleeptime + y)
 
 
 pitch_class_map = classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
