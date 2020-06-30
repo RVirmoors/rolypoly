@@ -52,8 +52,9 @@ drumtrack = pm.instruments[0]
 if (drumtrack.is_drum == False):
     sys.exit('Your MIDI file must be a DRUM track.')
 
-feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 3
+feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 tc = pm.get_tempo_changes()
+delayms = 0
 
 # SETUP METHODS
 
@@ -127,10 +128,22 @@ def score_pos_in_bar():
 
 
 def processFV(featVec):
-    print(featVec[9], featVec[10], featVec[11])
+    """
+    Live:
+    1. send the drums to be played in Max
+    2. wait a little to hear the guitar info (onset)
+    3. add the guitar onset to the featVec
+    4. send the drum+guitar FV to the RNN for inference
+    5. return the obtained Y = next beat timing
+    """
+    print(featVec[9], featVec[10], featVec[11], featVec[12])
+    # 1.
     play = ["%.3f" % feat for feat in featVec]
     play = ' '.join(play)
     client.send_message("/play", play)
+    # 2.
+    time.sleep(sleeptime * 0.6)
+    featVec[13] = delayms
     return 0
 
 
@@ -140,7 +153,7 @@ def parseMIDItoFV():
     feature vectors to be processed by processFV().
     """
     start = time.monotonic()
-    featVec = np.zeros(feat_vec_size)  # 9+3 zeros
+    featVec = np.zeros(feat_vec_size)  # 9+4 zeros
     for index, note in enumerate(drumtrack.notes):
         #        print(pitch_class_map[note.pitch])
         if index < (len(drumtrack.notes) - 1):
@@ -152,14 +165,15 @@ def parseMIDItoFV():
         featVec[pitch_class_map[note.pitch]] = 1
         if sleeptime:
             # FV complete, process it and wait for the next one
-            featVec[9] = tempos[index]
+            featVec[9] = sleeptime * 1000.  # hit duration [ms]
+            featVec[10] = tempos[index]
             # num / denom (e.g. 4/4 = 1.)
-            featVec[10] = timesigs[index][0] / timesigs[index][1]
-            featVec[11] = positions_in_bar[index]
-            y = processFV(featVec)
+            featVec[11] = timesigs[index][0] / timesigs[index][1]
+            featVec[12] = positions_in_bar[index]
+            y = processFV(featVec)  # next hit timing [ms]
             featVec = np.zeros(feat_vec_size)
             if not args.offline:
-                time.sleep(sleeptime + y)
+                time.sleep(sleeptime + y / 1000.)
 
 
 pitch_class_map = classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
