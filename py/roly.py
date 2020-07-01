@@ -55,7 +55,7 @@ if (drumtrack.is_drum == False):
 
 feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 tc = pm.get_tempo_changes()
-delayms = 0
+delayms = 33
 
 # SETUP METHODS
 
@@ -130,6 +130,7 @@ def score_pos_in_bar():
 
 def getOnsetDiffOSC(address, *args):
     # print(f"{address}: {args[0]}")
+    global delayms
     delayms = args[0]
 
 
@@ -158,9 +159,10 @@ async def processFV(featVec):
     play = ' '.join(play)
     client.send_message("/play", play)
     # 2.
-    await asyncio.sleep(featVec[9] * 0.6)
+    #await asyncio.sleep(featVec[9] * 0.6)
     # 3.
     featVec[13] = delayms  # remains constant if no guit onset
+    print("delay:", delayms)
     # 4.
     y = timingModel(featVec)
     # 5.
@@ -208,6 +210,7 @@ positions_in_bar = score_pos_in_bar()
 
 async def init_main():
     # listen on port 5006
+    delayms = 66
     server = AsyncIOOSCUDPServer(
         ("127.0.0.1", 5006), dispatcher, asyncio.get_event_loop())
     # Create datagram endpoint and start serving

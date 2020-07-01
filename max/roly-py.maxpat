@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 35.0, 82.0, 890.0, 920.0 ],
+		"rect" : [ 995.0, 85.0, 890.0, 920.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -117,7 +117,6 @@
 						"tags" : "",
 						"style" : "",
 						"subpatcher_template" : "",
-						"visible" : 1,
 						"boxes" : [ 							{
 								"box" : 								{
 									"id" : "obj-6",
@@ -2750,12 +2749,13 @@
 , 			{
 				"box" : 				{
 					"id" : "obj-9",
+					"linecount" : 2,
 					"maxclass" : "message",
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 127.0, 203.0, 238.0, 22.0 ],
-					"text" : "0. 1. 0. 0. 0. 0. 0. 0. 0. 140. 1. 0.875"
+					"patching_rect" : [ 127.0, 203.0, 238.0, 36.0 ],
+					"text" : "0. 1. 0. 0. 0. 0. 0. 0. 0. 300. 150. 1. 0.688 0."
 				}
 
 			}
