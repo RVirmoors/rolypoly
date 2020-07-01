@@ -12,17 +12,18 @@ import sys
 import pretty_midi
 from constants import ROLAND_DRUM_PITCH_CLASSES
 
-from pythonosc import udp_client
+from pythonosc.udp_client import SimpleUDPClient
 import time
+
+from pythonosc.osc_server import AsyncIOOSCUDPServer
+from pythonosc.dispatcher import Dispatcher
+import asyncio
 
 import numpy as np
 # For plotting
 import mir_eval.display
 import librosa.display
 import matplotlib.pyplot as plt
-
-# OSC communication
-client = udp_client.SimpleUDPClient("127.0.0.1", 5005)
 
 # parse command line args
 parser = argparse.ArgumentParser(
@@ -127,7 +128,22 @@ def score_pos_in_bar():
 # LIVE METHODS
 
 
-def processFV(featVec):
+def getOnsetDiffOSC(address, *args):
+    # print(f"{address}: {args[0]}")
+    delayms = args[0]
+
+
+# OSC communication
+client = SimpleUDPClient("127.0.0.1", 5005)  # send
+dispatcher = Dispatcher()
+dispatcher.map("/listen", getOnsetDiffOSC)  # receive
+
+
+def timingModel(featVec):
+    return 0
+
+
+async def processFV(featVec):
     """
     Live:
     1. send the drums to be played in Max
@@ -142,12 +158,16 @@ def processFV(featVec):
     play = ' '.join(play)
     client.send_message("/play", play)
     # 2.
-    time.sleep(sleeptime * 0.6)
-    featVec[13] = delayms
-    return 0
+    await asyncio.sleep(featVec[9] * 0.6)
+    # 3.
+    featVec[13] = delayms  # remains constant if no guit onset
+    # 4.
+    y = timingModel(featVec)
+    # 5.
+    return y
 
 
-def parseMIDItoFV():
+async def parseMIDItoFV():
     """
     Play the drum MIDI file in real time (or not), emitting
     feature vectors to be processed by processFV().
@@ -170,10 +190,14 @@ def parseMIDItoFV():
             # num / denom (e.g. 4/4 = 1.)
             featVec[11] = timesigs[index][0] / timesigs[index][1]
             featVec[12] = positions_in_bar[index]
-            y = processFV(featVec)  # next hit timing [ms]
+
+            #loop = asyncio.get_event_loop()
+            y = await processFV(featVec)  # next hit timing [ms]
+            #y = loop.run_until_complete(infer)
             featVec = np.zeros(feat_vec_size)
             if not args.offline:
-                time.sleep(sleeptime + y / 1000.)
+                # time.sleep(sleeptime + y / 1000.)
+                await asyncio.sleep(sleeptime + y / 1000.)
 
 
 pitch_class_map = classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
@@ -181,4 +205,17 @@ tempos = score_tempo()
 timesigs = score_timesig()
 positions_in_bar = score_pos_in_bar()
 
-parseMIDItoFV()
+
+async def init_main():
+    # listen on port 5006
+    server = AsyncIOOSCUDPServer(
+        ("127.0.0.1", 5006), dispatcher, asyncio.get_event_loop())
+    # Create datagram endpoint and start serving
+    transport, protocol = await server.create_serve_endpoint()
+
+    await parseMIDItoFV()  # Enter main loop of program
+
+    transport.close()  # Clean up serve endpoint
+
+
+asyncio.run(init_main())
