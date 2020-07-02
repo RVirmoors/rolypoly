@@ -144,6 +144,11 @@ def timingModel(featVec):
     return 0
 
 
+def addRow(featVec, y):
+    newRow = np.append(featVec, y)
+    #print('saved as: ', newRow)
+
+
 async def processFV(featVec):
     """
     Live:
@@ -151,7 +156,8 @@ async def processFV(featVec):
     2. wait a little to hear the guitar info (onset)
     3. add the guitar onset to the featVec
     4. send the drum+guitar FV to the RNN for inference
-    5. return the obtained Y = next beat timing
+    5. save FV & Y for future offline training
+    6. return the obtained Y = next beat timing
     """
     print(featVec[9], featVec[10], featVec[11], featVec[12])
     # 1.
@@ -159,13 +165,15 @@ async def processFV(featVec):
     play = ' '.join(play)
     client.send_message("/play", play)
     # 2.
-    #await asyncio.sleep(featVec[9] * 0.6)
+    await asyncio.sleep(featVec[9] * 0.6 / 1000)
     # 3.
     featVec[13] = delayms  # remains constant if no guit onset
-    print("delay:", delayms)
+    print("delay: ", delayms)
     # 4.
     y = timingModel(featVec)
     # 5.
+    addRow(featVec, y)
+    # 6.
     return y
 
 
