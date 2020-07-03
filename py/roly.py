@@ -20,10 +20,7 @@ from pythonosc.dispatcher import Dispatcher
 import asyncio
 
 import numpy as np
-# For plotting
-import mir_eval.display
-import librosa.display
-import matplotlib.pyplot as plt
+import timing           # ML timing module
 
 # parse command line args
 parser = argparse.ArgumentParser(
@@ -140,15 +137,6 @@ dispatcher = Dispatcher()
 dispatcher.map("/listen", getOnsetDiffOSC)  # receive
 
 
-def timingModel(featVec):
-    return 0
-
-
-def addRow(featVec, y):
-    newRow = np.append(featVec, y)
-    #print('saved as: ', newRow)
-
-
 async def processFV(featVec):
     """
     Live:
@@ -170,9 +158,9 @@ async def processFV(featVec):
     featVec[13] = delayms  # remains constant if no guit onset
     print("delay: ", delayms)
     # 4.
-    y = timingModel(featVec)
+    y = timing.inference(featVec)
     # 5.
-    addRow(featVec, y)
+    timing.addRow(featVec, y)
     # 6.
     return y
 
