@@ -68,6 +68,19 @@ def classes_to_map(classes):
     return class_map
 
 
+def ms_to_bartime(ms, featVec):
+    """
+    Convert a ms time difference to a bar-relative diff.
+    input:
+        ms = time to be converted
+        featVec = feature of the note we relate to
+    """
+    tempo = featVec[10]
+    timeSig = featVec[11]
+    barDiff = ms / 1000 * 60 / tempo / timeSig
+    return barDiff
+
+
 def score_tempo():
     """
     Assign BPM values to every note
@@ -154,9 +167,9 @@ async def processFV(featVec):
     client.send_message("/play", play)
     # 2.
     await asyncio.sleep(featVec[9] * 0.6 / 1000)
-    # 3.
-    featVec[13] = delayms  # remains constant if no guit onset
-    print("delay: ", delayms)
+    # 3. remains constant if no guit onset
+    featVec[13] = ms_to_bartime(delayms, featVec)
+    print("delay: ", featVec[13])
     # 4.
     y = timing.inference(featVec)
     # 5.
