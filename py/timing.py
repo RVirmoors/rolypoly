@@ -45,6 +45,6 @@ def inference(featVec):
     return 0
 
 
-def addRow(featVec, y):
+def addRow(featVec, y, onsetDelay):
     newRow = np.append(featVec, y)
     #print('saved as: ', newRow)

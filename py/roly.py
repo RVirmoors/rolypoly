@@ -52,7 +52,9 @@ if (drumtrack.is_drum == False):
 
 feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 tc = pm.get_tempo_changes()
-delayms = 33
+
+delayms = 1
+guitarDescr = 0  # loudness delta?
 
 # SETUP METHODS
 
@@ -144,36 +146,46 @@ def getOnsetDiffOSC(address, *args):
     delayms = args[0]
 
 
+def getGuitarDescrOSC(address, *args):
+    # print(f"{address}: {args[0]}")
+    global guitarDescr
+    guitarDescr = args[0]
+
+
 # OSC communication
 client = SimpleUDPClient("127.0.0.1", 5005)  # send
 dispatcher = Dispatcher()
-dispatcher.map("/listen", getOnsetDiffOSC)  # receive
+dispatcher.map("/onset", getOnsetDiffOSC)  # receive
+dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 
 
 async def processFV(featVec):
     """
     Live:
     1. send the drums to be played in Max
-    2. wait a little to hear the guitar info (onset)
-    3. add the guitar onset to the featVec
-    4. send the drum+guitar FV to the RNN for inference
-    5. save FV & Y for future offline training
+    2. wait a little to hear the guitar info
+    3. send the drum+guitar FV to the RNN for inference
+    4. wait a little to hear the guitar onset
+    5. save FV & Y & onsetDelay for future offline training
     6. return the obtained Y = next beat timing
     """
-    print(featVec[9], featVec[10], featVec[11], featVec[12])
     # 1.
     play = ["%.3f" % feat for feat in featVec]
     play = ' '.join(play)
     client.send_message("/play", play)
     # 2.
-    await asyncio.sleep(featVec[9] * 0.6 / 1000)
-    # 3. remains constant if no guit onset
-    featVec[13] = ms_to_bartime(delayms, featVec)
-    print("delay: ", featVec[13])
-    # 4.
+    await asyncio.sleep(featVec[9] * 0.1 / 1000)
+    featVec[13] = guitarDescr
+    # 3.
+    print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
     y = timing.inference(featVec)
+    # 4.
+    await asyncio.sleep(featVec[9] * 0.4 / 1000)
+    # remains constant if no guit onset?
+    onsetDelay = ms_to_bartime(delayms, featVec)
+    print("onset delay: ", onsetDelay)
     # 5.
-    timing.addRow(featVec, y)
+    timing.addRow(featVec, y, onsetDelay)
     # 6.
     return y
 
@@ -219,7 +231,6 @@ positions_in_bar = score_pos_in_bar()
 
 async def init_main():
     # listen on port 5006
-    delayms = 66
     server = AsyncIOOSCUDPServer(
         ("127.0.0.1", 5006), dispatcher, asyncio.get_event_loop())
     # Create datagram endpoint and start serving
