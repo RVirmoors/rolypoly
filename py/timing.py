@@ -75,6 +75,10 @@ def addRow(featVec, y, loss):
 
 
 def prepare_X():
+    """
+    Pad short sequences
+    https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
+    """
     global X, X_lengths, s_i
     longest_seq = int(max(X_lengths))
     batch_size = s_i
@@ -86,7 +90,7 @@ def prepare_X():
             print("BBB", x_len)
             sequence = X[i]
             padded_X[i, 0:x_len - 1] = sequence[:x_len - 1]
-    print(padded_X)
+    return padded_X
 
 
 class timingLSTM(nn.Module):
