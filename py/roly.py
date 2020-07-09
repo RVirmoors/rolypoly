@@ -10,7 +10,6 @@ import queue
 import sys
 
 import pretty_midi
-from constants import ROLAND_DRUM_PITCH_CLASSES
 
 from pythonosc.udp_client import SimpleUDPClient
 import time
@@ -21,6 +20,7 @@ import asyncio
 
 import numpy as np
 import timing           # ML timing module
+from constants import ROLAND_DRUM_PITCH_CLASSES
 
 # parse command line args
 parser = argparse.ArgumentParser(
@@ -50,7 +50,7 @@ drumtrack = pm.instruments[0]
 if (drumtrack.is_drum == False):
     sys.exit('Your MIDI file must be a DRUM track.')
 
-feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
+feat_vec_size = timing.feat_vec_size
 tc = pm.get_tempo_changes()
 
 delayms = 1
@@ -192,7 +192,7 @@ async def processFV(featVec):
 
 async def parseMIDItoFV():
     """
-    Play the drum MIDI file in real time (or not), emitting
+    Play the drum MIDI file in real time (or not?), emitting
     feature vectors to be processed by processFV().
     """
     start = time.monotonic()
