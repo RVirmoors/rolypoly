@@ -47,7 +47,8 @@ feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 
 X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
 Y = np.zeros((1000, 64))                 # seqs * hits
-h_i = s_i = 0
+h_i = 0
+s_i = -1
 loss = 0
 X_lengths = np.zeros(1000)
 
@@ -60,13 +61,13 @@ def addRow(featVec, y, loss):
     global newSeq, X, Y, h_i, s_i, X_lengths
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12]:
-        X_lengths[s_i] = int(h_i + 1)
-        print("saved bar #", s_i, ", contains ", X_lengths[s_i], "hits.")
+        if s_i >= 0:  # s_i is init'd as -1, so first note doesn't trigger:
+            X_lengths[s_i] = int(h_i + 1)
+            print("saved bar #", s_i, ", contains ", X_lengths[s_i], "hits.")
         s_i += 1
         h_i = 0
         X[s_i][0] = featVec         # first hit in new seq
         Y[s_i][0] = y
-        prepare_X()
     else:
         h_i += 1
         X[s_i][h_i] = featVec
@@ -80,9 +81,11 @@ def prepare_X():
     print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.ones((batch_size, longest_seq, feat_vec_size))
     for i, x_len in enumerate(X_lengths):
-        x_len = int(x_len)
-        sequence = X[i]
-        padded_X[i, 0:x_len - 1] = sequence[:x_len - 1]
+        if i < batch_size:
+            x_len = int(x_len)
+            print("BBB", x_len)
+            sequence = X[i]
+            padded_X[i, 0:x_len - 1] = sequence[:x_len - 1]
     print(padded_X)
 
 

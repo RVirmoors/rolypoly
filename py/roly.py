@@ -238,6 +238,8 @@ async def init_main():
 
     await parseMIDItoFV()  # Enter main loop of program
 
+    timing.prepare_X()
+
     transport.close()  # Clean up serve endpoint
 
 
