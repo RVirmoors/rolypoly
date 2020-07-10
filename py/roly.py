@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
     '--firstrun', action='store_true',
@@ -215,12 +215,12 @@ async def parseMIDItoFV():
             featVec[12] = positions_in_bar[index]
 
             #loop = asyncio.get_event_loop()
-            y = await processFV(featVec)  # next hit timing [ms]
+            y_hat = await processFV(featVec)  # next hit timing [ms]
             #y = loop.run_until_complete(infer)
             featVec = np.zeros(feat_vec_size)
             if not args.offline:
                 # time.sleep(sleeptime + y / 1000.)
-                await asyncio.sleep(sleeptime + y / 1000.)
+                await asyncio.sleep(sleeptime + y_hat / 1000.)
 
 
 pitch_class_map = classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
@@ -239,6 +239,7 @@ async def init_main():
     await parseMIDItoFV()  # Enter main loop of program
 
     timing.prepare_X()
+    timing.prepare_Y()
 
     transport.close()  # Clean up serve endpoint
 
