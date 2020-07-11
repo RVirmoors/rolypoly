@@ -53,9 +53,8 @@ s_i = -1
 loss = 0
 X_lengths = np.zeros(1000)
 
-
-def inference(featVec):
-    return random.uniform(-0.1, 0.1)
+# METHODS FOR BUILDING X, Y
+# =========================
 
 
 def addRow(featVec, y_hat, diff):
@@ -143,23 +142,22 @@ def prepare_Y(style='constant', value=None):
     #print("Y_hat played:", Y_hat)
     #print("Y 'correct':", Y)
 
+# TIMING NETWORK CLASS
+# ====================
 
-class timingLSTM(nn.Module):
-    def __init__(self, nb_layers, nb_lstm_units=100, input_dim=13, batch_size=10):
+
+class TimingLSTM(nn.Module):
+    def __init__(self, nb_layers=1, nb_lstm_units=100, input_dim=13, batch_size=10):
         """
         batch_size: # of sequences in training batch
         """
+        super(TimingLSTM, self).__init__()
+
         self.nb_layers = nb_layers
         self.nb_lstm_units = nb_lstm_units
         self.input_dim = input_dim
         self.batch_size = batch_size
 
-        self.lstm
-
-        # build actual NN
-        self.__build_model()
-
-    def __build_model(self):
         # design LSTM
         self.lstm = nn.LSTM(
             input_size=self.input_dim,
@@ -167,19 +165,22 @@ class timingLSTM(nn.Module):
             num_layers=self.nb_layers,
             batch_first=True,
         )
+
+        self.hidden = self.init_hidden()
         # output layer which projects back to tag space
         self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1)
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
-        hidden_a = torch.randn(self.hparams.nb_layers,
+        hidden_a = torch.randn(self.nb_layers,
                                self.batch_size, self.nb_lstm_units)
-        hidden_b = torch.randn(self.hparams.nb_layers,
+        hidden_b = torch.randn(self.nb_layers,
                                self.batch_size, self.nb_lstm_units)
-
+        """
         if self.hparams.on_gpu:
             hidden_a = hidden_a.cuda()
             hidden_b = hidden_b.cuda()
+        """
 
         hidden_a = Variable(hidden_a)
         hidden_b = Variable(hidden_b)
@@ -188,7 +189,7 @@ class timingLSTM(nn.Module):
 
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We want the LSTM to treat
-        # a new batch as a continuation of a sequence
+        # a new batch as a continuation of a sequence (?)
         # self.hidden = self.init_hidden()
 
         batch_size, seq_len, _ = X.size()
@@ -211,10 +212,10 @@ class timingLSTM(nn.Module):
         X = X.view(-1, X.shape[2])
 
         # run through actual linear layer
-        X = self.hidden_to_tag(X)
+        X = self.hidden_to_y(X)
 
-        # I like to reshape for mental sanity so we're back to (batch_size, seq_len, nb_tags)
-        X = X.view(batch_size, seq_len, self.nb_tags)
+        # I like to reshape for mental sanity so we're back to (batch_size, seq_len, 1 output)
+        X = X.view(batch_size, seq_len, 1)
 
         Y_hat = X
         return Y_hat

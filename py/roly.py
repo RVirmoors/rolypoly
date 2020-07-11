@@ -19,6 +19,7 @@ from pythonosc.dispatcher import Dispatcher
 import asyncio
 
 import numpy as np
+import torch
 import timing           # ML timing module
 from constants import ROLAND_DRUM_PITCH_CLASSES
 
@@ -55,6 +56,9 @@ tc = pm.get_tempo_changes()
 
 delayms = 1
 guitarDescr = 0  # loudness delta?
+
+# define model for LIVE. TODO init weights
+model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
 
 # SETUP METHODS
 
@@ -169,6 +173,7 @@ async def processFV(featVec):
     5. save FV & Y & onsetDelay for future offline training
     6. return the obtained Y = next beat timing
     """
+    global model
     # 1.
     play = ["%.3f" % feat for feat in featVec]
     play = ' '.join(play)
@@ -178,7 +183,9 @@ async def processFV(featVec):
     featVec[13] = guitarDescr
     # 3.
     print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
-    y = timing.inference(featVec)
+    input = torch.Tensor(featVec)
+    input = input[None, None, :]    # one batch, one seq
+    y = model(input, [1])           # one fV
     # 4.
     await asyncio.sleep(featVec[9] * 0.4 / 1000)
     # remains constant if no guit onset?
@@ -238,8 +245,11 @@ async def init_main():
 
     await parseMIDItoFV()  # Enter main loop of program
 
+    # OFFLINE
     timing.prepare_X()
     timing.prepare_Y()
+    # redefine model: TODO copy weights from existing model
+    model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=timing.s_i)
 
     transport.close()  # Clean up serve endpoint
 
