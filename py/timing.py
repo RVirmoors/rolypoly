@@ -108,6 +108,7 @@ def prepare_X():
     X = padded_X
     Y = padded_Y
     Y_hat = padded_Y_hat
+    X_lengths = X_lengths[:batch_size]
 
 
 def prepare_Y(style='constant', value=None):
@@ -139,6 +140,10 @@ def prepare_Y(style='constant', value=None):
         # Y_hat = Y + diff - diff_hat
         np.add(Y_hat[i], Y[i], Y_hat[i])          # Y_hat = Y_hat + diff_hat
         np.subtract(Y_hat[i], diff[i], Y[i])      # Y = Y_hat - diff
+
+    X = torch.Tensor(X)
+    Y = torch.Tensor(Y)
+    Y_hat = torch.Tensor(Y_hat)
     #print("Y_hat played:", Y_hat)
     #print("Y 'correct':", Y)
 
@@ -195,8 +200,9 @@ class TimingLSTM(nn.Module):
         batch_size, seq_len, _ = X.size()
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
+        # doesn't make sense to sort seqs by length => we lose ONNX exportability..
         X = torch.nn.utils.rnn.pack_padded_sequence(
-            X, X_lengths, batch_first=True)
+            X, X_lengths, batch_first=True, enforce_sorted=False)
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
@@ -234,7 +240,9 @@ class TimingLSTM(nn.Module):
         nb_outputs = torch.sum(mask).item()
 
         # pick the values for Y_hat and zero out the rest with the mask
-        Y_hat = Y_hat[range(Y_hat.shape[0]), Y] * mask
+        Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
+
+        criterion = nn.MSELoss(reduction='sum')
 
         # compute MSE loss
-        return (nn.MSELoss(Y_hat, Y, reduction='sum') / nb_outputs)
+        return (criterion(Y_hat, Y) / nb_outputs)

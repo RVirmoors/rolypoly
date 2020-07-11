@@ -185,7 +185,9 @@ async def processFV(featVec):
     print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
     input = torch.Tensor(featVec)
     input = input[None, None, :]    # one batch, one seq
-    y = model(input, [1])           # one fV
+    # Here we don't need to train, so the code is wrapped in torch.no_grad()
+    with torch.no_grad():
+        y = model(input, [1])           # one fV
     # 4.
     await asyncio.sleep(featVec[9] * 0.4 / 1000)
     # remains constant if no guit onset?
@@ -250,6 +252,27 @@ async def init_main():
     timing.prepare_Y()
     # redefine model: TODO copy weights from existing model
     model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=timing.s_i)
+
+    print("BEFORE ===============",
+          torch.nn.utils.parameters_to_vector(model.parameters()))
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
+
+    for t in range(100):
+        # train loop. TODO add several epochs, w/ noise?
+        timing.Y_hat = model(timing.X, timing.X_lengths)
+        loss = model.loss(timing.Y_hat, timing.Y, timing.X_lengths)
+        print("LOSS:", loss)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        # detach/repackage the hidden state in between batches
+        model.hidden[0].detach_()
+        model.hidden[1].detach_()
+
+    print("AFTER ===============",
+          torch.nn.utils.parameters_to_vector(model.parameters()))
 
     transport.close()  # Clean up serve endpoint
 
