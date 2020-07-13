@@ -32,6 +32,9 @@ parser.add_argument(
     '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
+    '--take', default='data/takes/20200713121735.csv', metavar='FOO.csv',
+    help='take csv file name')
+parser.add_argument(
     '--offline', action='store_true',
     help='execute offline (learn)')
 args = parser.parse_args()
@@ -245,6 +248,8 @@ positions_in_bar = score_pos_in_bar()
 
 
 async def init_main():
+    if args.take:
+        timing.load_XY(args.take)
     if args.offline:
         # OFFLINE : ...
         # redefine model: TODO copy weights from existing model

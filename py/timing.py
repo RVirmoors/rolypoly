@@ -1,14 +1,6 @@
 """
 Rolypoly timing model
 2020 rvirmoors
-
-TODO methods:
-new performance
-add row
-preprocess dataset
-train model
-inference
-
 """
 
 import torch
@@ -179,6 +171,17 @@ def save_XY(filename=None):
     else:
         filename = "data/takes/" + filename
     np.savetxt(filename, to_csv, fmt=fmt, header=header)
+
+
+def load_XY(filename):
+    """
+    Get X, diff_hat, Y from a csv file.
+    """
+    global X, X_lengths, s_i, diff_hat, Y, feat_vec_size
+    from_csv = np.loadtxt(filename, delimiter=',')
+    s_i = from_csv[-1][0]
+    print(from_csv)
+    print(s_i)
 
 
 # TIMING NETWORK CLASS
