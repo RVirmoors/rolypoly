@@ -175,9 +175,9 @@ def save_XY(filename=None):
             cur_row += 1
     now = datetime.datetime.now()
     if filename == None:
-        filename = "data/performances/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
+        filename = "data/takes/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
     else:
-        filename = "data/performances/" + filename
+        filename = "data/takes/" + filename
     np.savetxt(filename, to_csv, fmt=fmt, header=header)
 
 
