@@ -248,11 +248,11 @@ positions_in_bar = score_pos_in_bar()
 
 
 async def init_main():
-    if args.take:
-        timing.load_XY(args.take)
     if args.offline:
         # OFFLINE : ...
         # redefine model: TODO copy weights from existing model
+        timing.load_XY(args.take)
+
         model = timing.TimingLSTM(
             input_dim=feat_vec_size, batch_size=timing.s_i)
 

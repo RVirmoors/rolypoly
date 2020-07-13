@@ -179,7 +179,7 @@ def load_XY(filename):
     """
     global X, X_lengths, s_i, diff_hat, Y, feat_vec_size
     from_csv = np.loadtxt(filename, delimiter=',')
-    s_i = from_csv[-1][0]
+    s_i = int(from_csv[-1][0])
     print(from_csv)
     print(s_i)
 
