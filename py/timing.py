@@ -18,6 +18,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 import numpy as np
+import datetime
 
 from constants import ROLAND_DRUM_PITCH_CLASSES
 
@@ -46,8 +47,9 @@ data_loader = torch.utils.data.DataLoader(yesno_data,
 feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 
 X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
-Y = np.zeros((1000, 64))             # seqs * hits
+Y = np.zeros((1000, 64))                 # seqs * hits
 Y_hat = np.zeros((1000, 64))             # seqs * hits
+diff_hat = np.zeros((1000, 64))          # seqs * hits
 h_i = 0
 s_i = -1
 loss = 0
@@ -75,12 +77,12 @@ def addRow(featVec, y_hat, diff):
         h_i = 0
         X[s_i][0] = featVec         # first hit in new seq
         Y_hat[s_i][1] = y_hat       # delay for next hit
-        Y[s_i][0] = diff            # correct delay for this hit
+        diff_hat[s_i][0] = diff     # drum-guitar diff for this hit
     else:
         h_i += 1
         X[s_i][h_i] = featVec       # this hit
         Y_hat[s_i][h_i + 1] = y_hat  # delay for next hit
-        Y[s_i][h_i] = diff          # correct delay for this hit
+        diff_hat[s_i][h_i] = diff   # drum-guitar diff for this hit
 
 
 def prepare_X():
@@ -88,64 +90,96 @@ def prepare_X():
     Pad short sequences
     https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
     """
-    global X, X_lengths, s_i, Y, Y_hat
+    global X, X_lengths, s_i, Y_hat, diff_hat
     longest_seq = int(max(X_lengths))
     batch_size = s_i       # number of sequences (TODO add the last one?)
     print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.zeros((batch_size, longest_seq, feat_vec_size))
-    padded_Y = np.zeros((batch_size, longest_seq))
-    padded_Y_hat = np.zeros_like(padded_Y)
+    padded_Y_hat = np.zeros((batch_size, longest_seq))
+    padded_diff_hat = np.zeros_like(padded_Y_hat)
     for i, x_len in enumerate(X_lengths):
         if i < batch_size:
             x_len = int(x_len)
             # print("i", i, "seq length", x_len)
             sequence = X[i]
             padded_X[i, 0:x_len] = sequence[:x_len]
-            sequence = Y[i]
-            padded_Y[i, 0:x_len] = sequence[:x_len]
             sequence = Y_hat[i]
             padded_Y_hat[i, 0:x_len] = sequence[:x_len]
+            sequence = diff_hat[i]
+            padded_diff_hat[i, 0:x_len] = sequence[:x_len]
     X = padded_X
-    Y = padded_Y
     Y_hat = padded_Y_hat
+    diff_hat = padded_diff_hat
     X_lengths = X_lengths[:batch_size]
 
 
 def prepare_Y(style='constant', value=None):
     """
     Computes Y, the "correct" values to be used in the MSE loss function.
-    Starts from difference values between drum-guitar onsets (currently in Y)
+    Starts from difference values between played drum-guitar onsets (currently in diff_hat)
 
     Parameters for determining diff:
         - style = 'constant' or 'diff' (does nothing) or 'EMA' (tba)
         - value = if None, will be computed as avg(diff_hat) over the present seq
                   if style='constant', diff   = value
                   if style='EMA',      EMA period = value
-    Returns (Y_hat + diff_hat - diff), in order to achieve ->
-        -> a constant value for diff (computed above)
+    Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
+        -> a constant value for diff (see above)
     """
+    global X, X_lengths, diff_hat, Y_hat, Y
     if style == 'diff':
+        Y = torch.Tensor(diff_hat)
         return
-    global X, X_lengths, Y, Y_hat
-    diff = np.zeros_like(Y)
+    diff = np.zeros_like(diff_hat)
+    Y = np.zeros_like(Y_hat)
     for i in range(len(diff)):
         seq_len = int(X_lengths[i])
         if style == 'constant':
             if value:
                 diff[i, :seq_len] = value
             else:  # default
-                diff[i, :seq_len] = np.average(Y[i][:seq_len])
+                diff[i, :seq_len] = np.average(diff_hat[i][:seq_len])
         else:  # EMA TODO
             diff[i, :seq_len] = 0
-        # Y_hat = Y + diff - diff_hat
-        np.add(Y_hat[i], Y[i], Y_hat[i])          # Y_hat = Y_hat + diff_hat
-        np.subtract(Y_hat[i], diff[i], Y[i])      # Y = Y_hat - diff
+        # Y = Y_hat + diff_hat - diff
+        np.add(Y_hat[i], diff_hat[i], Y_hat[i])   # Y_hat = Y_hat + diff_hat
+        np.subtract(Y_hat[i], diff[i], Y[i])      # Y     = Y_hat - diff
 
     X = torch.Tensor(X)
     Y = torch.Tensor(Y)
     Y_hat = torch.Tensor(Y_hat)
     #print("Y_hat played:", Y_hat)
     #print("Y 'correct':", Y)
+
+
+def save_XY(filename=None):
+    """
+    Save X, diff_hat, Y to a csv file.
+    """
+    global X, X_lengths, s_i, diff_hat, Y, feat_vec_size
+    X = X.numpy()
+    Y = Y.numpy()
+    fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %f, %.2f, %.3f, %f, %f, %f, %f'
+    header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y"
+    columns = 1 + feat_vec_size + 1 + 1  # seq, fv, diff, y
+    rows = int(sum(X_lengths))
+    to_csv = np.zeros((rows, columns))
+    cur_row = 0
+    for i, x_len in enumerate(X_lengths):
+        seq_len = int(X_lengths[i])
+        for j in range(seq_len):
+            to_csv[cur_row][0] = i
+            to_csv[cur_row][1:feat_vec_size + 1] = X[i][j]
+            to_csv[cur_row][feat_vec_size + 1] = diff_hat[i][j]
+            to_csv[cur_row][feat_vec_size + 2] = Y[i][j]
+            cur_row += 1
+    now = datetime.datetime.now()
+    if filename == None:
+        filename = "data/performances/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
+    else:
+        filename = "data/performances/" + filename
+    np.savetxt(filename, to_csv, fmt=fmt, header=header)
+
 
 # TIMING NETWORK CLASS
 # ====================
@@ -223,8 +257,8 @@ class TimingLSTM(nn.Module):
         # I like to reshape for mental sanity so we're back to (batch_size, seq_len, 1 output)
         X = X.view(batch_size, seq_len, 1)
 
-        Y_hat = X
-        return Y_hat
+        y_hat = X
+        return y_hat
 
     def loss(self, Y_hat, Y, X_lengths):
         """

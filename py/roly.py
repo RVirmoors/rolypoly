@@ -32,9 +32,6 @@ parser.add_argument(
     '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
-    '--firstrun', action='store_true',
-    help='first run (no timing dynamics)')
-parser.add_argument(
     '--offline', action='store_true',
     help='execute offline (learn)')
 args = parser.parse_args()
@@ -59,6 +56,16 @@ guitarDescr = 0  # loudness delta?
 
 # define model for LIVE. TODO init weights
 model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
+
+# HELPER METHODS
+
+
+def get_y_n(prompt):
+    while True:
+        try:
+            return {"y" or " ": True, "n": False}[input(prompt).lower()]
+        except KeyError:
+            print("Invalid input---please enter Y or N!")
 
 # SETUP METHODS
 
@@ -205,7 +212,7 @@ async def parseMIDItoFV():
     feature vectors to be processed by processFV().
     """
     start = time.monotonic()
-    featVec = np.zeros(feat_vec_size)  # 9+4 zeros
+    featVec = np.zeros(feat_vec_size)  # 9+4+1 zeros
     for index, note in enumerate(drumtrack.notes):
         #        print(pitch_class_map[note.pitch])
         if index < (len(drumtrack.notes) - 1):
@@ -227,9 +234,8 @@ async def parseMIDItoFV():
             y_hat = await processFV(featVec)  # next hit timing [ms]
             #y = loop.run_until_complete(infer)
             featVec = np.zeros(feat_vec_size)
-            if not args.offline:
-                # time.sleep(sleeptime + y / 1000.)
-                await asyncio.sleep(sleeptime + y_hat / 1000.)
+
+            await asyncio.sleep(sleeptime + y_hat / 1000.)
 
 
 pitch_class_map = classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
@@ -239,42 +245,49 @@ positions_in_bar = score_pos_in_bar()
 
 
 async def init_main():
-    # listen on port 5006
-    server = AsyncIOOSCUDPServer(
-        ("127.0.0.1", 5006), dispatcher, asyncio.get_event_loop())
-    # Create datagram endpoint and start serving
-    transport, protocol = await server.create_serve_endpoint()
+    if args.offline:
+        # OFFLINE : ...
+        # redefine model: TODO copy weights from existing model
+        model = timing.TimingLSTM(
+            input_dim=feat_vec_size, batch_size=timing.s_i)
 
-    await parseMIDItoFV()  # Enter main loop of program
+        optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
 
-    # OFFLINE
-    timing.prepare_X()
-    timing.prepare_Y()
-    # redefine model: TODO copy weights from existing model
-    model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=timing.s_i)
+        for t in range(1):
+            # train loop. TODO add several epochs, w/ noise?
+            timing.Y_hat = model(timing.X, timing.X_lengths)
+            loss = model.loss(timing.Y_hat, timing.Y, timing.X_lengths)
+            print("LOSS:", loss)
 
-    print("BEFORE ===============",
-          torch.nn.utils.parameters_to_vector(model.parameters()))
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            # detach/repackage the hidden state in between batches
+            model.hidden[0].detach_()
+            model.hidden[1].detach_()
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
+        print("AFTER ===============",
+              torch.nn.utils.parameters_to_vector(model.parameters()))
 
-    for t in range(100):
-        # train loop. TODO add several epochs, w/ noise?
-        timing.Y_hat = model(timing.X, timing.X_lengths)
-        loss = model.loss(timing.Y_hat, timing.Y, timing.X_lengths)
-        print("LOSS:", loss)
+        for param_tensor in model.state_dict():
+            print(param_tensor, "\t", model.state_dict()[param_tensor].size())
+    else:
+        # ONLINE :
+        # listen on port 5006
+        server = AsyncIOOSCUDPServer(
+            ("127.0.0.1", 5006), dispatcher, asyncio.get_event_loop())
+        # Create datagram endpoint and start serving
+        transport, protocol = await server.create_serve_endpoint()
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        # detach/repackage the hidden state in between batches
-        model.hidden[0].detach_()
-        model.hidden[1].detach_()
+        await parseMIDItoFV()  # Enter main loop of program
 
-    print("AFTER ===============",
-          torch.nn.utils.parameters_to_vector(model.parameters()))
+        timing.prepare_X()
+        timing.prepare_Y()
 
-    transport.close()  # Clean up serve endpoint
+        if get_y_n("Save performance? "):
+            timing.save_XY()
+
+        transport.close()  # Clean up serve endpoint
 
 
 asyncio.run(init_main())
