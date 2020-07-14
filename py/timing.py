@@ -241,14 +241,10 @@ class TimingLSTM(nn.Module):
 
         batch_size, seq_len, _ = X.size()
 
-        print(X.size())
-
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability..
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
-
-        print(X)
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
