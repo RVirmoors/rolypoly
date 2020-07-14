@@ -65,8 +65,9 @@ def parseHOVtoFV(H, O, V):
             currstart = H[index]        # quantized
             nextstart = H[index + 1]
             sleeptime = nextstart - currstart
-            if sleeptime < 0:  # end of bar
-                sleeptime += 1.
+            if sleeptime < 0:  # if end of bar...
+                # ...then add barlength (1. for 4/4)
+                sleeptime += timesigs[index][0] / timesigs[index][1]
         # one-hot encode feature vector [0...8]
         featVec[pitch_class_map[note.pitch]] = 1
         if sleeptime:
@@ -95,34 +96,5 @@ timing.prepare_Y('diff')
 
 if get_y_n("Save to csv? "):
     timing.save_XY()
-
-
-def train(batch_size, epochs=1):
-    # print(timing.Y)
-
-    model = timing.TimingLSTM(
-        input_dim=feat_vec_size, batch_size=batch_size)
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
-
-    for t in range(epochs):
-        # train loop. TODO add several epochs, w/ noise?
-        timing.Y_hat = model(timing.X, timing.X_lengths)
-        loss = model.loss(timing.Y_hat, timing.Y, timing.X_lengths)
-        print("LOSS:", loss)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        # detach/repackage the hidden state in between batches
-        model.hidden[0].detach_()
-        model.hidden[1].detach_()
-
-    print("AFTER ===============",
-          torch.nn.utils.parameters_to_vector(model.parameters()))
-
-    for param_tensor in model.state_dict():
-        print(param_tensor, "\t", model.state_dict()[param_tensor].size())
-
 
 train(timing.s_i + 1)
