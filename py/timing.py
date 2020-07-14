@@ -60,7 +60,6 @@ def addRow(featVec, y_hat, d_g_diff):
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
             # last hit plus one doesn't make sense
             Y_hat[s_i][h_i + 1] = 0
-            X_lengths[s_i] = h_i + 1
             print("saved bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
             print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
             print("==========")
@@ -74,6 +73,7 @@ def addRow(featVec, y_hat, d_g_diff):
         X[s_i][h_i] = featVec           # this hit
         Y_hat[s_i][h_i + 1] = y_hat     # delay for next hit
         diff_hat[s_i][h_i] = d_g_diff   # drum-guitar diff for this hit
+        X_lengths[s_i] = h_i + 1
 
 
 def prepare_X():
@@ -83,21 +83,20 @@ def prepare_X():
     """
     global X, X_lengths, s_i, Y_hat, diff_hat
     longest_seq = int(max(X_lengths))
-    batch_size = s_i       # number of sequences (TODO add the last one?)
+    batch_size = s_i + 1      # number of sequences in batch
     print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.zeros((batch_size, longest_seq, feat_vec_size))
     padded_Y_hat = np.zeros((batch_size, longest_seq))
     padded_diff_hat = np.zeros_like(padded_Y_hat)
-    for i, x_len in enumerate(X_lengths):
-        if i < batch_size:
-            x_len = int(x_len)
-            # print("i", i, "seq length", x_len)
-            sequence = X[i]
-            padded_X[i, 0:x_len] = sequence[:x_len]
-            sequence = Y_hat[i]
-            padded_Y_hat[i, 0:x_len] = sequence[:x_len]
-            sequence = diff_hat[i]
-            padded_diff_hat[i, 0:x_len] = sequence[:x_len]
+    for i, x_len in enumerate(X_lengths[:batch_size]):
+        x_len = int(x_len)
+        # print("i", i, "seq length", x_len)
+        sequence = X[i]
+        padded_X[i, 0:x_len] = sequence[:x_len]
+        sequence = Y_hat[i]
+        padded_Y_hat[i, 0:x_len] = sequence[:x_len]
+        sequence = diff_hat[i]
+        padded_diff_hat[i, 0:x_len] = sequence[:x_len]
     X = padded_X
     Y_hat = padded_Y_hat
     diff_hat = padded_diff_hat

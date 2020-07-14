@@ -32,7 +32,7 @@ parser.add_argument(
     '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
-    '--take', default='data/takes/20200713121735.csv', metavar='FOO.csv',
+    '--take', default='data/takes/20200714112219.csv', metavar='FOO.csv',
     help='take csv file name')
 parser.add_argument(
     '--offline', action='store_true',
@@ -252,9 +252,11 @@ async def init_main():
         # OFFLINE : ...
         # redefine model: TODO copy weights from existing model
         timing.load_XY(args.take)
+        timing.prepare_X()
+        timing.prepare_Y()
 
         model = timing.TimingLSTM(
-            input_dim=feat_vec_size, batch_size=timing.s_i)
+            input_dim=feat_vec_size, batch_size=timing.s_i + 1)
 
         optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
 
@@ -288,6 +290,8 @@ async def init_main():
 
         timing.prepare_X()
         timing.prepare_Y()
+
+        print(timing.X)
 
         if get_y_n("Save performance? "):
             timing.save_XY()
