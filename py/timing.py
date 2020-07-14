@@ -53,7 +53,7 @@ def addRow(featVec, y_hat, d_g_diff):
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
             # last hit plus one doesn't make sense
             Y_hat[s_i][h_i + 1] = 0
-            print("saved bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
+            print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
             print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
             print("==========")
         s_i += 1
@@ -209,6 +209,7 @@ class TimingLSTM(nn.Module):
             hidden_size=self.nb_lstm_units,
             num_layers=self.nb_layers,
             batch_first=True,
+            dropout=0.5
         )
 
         self.hidden = self.init_hidden()
@@ -286,3 +287,38 @@ class TimingLSTM(nn.Module):
 
         # compute MSE loss
         return (criterion(Y_hat, Y) / nb_outputs)
+
+
+# TRAIN METHOD
+# ============
+
+def train(batch_size, epochs=1):
+
+    model = TimingLSTM(
+        input_dim=feat_vec_size, batch_size=batch_size)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    train_hist = np.zeros(epochs)
+
+    for t in range(epochs):
+        # train loop. TODO add several epochs, w/ noise?
+        Y_hat = model(X, X_lengths)
+        loss = model.loss(Y_hat, Y, X_lengths)
+        print("LOSS:", loss)
+        train_hist[t] = loss.item()
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        # detach/repackage the hidden state in between batches
+        model.hidden[0].detach_()
+        model.hidden[1].detach_()
+
+    return model.eval(), train_hist
+
+    print("AFTER ===============",
+          torch.nn.utils.parameters_to_vector(model.parameters()))
+
+    for param_tensor in model.state_dict():
+        print(param_tensor, "\t", model.state_dict()[param_tensor].size())

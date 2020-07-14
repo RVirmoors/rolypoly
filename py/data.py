@@ -1,7 +1,7 @@
 """Rolypoly Python implementation
 2020 rvirmoors
 
-Data helper methods
+Data preprocessing methods
 """
 
 import numpy as np

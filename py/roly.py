@@ -162,34 +162,6 @@ timesigs = data.score_timesig(drumtrack, ts)
 positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 
 
-def train(batch_size, epochs=1):
-    # print(timing.Y)
-
-    model = timing.TimingLSTM(
-        input_dim=feat_vec_size, batch_size=batch_size)
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
-
-    for t in range(epochs):
-        # train loop. TODO add several epochs, w/ noise?
-        timing.Y_hat = model(timing.X, timing.X_lengths)
-        loss = model.loss(timing.Y_hat, timing.Y, timing.X_lengths)
-        print("LOSS:", loss)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        # detach/repackage the hidden state in between batches
-        model.hidden[0].detach_()
-        model.hidden[1].detach_()
-
-    print("AFTER ===============",
-          torch.nn.utils.parameters_to_vector(model.parameters()))
-
-    for param_tensor in model.state_dict():
-        print(param_tensor, "\t", model.state_dict()[param_tensor].size())
-
-
 async def init_main():
     if args.offline:
         # OFFLINE : ...
@@ -199,7 +171,7 @@ async def init_main():
         batch_size = timing.s_i + 1
         longest_seq = int(max(timing.X_lengths))
         timing.Y = torch.Tensor(timing.Y[:batch_size, :longest_seq])
-        train(batch_size)
+        timing.train(batch_size)
 
     else:
         # ONLINE :
@@ -217,7 +189,7 @@ async def init_main():
         if get_y_n("Save performance? "):
             timing.save_XY()
 
-        train(timing.s_i + 1)
+        timing.train(timing.s_i + 1)
 
         transport.close()  # Clean up serve endpoint
 

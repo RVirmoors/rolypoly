@@ -80,7 +80,7 @@ def parseHOVtoFV(H, O, V):
 
             # use average offset of first & last note in group
             y = (O[new_index] + O[index]) / 2
-            print(y)
+            # print("y:", y)
             timing.addRow(featVec, None, y)  # build X & d_g_riff
 
             # move on to the next (group of) note(s)
@@ -97,4 +97,4 @@ timing.prepare_Y('diff')
 if get_y_n("Save to csv? "):
     timing.save_XY()
 
-train(timing.s_i + 1)
+timing.train(timing.s_i + 1)
