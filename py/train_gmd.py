@@ -94,7 +94,10 @@ parseHOVtoFV(hits, offsets, vels)
 timing.prepare_X()
 timing.prepare_Y('diff')
 
-if get_y_n("Save to csv? "):
-    timing.save_XY()
+#if get_y_n("Save to csv? "):
+#    timing.save_XY()
 
-timing.train(timing.s_i + 1)
+model = timing.TimingLSTM(
+    input_dim=feat_vec_size, batch_size=timing.s_i + 1)
+
+timing.train(model, batch_size=timing.s_i + 1)

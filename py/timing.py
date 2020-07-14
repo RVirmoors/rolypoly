@@ -95,6 +95,7 @@ def prepare_X():
     diff_hat = padded_diff_hat
     X_lengths = X_lengths[:batch_size]
     X = torch.Tensor(X)
+    X_lengths = torch.LongTensor(X_lengths)
 
 
 def prepare_Y(style='constant', value=None):
@@ -131,8 +132,8 @@ def prepare_Y(style='constant', value=None):
 
     Y = torch.Tensor(Y)
     Y_hat = torch.Tensor(Y_hat)
-    #print("Y_hat played:", Y_hat)
-    #print("Y 'correct':", Y)
+    # print("Y_hat played:", Y_hat)
+    # print("Y 'correct':", Y)
 
 
 def save_XY(filename=None):
@@ -192,7 +193,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=1, nb_lstm_units=100, input_dim=13, batch_size=10):
+    def __init__(self, nb_layers=1, nb_lstm_units=100, input_dim=14, batch_size=10):
         """
         batch_size: # of sequences in training batch
         """
@@ -240,10 +241,14 @@ class TimingLSTM(nn.Module):
 
         batch_size, seq_len, _ = X.size()
 
+        print(X.size())
+
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability..
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
+
+        print(X)
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
@@ -251,7 +256,14 @@ class TimingLSTM(nn.Module):
         # undo the packing operation
         X, _ = torch.nn.utils.rnn.pad_packed_sequence(X, batch_first=True)
 
-        # Project to tag space
+        # hack for padded max length sequences:
+        # https://github.com/pytorch/pytorch/issues/1591#issuecomment-365834629
+        if X.size(1) < seq_len:
+            dummy_tensor = Variable(torch.zeros(
+                batch_size, seq_len - X.size(1), self.nb_lstm_units))
+            X = torch.cat([X, dummy_tensor], 1)
+
+        # Project to output space
         # Dim transformation: (batch_size, seq_len, nb_lstm_units) -> (batch_size * seq_len, nb_lstm_units)
 
         # this one is a bit tricky as well. First we need to reshape the data so it goes into the linear layer
@@ -292,28 +304,39 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(batch_size, epochs=1):
-
-    model = TimingLSTM(
-        input_dim=feat_vec_size, batch_size=batch_size)
+def train(model, batch_size=10, epochs=1):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     train_hist = np.zeros(epochs)
+    n_b = int(np.ceil(X.shape[0] / batch_size))
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
-        Y_hat = model(X, X_lengths)
-        loss = model.loss(Y_hat, Y, X_lengths)
-        print("LOSS:", loss)
-        train_hist[t] = loss.item()
+        for b_i in range(n_b):
+            print("miniBatch", b_i + 1, "/", n_b)
+            # get minibatch indices
+            if (b_i + 1) * batch_size < X.shape[0]:
+                end = (b_i + 1) * batch_size
+            else:
+                # reached the end
+                end = X.shape[0]
+            indices = torch.LongTensor(
+                range(b_i * batch_size, end))
+            b_X = torch.index_select(X, 0, indices)
+            b_Xl = torch.index_select(X_lengths, 0, indices)
+            b_Y = torch.index_select(Y, 0, indices)
+            Y_hat = model(b_X, b_Xl)
+            loss = model.loss(Y_hat, b_Y, X_lengths)
+            print("LOSS:", loss.item())
+            train_hist[t] = loss.item()
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        # detach/repackage the hidden state in between batches
-        model.hidden[0].detach_()
-        model.hidden[1].detach_()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            # detach/repackage the hidden state in between batches
+            model.hidden[0].detach_()
+            model.hidden[1].detach_()
 
     return model.eval(), train_hist
 

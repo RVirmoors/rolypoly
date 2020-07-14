@@ -171,7 +171,9 @@ async def init_main():
         batch_size = timing.s_i + 1
         longest_seq = int(max(timing.X_lengths))
         timing.Y = torch.Tensor(timing.Y[:batch_size, :longest_seq])
-        timing.train(batch_size)
+        model = timing.TimingLSTM(
+            input_dim=feat_vec_size, batch_size=timing.s_i + 1)
+        timing.train(model, batch_size)
 
     else:
         # ONLINE :
@@ -188,8 +190,6 @@ async def init_main():
 
         if get_y_n("Save performance? "):
             timing.save_XY()
-
-        timing.train(timing.s_i + 1)
 
         transport.close()  # Clean up serve endpoint
 
