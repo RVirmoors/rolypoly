@@ -26,15 +26,8 @@ torch.manual_seed(SEED)
 # torch.cuda.manual_seed(SEED)
 # torch.backends.cudnn.deterministic = True
 
-
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-"""
-data_loader = torch.utils.data.DataLoader(yesno_data,
-                                          batch_size=1,
-                                          shuffle=True)
-
-"""
 
 feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 
@@ -65,8 +58,8 @@ def addRow(featVec, y_hat, d_g_diff):
             print("==========")
         s_i += 1
         h_i = 0
-        X[s_i][0] = featVec         # first hit in new seq
-        Y_hat[s_i][1] = y_hat       # delay for next hit
+        X[s_i][0] = featVec          # first hit in new seq
+        Y_hat[s_i][1] = y_hat        # delay for next hit
         diff_hat[s_i][0] = d_g_diff  # drum-guitar diff for this hit
     else:
         h_i += 1

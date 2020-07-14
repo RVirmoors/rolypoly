@@ -21,7 +21,9 @@ import asyncio
 import numpy as np
 import torch
 import timing           # ML timing module
+import data             # data helper methods
 from constants import ROLAND_DRUM_PITCH_CLASSES
+from helper import get_y_n
 
 np.set_printoptions(suppress=True)
 
@@ -55,6 +57,7 @@ if (drumtrack.is_drum == False):
 
 feat_vec_size = timing.feat_vec_size
 tc = pm.get_tempo_changes()
+ts = pm.time_signature_changes
 
 delayms = 1
 guitarDescr = 0  # loudness delta?
@@ -62,96 +65,6 @@ guitarDescr = 0  # loudness delta?
 # define model for LIVE. TODO init weights
 model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
 
-# HELPER METHODS
-
-
-def get_y_n(prompt):
-    while True:
-        try:
-            return {"y" or " ": True, "n": False}[input(prompt).lower()]
-        except KeyError:
-            print("Invalid input---please enter Y or N!")
-
-# SETUP METHODS
-
-
-def classes_to_map(classes):
-    """
-    Build a pitch class map. (Kicks are class 0 etc)
-    """
-    class_map = {}
-    for cls, pitches in enumerate(classes):
-        for pitch in pitches:
-            class_map[pitch] = cls
-    return class_map
-
-
-def ms_to_bartime(ms, featVec):
-    """
-    Convert a ms time difference to a bar-relative diff.
-    input:
-        ms = time to be converted
-        featVec = feature of the note we relate to
-    """
-    tempo = featVec[10]
-    timeSig = featVec[11]
-    barDiff = ms / 1000 * 60 / tempo / timeSig
-    return barDiff
-
-
-def score_tempo():
-    """
-    Assign BPM values to every note
-    """
-    note_tempos = np.ones(len(drumtrack.notes))
-    times = tc[0]
-    tempos = tc[1]
-    for index, note in enumerate(drumtrack.notes):
-        atTime = note.start
-        # get index of tempo
-        here = np.searchsorted(times, atTime + 0.01)
-        if here:
-            here -= 1
-        # the found tempo is assigned to the current note
-        note_tempos[index] = tempos[here]
-    return note_tempos
-
-
-def score_timesig():
-    """
-    Assign timesig to every note
-    """
-    timesigs = np.full((len(drumtrack.notes), 2), 4)  # init all as [4 4]
-    for index, note in enumerate(drumtrack.notes):
-        atTime = note.start
-        for i in pm.time_signature_changes:
-            if i.time < atTime or np.isclose(i.time, atTime):
-                here = i
-            else:
-                break
-        timesigs[index] = (here.numerator, here.denominator)
-    return timesigs
-
-
-def score_pos_in_bar():
-    positions_in_bar = np.zeros(len(drumtrack.notes))
-    first_timesig = pm.time_signature_changes[0]
-    barStart = 0
-    barEnd = 240 / tempos[0] * \
-        first_timesig.numerator / first_timesig.denominator
-    for index, note in enumerate(drumtrack.notes):
-        atTime = note.start
-        if np.isclose(atTime, barEnd) or atTime > barEnd:
-            # reached the end of the bar, compute the next one
-            barStart = atTime
-            barEnd = atTime + 240 / tempos[index] * \
-                timesigs[index][0] / timesigs[index][1]
-            cur_pos = 0
-        else:
-            # pos in bar is always in [0, 1)
-            cur_pos = (atTime - barStart) / (barEnd - barStart)
-        positions_in_bar[index] = cur_pos
-    return positions_in_bar
 
 # LIVE METHODS
 
@@ -182,8 +95,8 @@ async def processFV(featVec):
     2. wait a little to hear the guitar info
     3. send the drum+guitar FV to the RNN for inference
     4. wait a little to hear the guitar onset
-    5. save FV & Y & onsetDelay for future offline training
-    6. return the obtained Y = next beat timing
+    5. save FV & y_hat & onsetDelay for future offline training
+    6. return the obtained y_hat = next beat timing
     """
     global model
     # 1.
@@ -199,16 +112,16 @@ async def processFV(featVec):
     input = input[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
     with torch.no_grad():
-        y = model(input, [1])           # one fV
+        y_hat = model(input, [1])           # one fV
     # 4.
     await asyncio.sleep(featVec[9] * 0.4 / 1000)
     # remains constant if no guit onset?
-    onsetDelay = ms_to_bartime(delayms, featVec)
+    onsetDelay = data.ms_to_bartime(delayms, featVec)
     print("onset delay: ", onsetDelay)
     # 5.
-    timing.addRow(featVec, y, onsetDelay)
+    timing.addRow(featVec, y_hat, onsetDelay)
     # 6.
-    return y
+    return y_hat
 
 
 async def parseMIDItoFV():
@@ -243,14 +156,14 @@ async def parseMIDItoFV():
             await asyncio.sleep(sleeptime + y_hat / 1000.)
 
 
-pitch_class_map = classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
-tempos = score_tempo()
-timesigs = score_timesig()
-positions_in_bar = score_pos_in_bar()
+pitch_class_map = data.classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
+tempos = data.score_tempo(drumtrack, tc)
+timesigs = data.score_timesig(drumtrack, ts)
+positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 
 
 def train(batch_size, epochs=1):
-    print(timing.Y)
+    # print(timing.Y)
 
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=batch_size)
