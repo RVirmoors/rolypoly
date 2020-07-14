@@ -101,6 +101,7 @@ def prepare_X():
     Y_hat = padded_Y_hat
     diff_hat = padded_diff_hat
     X_lengths = X_lengths[:batch_size]
+    X = torch.Tensor(X)
 
 
 def prepare_Y(style='constant', value=None):
@@ -116,7 +117,7 @@ def prepare_Y(style='constant', value=None):
     Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
         -> a constant value for diff (see above)
     """
-    global X, X_lengths, diff_hat, Y_hat, Y
+    global X_lengths, diff_hat, Y_hat, Y
     if style == 'diff':
         Y = torch.Tensor(diff_hat)
         return
@@ -135,7 +136,6 @@ def prepare_Y(style='constant', value=None):
         np.add(Y_hat[i], diff_hat[i], Y_hat[i])   # Y_hat = Y_hat + diff_hat
         np.subtract(Y_hat[i], diff[i], Y[i])      # Y     = Y_hat - diff
 
-    X = torch.Tensor(X)
     Y = torch.Tensor(Y)
     Y_hat = torch.Tensor(Y_hat)
     #print("Y_hat played:", Y_hat)
@@ -146,10 +146,10 @@ def save_XY(filename=None):
     """
     Save X, diff_hat, Y to a csv file.
     """
-    global X, X_lengths, s_i, diff_hat, Y, feat_vec_size
-    X = X.numpy()
-    Y = Y.numpy()
-    fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %f, %.2f, %.3f, %f, %f, %f, %f'
+    global X, X_lengths, diff_hat, Y, feat_vec_size
+    Xcsv = X.numpy()
+    Ycsv = Y.numpy()
+    fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g'
     header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y"
     columns = 1 + feat_vec_size + 1 + 1  # seq, fv, diff, y
     rows = int(sum(X_lengths))
@@ -159,9 +159,9 @@ def save_XY(filename=None):
         seq_len = int(X_lengths[i])
         for j in range(seq_len):
             to_csv[cur_row][0] = i
-            to_csv[cur_row][1:feat_vec_size + 1] = X[i][j]
+            to_csv[cur_row][1:feat_vec_size + 1] = Xcsv[i][j]
             to_csv[cur_row][feat_vec_size + 1] = diff_hat[i][j]
-            to_csv[cur_row][feat_vec_size + 2] = Y[i][j]
+            to_csv[cur_row][feat_vec_size + 2] = Ycsv[i][j]
             cur_row += 1
     now = datetime.datetime.now()
     if filename == None:

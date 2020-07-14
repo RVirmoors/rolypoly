@@ -23,6 +23,8 @@ import torch
 import timing           # ML timing module
 from constants import ROLAND_DRUM_PITCH_CLASSES
 
+np.set_printoptions(suppress=True)
+
 # parse command line args
 parser = argparse.ArgumentParser(
     description=__doc__,
@@ -32,7 +34,7 @@ parser.add_argument(
     '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
-    '--take', default='data/takes/20200714112219.csv', metavar='FOO.csv',
+    '--take', default='data/takes/20200714123034.csv', metavar='FOO.csv',
     help='take csv file name')
 parser.add_argument(
     '--offline', action='store_true',
@@ -192,7 +194,7 @@ async def processFV(featVec):
     await asyncio.sleep(featVec[9] * 0.1 / 1000)
     featVec[13] = guitarDescr
     # 3.
-    print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
+    #print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
     input = torch.Tensor(featVec)
     input = input[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
@@ -247,37 +249,45 @@ timesigs = score_timesig()
 positions_in_bar = score_pos_in_bar()
 
 
+def train(batch_size, epochs=1):
+    print(timing.Y)
+
+    model = timing.TimingLSTM(
+        input_dim=feat_vec_size, batch_size=batch_size)
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
+
+    for t in range(epochs):
+        # train loop. TODO add several epochs, w/ noise?
+        timing.Y_hat = model(timing.X, timing.X_lengths)
+        loss = model.loss(timing.Y_hat, timing.Y, timing.X_lengths)
+        print("LOSS:", loss)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        # detach/repackage the hidden state in between batches
+        model.hidden[0].detach_()
+        model.hidden[1].detach_()
+
+    print("AFTER ===============",
+          torch.nn.utils.parameters_to_vector(model.parameters()))
+
+    for param_tensor in model.state_dict():
+        print(param_tensor, "\t", model.state_dict()[param_tensor].size())
+
+
 async def init_main():
     if args.offline:
         # OFFLINE : ...
         # redefine model: TODO copy weights from existing model
         timing.load_XY(args.take)
         timing.prepare_X()
-        timing.prepare_Y()
+        batch_size = timing.s_i + 1
+        longest_seq = int(max(timing.X_lengths))
+        timing.Y = torch.Tensor(timing.Y[:batch_size, :longest_seq])
+        train(batch_size)
 
-        model = timing.TimingLSTM(
-            input_dim=feat_vec_size, batch_size=timing.s_i + 1)
-
-        optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
-
-        for t in range(1):
-            # train loop. TODO add several epochs, w/ noise?
-            timing.Y_hat = model(timing.X, timing.X_lengths)
-            loss = model.loss(timing.Y_hat, timing.Y, timing.X_lengths)
-            print("LOSS:", loss)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            # detach/repackage the hidden state in between batches
-            model.hidden[0].detach_()
-            model.hidden[1].detach_()
-
-        print("AFTER ===============",
-              torch.nn.utils.parameters_to_vector(model.parameters()))
-
-        for param_tensor in model.state_dict():
-            print(param_tensor, "\t", model.state_dict()[param_tensor].size())
     else:
         # ONLINE :
         # listen on port 5006
@@ -291,10 +301,10 @@ async def init_main():
         timing.prepare_X()
         timing.prepare_Y()
 
-        print(timing.X)
-
         if get_y_n("Save performance? "):
             timing.save_XY()
+
+        train(timing.s_i + 1)
 
         transport.close()  # Clean up serve endpoint
 
