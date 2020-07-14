@@ -51,9 +51,8 @@ X_lengths = np.zeros(1000)
 # =========================
 
 
-def addRow(featVec, y_hat, diff):
+def addRow(featVec, y_hat, d_g_diff):
     global newSeq, X, Y, Y_hat, h_i, s_i, X_lengths
-    #print("add y", y, "diff ", diff, "to X[", s_i, "][", h_i + 1, "]")
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12]:
         if s_i >= 0:  # s_i is init'd as -1, so first note doesn't trigger:
@@ -69,12 +68,12 @@ def addRow(featVec, y_hat, diff):
         h_i = 0
         X[s_i][0] = featVec         # first hit in new seq
         Y_hat[s_i][1] = y_hat       # delay for next hit
-        diff_hat[s_i][0] = diff     # drum-guitar diff for this hit
+        diff_hat[s_i][0] = d_g_diff  # drum-guitar diff for this hit
     else:
         h_i += 1
-        X[s_i][h_i] = featVec       # this hit
-        Y_hat[s_i][h_i + 1] = y_hat  # delay for next hit
-        diff_hat[s_i][h_i] = diff   # drum-guitar diff for this hit
+        X[s_i][h_i] = featVec           # this hit
+        Y_hat[s_i][h_i + 1] = y_hat     # delay for next hit
+        diff_hat[s_i][h_i] = d_g_diff   # drum-guitar diff for this hit
 
 
 def prepare_X():
@@ -175,13 +174,25 @@ def save_XY(filename=None):
 
 def load_XY(filename):
     """
-    Get X, diff_hat, Y from a csv file.
+    Get (unpadded) X, diff_hat, Y from a csv file.
     """
-    global X, X_lengths, s_i, diff_hat, Y, feat_vec_size
+    global X, X_lengths, s_i, h_i, diff_hat, Y, feat_vec_size
     from_csv = np.loadtxt(filename, delimiter=',')
-    s_i = int(from_csv[-1][0])
-    print(from_csv)
-    print(s_i)
+    s_i = h_i = 0
+    for cur_row in range(len(from_csv)):
+        cur_seq = int(from_csv[cur_row][0])
+        if (s_i != cur_seq):
+            # new seq
+            X_lengths[s_i] = h_i
+            s_i = cur_seq
+            h_i = 0
+        X[s_i][h_i] = from_csv[cur_row][1:feat_vec_size + 1]
+        diff_hat[s_i][h_i] = from_csv[cur_row][feat_vec_size + 1]
+        Y[s_i][h_i] = from_csv[cur_row][feat_vec_size + 2]
+        h_i += 1
+    # last seq
+    X_lengths[s_i] = h_i
+    print("Done loading sequences of lengths: ", X_lengths[:s_i + 1])
 
 
 # TIMING NETWORK CLASS
