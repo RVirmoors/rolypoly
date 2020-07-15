@@ -162,7 +162,7 @@ class GMDdataset(Dataset):
 # print(gmd[432]['pm'].time_signature_changes,
 #      gmd.meta.iloc[432]['time_signature'])
 
-
+# https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
 if __name__ == '__main__':
     # for now, just use batch_size = 1 because batches have different dimensions.
     # possible solutions:
