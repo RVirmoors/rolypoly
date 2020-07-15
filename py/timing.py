@@ -67,13 +67,12 @@ def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
     return X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths
 
 
-def prepare_X(X, X_lengths, s_i, Y_hat, diff_hat):
+def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     """
     Pad short sequences
     https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
     """
     longest_seq = int(max(X_lengths))
-    batch_size = s_i + 1      # number of sequences in batch
     if DEBUG:
         print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.zeros((batch_size, longest_seq, feat_vec_size))
@@ -94,7 +93,7 @@ def prepare_X(X, X_lengths, s_i, Y_hat, diff_hat):
     X_lengths = X_lengths[:batch_size]
     X = torch.Tensor(X)
     X_lengths = torch.LongTensor(X_lengths)
-    return X, X_lengths, s_i, Y_hat, diff_hat
+    return X, X_lengths, Y_hat, diff_hat
 
 
 def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
@@ -112,7 +111,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     """
     if style == 'diff':
         Y = torch.Tensor(diff_hat)
-        return X_lengths, diff_hat, Y_hat, Y
+        return Y_hat, Y
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
     for i in range(len(diff)):
@@ -131,14 +130,13 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     Y = torch.Tensor(Y)
     Y_hat = torch.Tensor(Y_hat)
 
-    return X_lengths, diff_hat, Y_hat, Y
+    return Y_hat, Y
 
 
-def save_XY(filename=None):
+def save_XY(X, X_lengths, diff_hat, Y, filename=None):
     """
     Save X, diff_hat, Y to a csv file.
     """
-    global X, X_lengths, diff_hat, Y, feat_vec_size
     Xcsv = X.numpy()
     Ycsv = Y.numpy()
     fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g'
@@ -158,8 +156,6 @@ def save_XY(filename=None):
     now = datetime.datetime.now()
     if filename == None:
         filename = "data/takes/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
-    else:
-        filename = "data/takes/" + filename
     np.savetxt(filename, to_csv, fmt=fmt, header=header)
 
 
@@ -167,9 +163,14 @@ def load_XY(filename):
     """
     Get (unpadded) X, diff_hat, Y from a csv file.
     """
-    global X, X_lengths, s_i, h_i, diff_hat, Y, feat_vec_size
+    X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
+    Y = np.zeros((1000, 64))                 # seqs * hits
+    diff_hat = np.zeros((1000, 64))          # seqs * hits
+    X_lengths = np.zeros(1000)
+    s_i = -1
+    h_i = 0
+
     from_csv = np.loadtxt(filename, delimiter=',')
-    s_i = h_i = 0
     for cur_row in range(len(from_csv)):
         cur_seq = int(from_csv[cur_row][0])
         if (s_i != cur_seq):
@@ -183,7 +184,10 @@ def load_XY(filename):
         h_i += 1
     # last seq
     X_lengths[s_i] = h_i
-    print("Done loading sequences of lengths: ", X_lengths[:s_i + 1])
+    batch_size = s_i + 1
+    if DEBUG:
+        print("Done loading sequences of lengths: ", X_lengths[:batch_size])
+    return X, X_lengths, diff_hat, Y, batch_size
 
 
 # TIMING NETWORK CLASS

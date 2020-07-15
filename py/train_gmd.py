@@ -10,6 +10,7 @@ import pretty_midi
 import numpy as np
 import torch
 
+import time
 import os
 import pandas as pd     # for quickly reading csv
 from torch.utils.data import Dataset, DataLoader
@@ -45,9 +46,10 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
     Y = np.zeros((1000, 64))                 # seqs * hits
     Y_hat = np.zeros((1000, 64))             # seqs * hits
     diff_hat = np.zeros((1000, 64))          # seqs * hits
-    h_i = 0
-    s_i = -1
     X_lengths = np.zeros(1000)
+    s_i = -1
+    h_i = 0
+
     for index, note in enumerate(drumtrack.notes):
         if index < (len(drumtrack.notes) - 1):
             # if we're not at the last note, maybe wait
@@ -79,10 +81,11 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
     return X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths
 
 
-def pm_to_XY(pm):
+def pm_to_XY(file_name):
     """
-    Receives pretty_midi, returns X, Y tuple
+    Receives MIDI file name, returns X, Y
     """
+    pm = pretty_midi.PrettyMIDI(file_name)
 
     if (len(pm.instruments) > 1):
         sys.exit('There are {} instruments. Please load a MIDI file with just one\
@@ -105,12 +108,14 @@ def pm_to_XY(pm):
     X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
                                                               tempos, timesigs, positions_in_bar)
 
-    X, X_lengths, s_i, Y_hat, diff_hat = timing.prepare_X(
-        X, X_lengths, s_i, Y_hat, diff_hat)
-    X_lengths, diff_hat, Y_hat, Y = timing.prepare_Y(
+    X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
+        X, X_lengths, Y_hat, diff_hat)
+    Y_hat, Y = timing.prepare_Y(
         X_lengths, diff_hat, Y_hat, Y, style='diff')
     # if get_y_n("Save to csv? "):
-    #    timing.save_XY()
+
+    csv_filename = file_name[:-3] + 'csv'
+    timing.save_XY(X, X_lengths, diff_hat, Y, filename=csv_filename)
 
     return X, X_lengths, Y
 
@@ -120,9 +125,10 @@ class GMDdataset(Dataset):
     GMD dataset class. See https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
     """
 
-    def __init__(self, csv_file, root_dir):
+    def __init__(self, csv_file, root_dir, source='csv'):
         self.meta = pd.read_csv(csv_file)
         self.root_dir = root_dir
+        self.source = source
 
     def __len__(self):
         return len(self.meta)
@@ -132,15 +138,23 @@ class GMDdataset(Dataset):
             idx = idx.tolist()
         file_name = os.path.join(self.root_dir,
                                  self.meta.iloc[idx]['midi_filename'])
-        # load MIDI file
-        pm = pretty_midi.PrettyMIDI(file_name)
-        x, xl, y = pm_to_XY(pm)
+        if self.source == 'midi':
+            # load MIDI file
+            x, xl, y = pm_to_XY(file_name)
+        else:
+            # load CSV file
+            csv_filename = file_name[:-3] + 'csv'
+            x, xl, dh, y, bs = timing.load_XY(csv_filename)
+            x, xl, yh, dh = timing.prepare_X(
+                x, xl, dh, dh, bs)
+            _, y = timing.prepare_Y(
+                xl, dh, yh, y, style='diff')
+
         split = self.meta.iloc[idx]['split']
 
         return {'X': x, 'X_lengths': xl, 'Y': y, 'split': split}
 
 
-gmd = GMDdataset(csv_file='data/groove/info.csv', root_dir='data/groove/')
 # for i in range(len(gmd)):
 #   sample = gmd[i]
 # print(i, sample['pm'].time_signature_changes, sample['bpm'], sample['split'])
@@ -149,32 +163,36 @@ gmd = GMDdataset(csv_file='data/groove/info.csv', root_dir='data/groove/')
 #      gmd.meta.iloc[432]['time_signature'])
 
 
-# for now, just use batch_size = 1 because batches have different dimensions.
-# possible solutions:
-#   https://discuss.pytorch.org/t/tensorflow-esque-bucket-by-sequence-length/41284/17
-#   https://github.com/jihunchoi/recurrent-batch-normalization-pytorch
-#   https://discuss.pytorch.org/t/dataloader-for-various-length-of-data/6418/11
-#   https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
-train_data = [gmd[i] for i in range(len(gmd)) if gmd[i]['split'] == 'train']
-test_data = [gmd[i] for i in range(len(gmd)) if gmd[i]['split'] == 'test']
-val_data = [gmd[i] for i in range(len(gmd)) if gmd[i]['split'] == 'validation']
-
-dl = {}
-dl['train'] = DataLoader(train_data, batch_size=1,
-                         shuffle=False, num_workers=4)
-dl['test'] = DataLoader(test_data, batch_size=1, shuffle=False, num_workers=4)
-dl['val'] = DataLoader(val_data, batch_size=1, shuffle=False, num_workers=4)
-
-print("Data loaded:", len(dl['train']), "training samples.")
-
 if __name__ == '__main__':
-    """
-    for i_batch, sample_batched in enumerate(dataloader):
-        print(
-            i_batch, sample_batched['split'])
-        if i_batch == 3:
-            break
-    """
+    # for now, just use batch_size = 1 because batches have different dimensions.
+    # possible solutions:
+    #   https://discuss.pytorch.org/t/tensorflow-esque-bucket-by-sequence-length/41284/17
+    #   https://github.com/jihunchoi/recurrent-batch-normalization-pytorch
+    #   https://discuss.pytorch.org/t/dataloader-for-various-length-of-data/6418/11
+    #   https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
+    since = time.time()
+    gmd = GMDdataset(csv_file='data/groove/info.csv',
+                     root_dir='data/groove/')
+
+    train_data = [gmd[i]
+                  for i in range(len(gmd)) if gmd[i]['split'] == 'train']
+    test_data = [gmd[i] for i in range(len(gmd)) if gmd[i]['split'] == 'test']
+    val_data = [gmd[i]
+                for i in range(len(gmd)) if gmd[i]['split'] == 'validation']
+
+    dl = {}
+    dl['train'] = DataLoader(train_data, batch_size=1,
+                             shuffle=False, num_workers=1)
+    dl['test'] = DataLoader(test_data, batch_size=1,
+                            shuffle=False, num_workers=1)
+    dl['val'] = DataLoader(val_data, batch_size=1,
+                           shuffle=False, num_workers=1)
+
+    time_elapsed = time.time() - since
+    print('====\nData loaded in {:.0f}m {:.0f}s'.format(
+        time_elapsed // 60, time_elapsed % 60))
+    print(len(dl['train']), "training batches.",
+          len(dl['val']), "val batches.")
 
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=len(dl['train']))
