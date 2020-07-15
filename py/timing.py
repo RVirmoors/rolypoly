@@ -11,6 +11,9 @@ from torch.autograd import Variable
 
 import numpy as np
 import datetime
+import time
+import os
+import copy
 
 from constants import ROLAND_DRUM_PITCH_CLASSES
 
@@ -26,26 +29,19 @@ torch.manual_seed(SEED)
 # torch.cuda.manual_seed(SEED)
 # torch.backends.cudnn.deterministic = True
 
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+DEBUG = False
 
 feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 
-X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
-Y = np.zeros((1000, 64))                 # seqs * hits
-Y_hat = np.zeros((1000, 64))             # seqs * hits
-diff_hat = np.zeros((1000, 64))          # seqs * hits
-h_i = 0
-s_i = -1
 loss = 0
-X_lengths = np.zeros(1000)
 
 # METHODS FOR BUILDING X, Y
 # =========================
 
 
-def addRow(featVec, y_hat, d_g_diff):
-    global newSeq, X, Y, Y_hat, h_i, s_i, X_lengths
+def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12]:
         if s_i >= 0:  # s_i is init'd as -1, so first note doesn't trigger:
@@ -53,9 +49,10 @@ def addRow(featVec, y_hat, d_g_diff):
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
             # last hit plus one doesn't make sense
             Y_hat[s_i][h_i + 1] = 0
-            print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
-            print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
-            print("==========")
+            if DEBUG:
+                print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
+                print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
+                print("==========")
         s_i += 1
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
@@ -67,17 +64,18 @@ def addRow(featVec, y_hat, d_g_diff):
         Y_hat[s_i][h_i + 1] = y_hat     # delay for next hit
         diff_hat[s_i][h_i] = d_g_diff   # drum-guitar diff for this hit
         X_lengths[s_i] = h_i + 1
+    return X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths
 
 
-def prepare_X():
+def prepare_X(X, X_lengths, s_i, Y_hat, diff_hat):
     """
     Pad short sequences
     https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
     """
-    global X, X_lengths, s_i, Y_hat, diff_hat
     longest_seq = int(max(X_lengths))
     batch_size = s_i + 1      # number of sequences in batch
-    print("longest: ", longest_seq, " | batch size: ", batch_size)
+    if DEBUG:
+        print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.zeros((batch_size, longest_seq, feat_vec_size))
     padded_Y_hat = np.zeros((batch_size, longest_seq))
     padded_diff_hat = np.zeros_like(padded_Y_hat)
@@ -96,9 +94,10 @@ def prepare_X():
     X_lengths = X_lengths[:batch_size]
     X = torch.Tensor(X)
     X_lengths = torch.LongTensor(X_lengths)
+    return X, X_lengths, s_i, Y_hat, diff_hat
 
 
-def prepare_Y(style='constant', value=None):
+def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     """
     Computes Y, the "correct" values to be used in the MSE loss function.
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
@@ -111,10 +110,9 @@ def prepare_Y(style='constant', value=None):
     Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
         -> a constant value for diff (see above)
     """
-    global X_lengths, diff_hat, Y_hat, Y
     if style == 'diff':
         Y = torch.Tensor(diff_hat)
-        return
+        return X_lengths, diff_hat, Y_hat, Y
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
     for i in range(len(diff)):
@@ -132,8 +130,8 @@ def prepare_Y(style='constant', value=None):
 
     Y = torch.Tensor(Y)
     Y_hat = torch.Tensor(Y_hat)
-    # print("Y_hat played:", Y_hat)
-    # print("Y 'correct':", Y)
+
+    return X_lengths, diff_hat, Y_hat, Y
 
 
 def save_XY(filename=None):
@@ -300,41 +298,93 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, batch_size=10, epochs=1):
+def train(model, dataloaders, minibatch_size=10, epochs=1):
+    since = time.time()
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_loss = 1.
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 
     train_hist = np.zeros(epochs)
-    n_b = int(np.ceil(X.shape[0] / batch_size))
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
-        for b_i in range(n_b):
-            print("miniBatch", b_i + 1, "/", n_b)
-            # get minibatch indices
-            if (b_i + 1) * batch_size < X.shape[0]:
-                end = (b_i + 1) * batch_size
+        print('Epoch', t + 1, "/", epochs)
+        epoch_loss = div_loss = 0.
+        # Each epoch has a training and validation phase
+        for phase in ['train', 'val']:
+            if phase == 'train':
+                model.train()  # Set model to training mode
             else:
-                # reached the end
-                end = X.shape[0]
-            indices = torch.LongTensor(
-                range(b_i * batch_size, end))
-            b_X = torch.index_select(X, 0, indices)
-            b_Xl = torch.index_select(X_lengths, 0, indices)
-            b_Y = torch.index_select(Y, 0, indices)
-            Y_hat = model(b_X, b_Xl)
-            loss = model.loss(Y_hat, b_Y, X_lengths)
-            print("LOSS:", loss.item())
-            train_hist[t] = loss.item()
+                model.eval()   # Set model to evaluate mode
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            # detach/repackage the hidden state in between batches
-            model.hidden[0].detach_()
-            model.hidden[1].detach_()
+            for _, sample in enumerate(dataloaders[phase]):
+                # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
+                X = sample['X'][0].to(device)
+                X_lengths = sample['X_lengths'][0].to(device)
+                Y = sample['Y'][0].to(device)
 
-    return model.eval(), train_hist
+                n_mb = int(np.ceil(X.shape[0] / minibatch_size))
+
+                for mb_i in range(n_mb):
+
+                    if DEBUG:
+                        print("miniBatch", mb_i + 1, "/", n_mb)
+                    # get minibatch indices
+                    if (mb_i + 1) * minibatch_size < X.shape[0]:
+                        end = (mb_i + 1) * minibatch_size
+                    else:
+                        # reached the end
+                        end = X.shape[0]
+                    indices = torch.LongTensor(
+                        range(mb_i * minibatch_size, end))
+                    b_X = torch.index_select(X, 0, indices)
+                    b_Xl = torch.index_select(X_lengths, 0, indices)
+                    b_Y = torch.index_select(Y, 0, indices)
+
+                    if (torch.nonzero(b_Y).size()[0]):
+                        # hack to avoid empty tensors (must be faulty padding?)
+                        optimizer.zero_grad()
+
+                        # forward
+                        # track history if only in train
+                        with torch.set_grad_enabled(phase == 'train'):
+                            Y_hat = model(b_X, b_Xl)
+                            loss = model.loss(Y_hat, b_Y, X_lengths)
+                            epoch_loss += loss.item()
+                            div_loss += 1
+                            if DEBUG:
+                                print("LOSS:", loss.item())
+                            # backward + optimize only if in training phase
+                            if phase == 'train':
+                                loss.backward()
+                                optimizer.step()
+
+                    # detach/repackage the hidden state in between batches
+                    model.hidden[0].detach_()
+                    model.hidden[1].detach_()
+
+            epoch_loss = epoch_loss / div_loss
+            print(phase, "loss:", epoch_loss)
+
+            if phase == 'train':
+                scheduler.step()
+                train_hist[t] = epoch_loss
+
+            # deep copy the model
+            if phase == 'val' and epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_model_wts = copy.deepcopy(model.state_dict())
+
+    time_elapsed = time.time() - since
+    print('====\nTraining complete in {:.0f}m {:.0f}s'.format(
+        time_elapsed // 60, time_elapsed % 60))
+    print('Best validation loss: {:4f}'.format(best_loss))
+
+    # load best model weights
+    model.load_state_dict(best_model_wts)
+    return model
 
     print("AFTER ===============",
           torch.nn.utils.parameters_to_vector(model.parameters()))
