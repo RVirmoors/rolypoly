@@ -14,6 +14,7 @@ import torch
 
 import time
 import os
+import warnings
 import pandas as pd     # for quickly reading csv
 from torch.utils.data import Dataset, DataLoader
 
@@ -157,19 +158,28 @@ class GMDdataset(Dataset):
             else:
                 # load CSV file
                 csv_filename = file_name[:-3] + 'csv'
-                x, xl, dh, y, bs = timing.load_XY(csv_filename)
-                x, xl, yh, dh = timing.prepare_X(
-                    x, xl, dh, dh, bs)
-                _, y = timing.prepare_Y(
-                    xl, dh, yh, y, style='diff')
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    x, xl, dh, y, bs = timing.load_XY(csv_filename)
+                if sum(xl):
+                    # don't process empty files
+                    x, xl, yh, dh = timing.prepare_X(
+                        x, xl, dh, dh, bs)
+                    _, y = timing.prepare_Y(
+                        xl, dh, yh, y, style='diff')
                 # print("Loaded", csv_filename, ": ", bs, "bars.")
 
-            self.x[idx] = x
-            self.xl[idx] = xl
-            self.y[idx] = y
-            self.split[idx] = self.meta.iloc[idx]['split']
+            if sum(xl):
+                self.x[idx] = x
+                self.xl[idx] = xl
+                self.y[idx] = y
+                self.split[idx] = self.meta.iloc[idx]['split']
+            elif not self.meta.iloc[idx]['bpm'].item():
+                # drop one-bar takes that weren't dropped already
+                self.meta.drop(idx)
+                print("Dropped one-bar sample #", idx)
 
-    def _remove_short_takes(self, min_dur=5.1):
+    def _remove_short_takes(self, min_dur=1):
         print("Filtering out samples shorter than ", min_dur, "seconds...")
         old = len(self.meta)
         (self.meta).drop([i for i in range(len(self.meta))
@@ -209,7 +219,6 @@ if __name__ == '__main__':
 
     train_data = [gmd[i]
                   for i in range(len(gmd)) if gmd[i]['split'] == 'train']
-
     test_data = [gmd[i] for i in range(len(gmd)) if gmd[i]['split'] == 'test']
     val_data = [gmd[i]
                 for i in range(len(gmd)) if gmd[i]['split'] == 'validation']
@@ -227,6 +236,8 @@ if __name__ == '__main__':
         time_elapsed // 60, time_elapsed % 60))
     print(len(dl['train']), "training batches.",
           len(dl['val']), "val batches.")
+
+    quit()
 
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=len(dl['train']))
