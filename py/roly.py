@@ -164,14 +164,14 @@ positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 async def init_main():
     if args.offline:
         # OFFLINE : ...
-        # redefine model: TODO copy weights from existing model
-        timing.load_XY(args.take)
-        timing.prepare_X()
-        batch_size = timing.s_i + 1
-        longest_seq = int(max(timing.X_lengths))
-        timing.Y = torch.Tensor(timing.Y[:batch_size, :longest_seq])
+        x, xl, dh, y, bs = timing.load_XY(args.take)
+        x, xl, yh, dh = timing.prepare_X(x, xl, dh, dh, bs)
+        batch_size = bs
+        longest_seq = int(max(xl))
+        y = torch.Tensor(y[:batch_size, :longest_seq])
+        # define model for offline: learn a batch
         model = timing.TimingLSTM(
-            input_dim=feat_vec_size, batch_size=timing.s_i + 1)
+            input_dim=feat_vec_size, batch_size=batch_size)
         if args.preload_model:
             trained_path = args.preload_model
             model.load_state_dict(torch.load(trained_path))

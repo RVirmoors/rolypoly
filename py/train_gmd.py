@@ -213,7 +213,7 @@ if __name__ == '__main__':
     #   https://discuss.pytorch.org/t/dataloader-for-various-length-of-data/6418/11
     #   https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
     since = time.time()
-    gmd = GMDdataset(csv_file='data/groove/info.csv',
+    gmd = GMDdataset(csv_file='data/groove/miniinfo.csv',
                      root_dir='data/groove/',
                      source='csv')
 
@@ -232,19 +232,17 @@ if __name__ == '__main__':
                            shuffle=False, num_workers=1)
 
     time_elapsed = time.time() - since
-    print('====\nData loaded in {:.0f}m {:.0f}s'.format(
+    print('Data loaded in {:.0f}m {:.0f}s\n==========='.format(
         time_elapsed // 60, time_elapsed % 60))
     print(len(dl['train']), "training batches.",
           len(dl['val']), "val batches.")
-
-    quit()
 
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=len(dl['train']))
 
     print("Start training...")
 
-    trained_model = timing.train(model, dl, minibatch_size=1)
-    PATH = "models/gmd_LSTM.pt"
+    trained_model = timing.train(model, dl)
+    PATH = "models/gmd_LSTM_mb10.pt"
     torch.save(trained_model.state_dict(), PATH)
     print("Saved trained model to", PATH)

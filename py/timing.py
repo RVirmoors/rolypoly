@@ -218,7 +218,7 @@ class TimingLSTM(nn.Module):
         )
 
         self.hidden = self.init_hidden()
-        # output layer which projects back to tag space
+        # output layer which projects back to Y space
         self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1)
 
     def init_hidden(self):
@@ -232,10 +232,6 @@ class TimingLSTM(nn.Module):
             hidden_a = hidden_a.cuda()
             hidden_b = hidden_b.cuda()
         """
-
-        hidden_a = Variable(hidden_a)
-        hidden_b = Variable(hidden_b)
-
         return (hidden_a, hidden_b)
 
     def forward(self, X, X_lengths):
@@ -244,11 +240,14 @@ class TimingLSTM(nn.Module):
         # self.hidden = self.init_hidden()
 
         batch_size, seq_len, _ = X.size()
+        print("PACKED", X.size())
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability..
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
+
+        print("====\n", self.hidden[0].size(), "\n====")
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
@@ -346,17 +345,18 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                         end = X.shape[0]
                     indices = torch.LongTensor(
                         range(mb_i * minibatch_size, end))
-                    b_X = torch.index_select(X, 0, indices)
-                    b_Xl = torch.index_select(X_lengths, 0, indices)
-                    b_Y = torch.index_select(Y, 0, indices)
+                    mb_X = torch.index_select(X, 0, indices)
+                    mb_Xl = torch.index_select(X_lengths, 0, indices)
+                    mb_Y = torch.index_select(Y, 0, indices)
 
                     optimizer.zero_grad()
 
                     # forward
                     # track history if only in train
                     with torch.set_grad_enabled(phase == 'train'):
-                        Y_hat = model(b_X, b_Xl)
-                        loss = model.loss(Y_hat, b_Y, X_lengths)
+                        #print(mb_X.size(), mb_Xl.size(), mb_Y.size())
+                        mb_Y_hat = model(mb_X, mb_Xl)
+                        loss = model.loss(mb_Y_hat, mb_Y, mb_Xl)
                         epoch_loss += loss.item()
                         div_loss += 1
                         if DEBUG:
