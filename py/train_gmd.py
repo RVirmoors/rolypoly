@@ -5,6 +5,8 @@ Train network using Groove MIDI Dataset (GMD) from Magenta:
 https://magenta.tensorflow.org/datasets/groove
 """
 
+# TODO: argparse for saving csv, training&saving model
+
 
 import pretty_midi
 import numpy as np
@@ -222,4 +224,7 @@ if __name__ == '__main__':
 
     print("Start training...")
 
-    timing.train(model, dl, minibatch_size=1)
+    trained_model = timing.train(model, dl, minibatch_size=1)
+    PATH = "models/gmd_LSTM.pt"
+    torch.save(trained_model.state_dict(), PATH)
+    print("Saved trained model to", PATH)

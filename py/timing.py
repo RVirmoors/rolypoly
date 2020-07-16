@@ -316,6 +316,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
+        # TODO shuffle batches (not minibatches!)
         print('Epoch', t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
         # Each epoch has a training and validation phase
@@ -389,9 +390,3 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model
-
-    print("AFTER ===============",
-          torch.nn.utils.parameters_to_vector(model.parameters()))
-
-    for param_tensor in model.state_dict():
-        print(param_tensor, "\t", model.state_dict()[param_tensor].size())

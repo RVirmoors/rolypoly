@@ -39,6 +39,9 @@ parser.add_argument(
     '--take', default='data/takes/20200714123034.csv', metavar='FOO.csv',
     help='take csv file name')
 parser.add_argument(
+    '--preload_model', default='models/gmd_LSTM.pt', metavar='FOO.pt',
+    help='start from a pre-trained model')
+parser.add_argument(
     '--offline', action='store_true',
     help='execute offline (learn)')
 args = parser.parse_args()
@@ -61,9 +64,6 @@ ts = pm.time_signature_changes
 
 delayms = 1
 guitarDescr = 0  # loudness delta?
-
-# define model for LIVE. TODO init weights
-model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
 
 
 # LIVE METHODS
@@ -88,7 +88,7 @@ dispatcher.map("/onset", getOnsetDiffOSC)  # receive
 dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 
 
-async def processFV(featVec):
+async def processFV(featVec, model):
     """
     Live:
     1. send the drums to be played in Max
@@ -98,7 +98,6 @@ async def processFV(featVec):
     5. save FV & y_hat & onsetDelay for future offline training
     6. return the obtained y_hat = next beat timing
     """
-    global model
     # 1.
     play = ["%.3f" % feat for feat in featVec]
     play = ' '.join(play)
@@ -124,7 +123,7 @@ async def processFV(featVec):
     return y_hat
 
 
-async def parseMIDItoFV():
+async def parseMIDItoFV(model):
     """
     Play the drum MIDI file in real time (or not?), emitting
     feature vectors to be processed by processFV().
@@ -149,7 +148,7 @@ async def parseMIDItoFV():
             featVec[12] = positions_in_bar[index]
 
             #loop = asyncio.get_event_loop()
-            y_hat = await processFV(featVec)  # next hit timing [ms]
+            y_hat = await processFV(featVec, model)  # next hit timing [ms]
             #y = loop.run_until_complete(infer)
             featVec = np.zeros(feat_vec_size)
 
@@ -173,6 +172,10 @@ async def init_main():
         timing.Y = torch.Tensor(timing.Y[:batch_size, :longest_seq])
         model = timing.TimingLSTM(
             input_dim=feat_vec_size, batch_size=timing.s_i + 1)
+        if args.preload_model:
+            trained_path = args.preload_model
+            model.load_state_dict(torch.load(trained_path))
+            print("Loaded pre-trained model weights from", trained_path)
         timing.train(model, batch_size)
 
     else:
@@ -183,7 +186,15 @@ async def init_main():
         # Create datagram endpoint and start serving
         transport, protocol = await server.create_serve_endpoint()
 
-        await parseMIDItoFV()  # Enter main loop of program
+        # define model for LIVE.
+        model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
+
+        if args.preload_model:
+            trained_path = args.preload_model
+            model.load_state_dict(torch.load(trained_path))
+            print("Loaded pre-trained model weights from", trained_path)
+
+        await parseMIDItoFV(model)  # Enter main loop of program
 
         timing.prepare_X()
         timing.prepare_Y()
