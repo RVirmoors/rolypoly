@@ -37,6 +37,15 @@ def quantizeDrumTrack(drumtrack, positions_in_bar, steps=16):
     H = live.round() / steps
     O = (live - live.round()) / steps
     V = np.zeros(len(drumtrack.notes))
+    # check for triplets
+    stepst = steps * 3 / 2
+    livet = positions_in_bar * stepst
+    Ht = livet.round() / stepst
+    Ot = (livet - livet.round()) / stepst
+    # find out indices of triplets (where the quant-diff is smaller)
+    triplets = np.array(np.absolute(Ot) < np.absolute(O))
+    H[triplets] = Ht[triplets]
+    O[triplets] = Ot[triplets]
     return H, O, V
 
 
