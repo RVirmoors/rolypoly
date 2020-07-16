@@ -216,11 +216,10 @@ if __name__ == '__main__':
         time_elapsed // 60, time_elapsed % 60))
     print(len(dl['train']), "training batches.",
           len(dl['val']), "val batches.")
-"""
+
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=len(dl['train']))
 
     print("Start training...")
 
     timing.train(model, dl, minibatch_size=1)
-"""

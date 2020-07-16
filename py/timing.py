@@ -349,7 +349,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                     b_Xl = torch.index_select(X_lengths, 0, indices)
                     b_Y = torch.index_select(Y, 0, indices)
 
-                    if (torch.nonzero(b_Y).size()[0]):
+                    if (torch.nonzero(b_Y, as_tuple=True).size()[0]):
                         # hack to avoid empty tensors (must be faulty padding?)
                         optimizer.zero_grad()
 
