@@ -43,7 +43,7 @@ loss = 0
 
 def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     # if new bar, finish existing sequence and start a new one
-    if featVec[12] <= X[s_i][h_i][12]:
+    if featVec[12] <= X[s_i][h_i][12] and h_i:
         if s_i >= 0:  # s_i is init'd as -1, so first note doesn't trigger:
             # move delay to first hit in new seq
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
@@ -349,23 +349,21 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                     b_Xl = torch.index_select(X_lengths, 0, indices)
                     b_Y = torch.index_select(Y, 0, indices)
 
-                    if (torch.nonzero(b_Y, as_tuple=True).size()[0]):
-                        # hack to avoid empty tensors (must be faulty padding?)
-                        optimizer.zero_grad()
+                    optimizer.zero_grad()
 
-                        # forward
-                        # track history if only in train
-                        with torch.set_grad_enabled(phase == 'train'):
-                            Y_hat = model(b_X, b_Xl)
-                            loss = model.loss(Y_hat, b_Y, X_lengths)
-                            epoch_loss += loss.item()
-                            div_loss += 1
-                            if DEBUG:
-                                print("LOSS:", loss.item())
-                            # backward + optimize only if in training phase
-                            if phase == 'train':
-                                loss.backward()
-                                optimizer.step()
+                    # forward
+                    # track history if only in train
+                    with torch.set_grad_enabled(phase == 'train'):
+                        Y_hat = model(b_X, b_Xl)
+                        loss = model.loss(Y_hat, b_Y, X_lengths)
+                        epoch_loss += loss.item()
+                        div_loss += 1
+                        if DEBUG:
+                            print("LOSS:", loss.item())
+                        # backward + optimize only if in training phase
+                        if phase == 'train':
+                            loss.backward()
+                            optimizer.step()
 
                     # detach/repackage the hidden state in between batches
                     model.hidden[0].detach_()

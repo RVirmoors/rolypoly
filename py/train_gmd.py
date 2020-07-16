@@ -151,7 +151,7 @@ class GMDdataset(Dataset):
                     x, xl, dh, dh, bs)
                 _, y = timing.prepare_Y(
                     xl, dh, yh, y, style='diff')
-                print("Loaded", csv_filename, ": ", bs, "bars.")
+                # print("Loaded", csv_filename, ": ", bs, "bars.")
 
             self.x[idx] = x
             self.xl[idx] = xl
@@ -173,7 +173,7 @@ class GMDdataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        return {'X': self.x[idx], 'X_lengths': self.xl[idx], 'Y': self.y[idx], 'split': self.split[idx]}
+        return {'fn': self.meta.iloc[idx]['midi_filename'], 'X': self.x[idx], 'X_lengths': self.xl[idx], 'Y': self.y[idx], 'split': self.split[idx]}
 
 
 # for i in range(len(gmd)):
