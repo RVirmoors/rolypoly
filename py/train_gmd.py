@@ -78,7 +78,7 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
             # move on to the next (group of) note(s)
             featVec = np.zeros(feat_vec_size)
             new_index = index + 1
-    return X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths
+    return X, Y, Y_hat, diff_hat, s_i + 1, X_lengths
 
 
 def pm_to_XY(file_name):
@@ -105,19 +105,15 @@ def pm_to_XY(file_name):
     positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 
     hits, offsets, vels = quantizeDrumTrack(drumtrack, positions_in_bar)
-    X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
-                                                              tempos, timesigs, positions_in_bar)
+    X, Y, Y_hat, diff_hat, batch_size, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
+                                                                tempos, timesigs, positions_in_bar)
 
     X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
-        X, X_lengths, Y_hat, diff_hat)
+        X, X_lengths, Y_hat, diff_hat, batch_size)
     Y_hat, Y = timing.prepare_Y(
         X_lengths, diff_hat, Y_hat, Y, style='diff')
-    # if get_y_n("Save to csv? "):
 
-    csv_filename = file_name[:-3] + 'csv'
-    timing.save_XY(X, X_lengths, diff_hat, Y, filename=csv_filename)
-
-    return X, X_lengths, Y
+    return X, X_lengths, diff_hat, Y
 
 
 class GMDdataset(Dataset):
@@ -130,29 +126,54 @@ class GMDdataset(Dataset):
         self.root_dir = root_dir
         self.source = source
 
+        self._remove_short_takes()  # filter out short samples
+
+        self.x = [None] * len(self.meta)
+        self.xl = [None] * len(self.meta)
+        self.y = [None] * len(self.meta)
+        self.split = [None] * len(self.meta)
+
+        for idx in range(len(self.meta)):
+            file_name = os.path.join(self.root_dir,
+                                     self.meta.iloc[idx]['midi_filename'])
+            if self.source == 'midi':
+                # load MIDI file
+                x, xl, dh, y = pm_to_XY(file_name)
+                # if get_y_n("Save to csv? "):
+                csv_filename = file_name[:-3] + 'csv'
+                rows = timing.save_XY(x, xl, dh, y, filename=csv_filename)
+                print("Saved", csv_filename, ": ", rows, "rows.")
+            else:
+                # load CSV file
+                csv_filename = file_name[:-3] + 'csv'
+                x, xl, dh, y, bs = timing.load_XY(csv_filename)
+                x, xl, yh, dh = timing.prepare_X(
+                    x, xl, dh, dh, bs)
+                _, y = timing.prepare_Y(
+                    xl, dh, yh, y, style='diff')
+                print("Loaded", csv_filename, ": ", bs, "bars.")
+
+            self.x[idx] = x
+            self.xl[idx] = xl
+            self.y[idx] = y
+            self.split[idx] = self.meta.iloc[idx]['split']
+
+    def _remove_short_takes(self, min_dur=5.1):
+        print("Filtering out samples shorter than ", min_dur, "seconds...")
+        old = len(self.meta)
+        (self.meta).drop([i for i in range(len(self.meta))
+                          if self.meta.iloc[i]['duration'] <= min_dur],
+                         inplace=True)
+        print("Dropped", old - len(self.meta), "short samples.")
+
     def __len__(self):
         return len(self.meta)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        file_name = os.path.join(self.root_dir,
-                                 self.meta.iloc[idx]['midi_filename'])
-        if self.source == 'midi':
-            # load MIDI file
-            x, xl, y = pm_to_XY(file_name)
-        else:
-            # load CSV file
-            csv_filename = file_name[:-3] + 'csv'
-            x, xl, dh, y, bs = timing.load_XY(csv_filename)
-            x, xl, yh, dh = timing.prepare_X(
-                x, xl, dh, dh, bs)
-            _, y = timing.prepare_Y(
-                xl, dh, yh, y, style='diff')
 
-        split = self.meta.iloc[idx]['split']
-
-        return {'X': x, 'X_lengths': xl, 'Y': y, 'split': split}
+        return {'X': self.x[idx], 'X_lengths': self.xl[idx], 'Y': self.y[idx], 'split': self.split[idx]}
 
 
 # for i in range(len(gmd)):
@@ -172,10 +193,12 @@ if __name__ == '__main__':
     #   https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
     since = time.time()
     gmd = GMDdataset(csv_file='data/groove/info.csv',
-                     root_dir='data/groove/')
+                     root_dir='data/groove/',
+                     source='csv')
 
     train_data = [gmd[i]
                   for i in range(len(gmd)) if gmd[i]['split'] == 'train']
+
     test_data = [gmd[i] for i in range(len(gmd)) if gmd[i]['split'] == 'test']
     val_data = [gmd[i]
                 for i in range(len(gmd)) if gmd[i]['split'] == 'validation']
@@ -193,10 +216,11 @@ if __name__ == '__main__':
         time_elapsed // 60, time_elapsed % 60))
     print(len(dl['train']), "training batches.",
           len(dl['val']), "val batches.")
-
+"""
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=len(dl['train']))
 
     print("Start training...")
 
     timing.train(model, dl, minibatch_size=1)
+"""

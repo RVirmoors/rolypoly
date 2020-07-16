@@ -136,6 +136,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
 def save_XY(X, X_lengths, diff_hat, Y, filename=None):
     """
     Save X, diff_hat, Y to a csv file.
+    Returns total numbers of rows written.
     """
     Xcsv = X.numpy()
     Ycsv = Y.numpy()
@@ -157,6 +158,7 @@ def save_XY(X, X_lengths, diff_hat, Y, filename=None):
     if filename == None:
         filename = "data/takes/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
     np.savetxt(filename, to_csv, fmt=fmt, header=header)
+    return cur_row
 
 
 def load_XY(filename):
