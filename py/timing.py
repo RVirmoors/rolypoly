@@ -223,16 +223,16 @@ class TimingLSTM(nn.Module):
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
-        hidden_a = torch.randn(self.nb_layers,
-                               self.batch_size, self.nb_lstm_units)
-        hidden_b = torch.randn(self.nb_layers,
-                               self.batch_size, self.nb_lstm_units)
+        hidden = torch.randn(self.nb_layers,
+                             self.batch_size, self.nb_lstm_units)
+        cell = torch.randn(self.nb_layers,
+                           self.batch_size, self.nb_lstm_units)
         """
         if self.hparams.on_gpu:
-            hidden_a = hidden_a.cuda()
-            hidden_b = hidden_b.cuda()
+            hidden = hidden.cuda()
+            cell = cell.cuda()
         """
-        return (hidden_a, hidden_b)
+        return (hidden, cell)
 
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We want the LSTM to treat
@@ -240,14 +240,14 @@ class TimingLSTM(nn.Module):
         # self.hidden = self.init_hidden()
 
         batch_size, seq_len, _ = X.size()
-        print("PACKED", X.size())
+        # print("X ....", X.size())
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability..
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
 
-        print("====\n", self.hidden[0].size(), "\n====")
+        # print("hidden", self.hidden[0].size(), "\n====")
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
@@ -330,11 +330,11 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                 X = sample['X'][0].to(device)
                 X_lengths = sample['X_lengths'][0].to(device)
                 Y = sample['Y'][0].to(device)
+                model.hidden = model.init_hidden()
 
                 n_mb = int(np.ceil(X.shape[0] / minibatch_size))
 
                 for mb_i in range(n_mb):
-
                     if DEBUG:
                         print("miniBatch", mb_i + 1, "/", n_mb)
                     # get minibatch indices
