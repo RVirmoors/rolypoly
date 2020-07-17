@@ -386,6 +386,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
     print('====\nTraining complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     print('Best validation loss: {:4f}'.format(best_loss))
+    print('Best validation MSE (16th note) loss: {:4f}'.format(best_loss * 16))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
