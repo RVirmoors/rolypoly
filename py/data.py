@@ -87,3 +87,16 @@ def ms_to_bartime(ms, featVec):
     timeSig = featVec[11]
     barDiff = ms / 1000 * 60 / tempo / timeSig
     return barDiff
+
+
+def bartime_to_ms(bartime, featVec):
+    """
+    Convert a bar-relative time difference to a ms interval.
+    input:
+        bartime = time to be converted
+        featVec = feature of the note we relate to
+    """
+    tempo = featVec[10]
+    timeSig = featVec[11]
+    ms = bartime * 1000 / 60 * tempo * timeSig
+    return ms

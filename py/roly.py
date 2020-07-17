@@ -39,7 +39,7 @@ parser.add_argument(
     '--take', default='data/takes/20200714123034.csv', metavar='FOO.csv',
     help='take csv file name')
 parser.add_argument(
-    '--preload_model', default='models/gmd_LSTM.pt', metavar='FOO.pt',
+    '--preload_model', default='models/gmd_LSTM_mb16.pt', metavar='FOO.pt',
     help='start from a pre-trained model')
 parser.add_argument(
     '--offline', action='store_true',
@@ -88,7 +88,7 @@ dispatcher.map("/onset", getOnsetDiffOSC)  # receive
 dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 
 
-async def processFV(featVec, model):
+async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     """
     Live:
     1. send the drums to be played in Max
@@ -116,11 +116,13 @@ async def processFV(featVec, model):
     await asyncio.sleep(featVec[9] * 0.4 / 1000)
     # remains constant if no guit onset?
     onsetDelay = data.ms_to_bartime(delayms, featVec)
-    print("onset delay: ", onsetDelay)
+    print("drum-guitar: {:.4f} || next drum-delay: {:.4f}".
+          format(onsetDelay, y_hat.item()))
     # 5.
-    timing.addRow(featVec, y_hat, onsetDelay)
+    X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = timing.addRow(
+        featVec, y_hat, onsetDelay, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
     # 6.
-    return y_hat
+    return y_hat, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths
 
 
 async def parseMIDItoFV(model):
@@ -128,6 +130,13 @@ async def parseMIDItoFV(model):
     Play the drum MIDI file in real time (or not?), emitting
     feature vectors to be processed by processFV().
     """
+    X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
+    Y = np.zeros((1000, 64))                 # seqs * hits
+    Y_hat = np.zeros((1000, 64))             # seqs * hits
+    diff_hat = np.zeros((1000, 64))          # seqs * hits
+    X_lengths = np.zeros(1000)
+    s_i = -1
+    h_i = 0
     start = time.monotonic()
     featVec = np.zeros(feat_vec_size)  # 9+4+1 zeros
     for index, note in enumerate(drumtrack.notes):
@@ -148,11 +157,15 @@ async def parseMIDItoFV(model):
             featVec[12] = positions_in_bar[index]
 
             #loop = asyncio.get_event_loop()
-            y_hat = await processFV(featVec, model)  # next hit timing [ms]
-            #y = loop.run_until_complete(infer)
-            featVec = np.zeros(feat_vec_size)
+            # next hit timing [ms]
+            y_hat, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = await processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
+            next_delay = data.bartime_to_ms(y_hat.item(), featVec)
 
-            await asyncio.sleep(sleeptime + y_hat / 1000.)
+            # reset FV and wait
+            featVec = np.zeros(feat_vec_size)
+            print("GROOVIN", next_delay)
+            await asyncio.sleep(sleeptime + next_delay / 1000.)
+    return X, Y, Y_hat, diff_hat, s_i + 1, X_lengths
 
 
 pitch_class_map = data.classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
@@ -194,13 +207,15 @@ async def init_main():
             model.load_state_dict(torch.load(trained_path))
             print("Loaded pre-trained model weights from", trained_path)
 
-        await parseMIDItoFV(model)  # Enter main loop of program
+        # Enter main loop of program
+        X, Y, Y_hat, diff_hat, batch_size, X_lengths = await parseMIDItoFV(model)
 
-        timing.prepare_X()
-        timing.prepare_Y()
+        X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
+            X, X_lengths, Y_hat, diff_hat, batch_size)
+        Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y)
 
         if get_y_n("Save performance? "):
-            timing.save_XY()
+            timing.save_XY(X, X_lengths, diff_hat, Y)
 
         transport.close()  # Clean up serve endpoint
 
