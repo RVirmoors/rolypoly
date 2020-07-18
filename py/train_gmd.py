@@ -5,8 +5,12 @@ Train network using Groove MIDI Dataset (GMD) from Magenta:
 https://magenta.tensorflow.org/datasets/groove
 """
 
-# TODO: argparse for saving csv, training&saving model
+# TODO: argparse for saving/loading csv, training&saving / loading model
 
+
+import argparse
+import queue
+import sys
 
 import pretty_midi
 import numpy as np
@@ -25,6 +29,25 @@ from constants import ROLAND_DRUM_PITCH_CLASSES
 from helper import get_y_n
 
 np.set_printoptions(suppress=True)
+
+# parse command line args
+parser = argparse.ArgumentParser(
+    description=__doc__,
+    formatter_class=argparse.RawDescriptionHelpFormatter
+)  # show docstring from top
+parser.add_argument(
+    '--source', default='csv',
+    help='source data files: csv or midi')
+parser.add_argument(
+    '--load_model', metavar='FOO.pt',
+    help='Load a pre-trained model.')
+parser.add_argument(
+    '--batch_size', type=int, default=16,
+    help='Minibatch size.')
+parser.add_argument(
+    '--epochs', type=int, default=0,
+    help='# of epochs to train.')
+args = parser.parse_args()
 
 
 feat_vec_size = timing.feat_vec_size
@@ -237,13 +260,23 @@ if __name__ == '__main__':
     print(len(dl['train']), "training batches.",
           len(dl['val']), "val batches.")
 
-    batch_size = 16
     model = timing.TimingLSTM(
-        input_dim=feat_vec_size, batch_size=batch_size)
+        input_dim=feat_vec_size, batch_size=args.batch_size)
 
-    print("Start training...")
+    if args.load_model:
+        trained_path = args.load_model
+        model.load_state_dict(torch.load(trained_path))
+        print("Loaded pre-trained model weights from", trained_path)
 
-    trained_model = timing.train(model, dl, minibatch_size=batch_size)
-    PATH = "models/gmd_LSTM_mb" + str(batch_size) + ".pt"
-    torch.save(trained_model.state_dict(), PATH)
-    print("Saved trained model to", PATH)
+    if args.epochs:
+        print("Start training for", args.epochs,"epochs...")
+
+        trained_model = timing.train(model, dl, minibatch_size=args.batch_size, epochs=args.epochs)
+
+    if get_y_n("Save trained model?"):
+        PATH = "models/gmd_LSTM_mb" + str(batch_size) + ".pt"
+        torch.save(trained_model.state_dict(), PATH)
+        print("Saved trained model to", PATH)
+
+    if get_y_n(len(dl['val']), "test batches. Run test evaluation?"):
+        model.eval()
