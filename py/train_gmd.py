@@ -36,8 +36,14 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
+    '--root_dir', default='data/groove/',
+    help='Root directory for dataset.')
+parser.add_argument(
+    '--meta', default='info.csv',
+    help='Metadata file: filename of csv list of samples for dataset.')
+parser.add_argument(
     '--source', default='csv',
-    help='source data files: csv or midi')
+    help='Source data files: csv or midi.')
 parser.add_argument(
     '--load_model', metavar='FOO.pt',
     help='Load a pre-trained model.')
@@ -46,7 +52,7 @@ parser.add_argument(
     help='Minibatch size.')
 parser.add_argument(
     '--epochs', type=int, default=0,
-    help='# of epochs to train.')
+    help='# of epochs to train. Zero means don\'t train.')
 args = parser.parse_args()
 
 
@@ -236,9 +242,9 @@ if __name__ == '__main__':
     #   https://discuss.pytorch.org/t/dataloader-for-various-length-of-data/6418/11
     #   https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
     since = time.time()
-    gmd = GMDdataset(csv_file='data/groove/info.csv',
-                     root_dir='data/groove/',
-                     source='csv')
+    gmd = GMDdataset(csv_file=args.root_dir + args.meta,
+                     root_dir=args.root_dir,
+                     source=args.source)
 
     train_data = [gmd[i]
                   for i in range(len(gmd)) if gmd[i]['split'] == 'train']
@@ -269,14 +275,15 @@ if __name__ == '__main__':
         print("Loaded pre-trained model weights from", trained_path)
 
     if args.epochs:
-        print("Start training for", args.epochs,"epochs...")
+        print("Start training for", args.epochs, "epochs...")
 
-        trained_model = timing.train(model, dl, minibatch_size=args.batch_size, epochs=args.epochs)
+        trained_model = timing.train(
+            model, dl, minibatch_size=args.batch_size, epochs=args.epochs)
 
-    if get_y_n("Save trained model?"):
+    if get_y_n("Save trained model? "):
         PATH = "models/gmd_LSTM_mb" + str(batch_size) + ".pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
 
-    if get_y_n(len(dl['val']), "test batches. Run test evaluation?"):
+    if get_y_n(str(len(dl['val'])) + " test batches. Run test evaluation? "):
         model.eval()
