@@ -29,6 +29,7 @@ from constants import ROLAND_DRUM_PITCH_CLASSES
 from helper import get_y_n
 
 np.set_printoptions(suppress=True)
+DEBUG = True
 
 # parse command line args
 parser = argparse.ArgumentParser(
@@ -287,3 +288,29 @@ if __name__ == '__main__':
 
     if get_y_n(str(len(dl['val'])) + " test batches. Run test evaluation? "):
         model.eval()
+        total_loss = div_loss = 0
+
+        for _, sample in enumerate(dl['val']):
+            # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
+            X = sample['X'][0]
+            X_lengths = sample['X_lengths'][0]
+            Y = sample['Y'][0]
+            model.hidden = model.init_hidden()
+
+            # forward, don't track history for eval
+            with torch.set_grad_enabled(False):
+                Y_hat = model(X, X_lengths)
+                loss = model.loss(Y_hat, Y, X_lengths)
+                total_loss += loss.item()
+                div_loss += 1
+                if DEBUG:
+                    print("LOSS:", loss.item())
+
+            # detach/repackage the hidden state in between batches
+            model.hidden[0].detach_()
+            model.hidden[1].detach_()
+
+        total_loss = total_loss / div_loss
+        print('Test loss: {:4f}'.format(total_loss))
+        print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16))
+
