@@ -223,9 +223,9 @@ class TimingLSTM(nn.Module):
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
-        hidden = torch.randn(self.nb_layers,
+        hidden = torch.zeros(self.nb_layers,
                              self.batch_size, self.nb_lstm_units)
-        cell = torch.randn(self.nb_layers,
+        cell = torch.zeros(self.nb_layers,
                            self.batch_size, self.nb_lstm_units)
         """
         if self.hparams.on_gpu:

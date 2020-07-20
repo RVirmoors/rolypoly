@@ -29,7 +29,7 @@ from constants import ROLAND_DRUM_PITCH_CLASSES
 from helper import get_y_n
 
 np.set_printoptions(suppress=True)
-DEBUG = True
+DEBUG = False
 
 # parse command line args
 parser = argparse.ArgumentParser(
@@ -210,7 +210,7 @@ class GMDdataset(Dataset):
                 print("Dropped one-bar sample #", idx)
 
     def _remove_short_takes(self, min_dur=1):
-        print("Filtering out samples shorter than ", min_dur, "seconds...")
+        print("Filtering out samples shorter than", min_dur, "seconds...")
         old = len(self.meta)
         (self.meta).drop([i for i in range(len(self.meta))
                           if self.meta.iloc[i]['duration'] <= min_dur],
@@ -297,20 +297,36 @@ if __name__ == '__main__':
             Y = sample['Y'][0]
             model.hidden = model.init_hidden()
 
-            # forward, don't track history for eval
-            with torch.set_grad_enabled(False):
-                Y_hat = model(X, X_lengths)
-                loss = model.loss(Y_hat, Y, X_lengths)
-                total_loss += loss.item()
-                div_loss += 1
-                if DEBUG:
-                    print("LOSS:", loss.item())
+            n_mb = int(np.ceil(X.shape[0] / args.batch_size))
 
-            # detach/repackage the hidden state in between batches
-            model.hidden[0].detach_()
-            model.hidden[1].detach_()
+            for mb_i in range(n_mb):
+                if DEBUG:
+                    print("miniBatch", mb_i + 1, "/", n_mb)
+                # get minibatch indices
+                if (mb_i + 1) * args.batch_size < X.shape[0]:
+                    end = (mb_i + 1) * args.batch_size
+                else:
+                    # reached the end
+                    end = X.shape[0]
+                indices = torch.LongTensor(
+                    range(mb_i * args.batch_size, end))
+                mb_X = torch.index_select(X, 0, indices)
+                mb_Xl = torch.index_select(X_lengths, 0, indices)
+                mb_Y = torch.index_select(Y, 0, indices)
+
+                # forward, don't track history for eval
+                with torch.set_grad_enabled(False):
+                    mb_Y_hat = model(mb_X, mb_Xl)
+                    loss = model.loss(mb_Y_hat, mb_Y, mb_Xl)
+                    total_loss += loss.item()
+                    div_loss += 1
+                    if DEBUG:
+                        print("LOSS:", loss.item())
+
+                # detach/repackage the hidden state in between batches
+                model.hidden[0].detach_()
+                model.hidden[1].detach_()
 
         total_loss = total_loss / div_loss
         print('Test loss: {:4f}'.format(total_loss))
         print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16))
-
