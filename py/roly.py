@@ -36,14 +36,14 @@ parser.add_argument(
     '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
-    '--take', default='data/takes/20200714123034.csv', metavar='FOO.csv',
-    help='take csv file name')
-parser.add_argument(
     '--preload_model', default='models/gmd_LSTM_mb16.pt', metavar='FOO.pt',
     help='start from a pre-trained model')
 parser.add_argument(
     '--offline', action='store_true',
     help='execute offline (learn)')
+parser.add_argument(
+    '--take', default='data/takes/20200714123034.csv', metavar='FOO.csv',
+    help='take csv file name for offline training')
 args = parser.parse_args()
 
 # load MIDI file

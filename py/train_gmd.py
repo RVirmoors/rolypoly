@@ -270,11 +270,13 @@ if __name__ == '__main__':
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=args.batch_size)
 
+    ### Pre-load ###
     if args.load_model:
         trained_path = args.load_model
         model.load_state_dict(torch.load(trained_path))
         print("Loaded pre-trained model weights from", trained_path)
 
+    ### Training ###
     if args.epochs:
         print("Start training for", args.epochs, "epochs...")
 
@@ -286,6 +288,7 @@ if __name__ == '__main__':
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
 
+    ### Evaluation ###
     if get_y_n(str(len(dl['test'])) + " test batches. Run test evaluation? "):
         model.eval()
         total_loss = div_loss = 0
