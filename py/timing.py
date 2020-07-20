@@ -98,13 +98,13 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
 
 def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     """
-    Computes Y, the "correct" values to be used in the MSE loss function.
+    Computes Y, the target values to be used in the MSE loss function.
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
 
     Parameters for determining diff:
-        - style = 'constant' or 'diff' (does nothing) or 'EMA' (tba)
+        - style = 'constant' or 'diff' (copies diff_hat) or 'EMA' (tba)
         - value = if None, will be computed as avg(diff_hat) over the present seq
-                  if style='constant', diff   = value
+                  if style='constant', diff = value
                   if style='EMA',      EMA period = value
     Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
         -> a constant value for diff (see above)
