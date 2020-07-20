@@ -286,12 +286,13 @@ if __name__ == '__main__':
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
 
-    if get_y_n(str(len(dl['val'])) + " test batches. Run test evaluation? "):
+    if get_y_n(str(len(dl['test'])) + " test batches. Run test evaluation? "):
         model.eval()
         total_loss = div_loss = 0
 
-        for _, sample in enumerate(dl['val']):
+        for _, sample in enumerate(dl['test']):
             # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
+            print(sample['fn'])
             X = sample['X'][0]
             X_lengths = sample['X_lengths'][0]
             Y = sample['Y'][0]
