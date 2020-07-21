@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
+# see https://pytorch.org/tutorials/recipes/recipes/tensorboard_with_pytorch.html
+from torch.utils.tensorboard import SummaryWriter
 
 import numpy as np
 import datetime
@@ -308,8 +310,12 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=1e-3)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+
+    writer = SummaryWriter()
+    w_i = 0
 
     train_hist = np.zeros(epochs)
 
@@ -366,12 +372,16 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                             loss.backward()
                             optimizer.step()
 
+                        writer.add_scalar(
+                            "Loss/" + phase, loss.item(), w_i)
+                        w_i += 1
+
                     # detach/repackage the hidden state in between batches
                     model.hidden[0].detach_()
                     model.hidden[1].detach_()
 
             epoch_loss = epoch_loss / div_loss
-            print(phase, "loss:", epoch_loss)
+            print("Epoch", t + 1, phase, "loss:", epoch_loss)
 
             if phase == 'train':
                 scheduler.step()
@@ -387,6 +397,8 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
         time_elapsed // 60, time_elapsed % 60))
     print('Best validation loss: {:4f}'.format(best_loss))
     print('Best validation MSE (16th note) loss: {:4f}'.format(best_loss * 16))
+
+    writer.flush()
 
     # load best model weights
     model.load_state_dict(best_model_wts)
