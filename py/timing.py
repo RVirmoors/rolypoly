@@ -221,7 +221,7 @@ class TimingLSTM(nn.Module):
 
         self.hidden = self.init_hidden()
         # output layer which projects back to Y space
-        self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1)
+        self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1).to(device)
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
@@ -229,17 +229,15 @@ class TimingLSTM(nn.Module):
                              self.batch_size, self.nb_lstm_units)
         cell = torch.zeros(self.nb_layers,
                            self.batch_size, self.nb_lstm_units)
-        """
-        if self.hparams.on_gpu:
-            hidden = hidden.cuda()
-            cell = cell.cuda()
-        """
+        hidden.to(device)
+        cell.to(device)
         return (hidden, cell)
 
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We want the LSTM to treat
         # a new batch as a continuation of a sequence (?)
         # self.hidden = self.init_hidden()
+        X = X.float()   # float, not double...
 
         batch_size, seq_len, _ = X.size()
         # print("X ....", X.size())
@@ -311,7 +309,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
     best_loss = 1.
 
     model.to(device)
-    print(model.type())
+    print(model)
     print("Running on", device)
 
     optimizer = torch.optim.Adam(
