@@ -28,8 +28,8 @@ SEED = 1234
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
-# torch.cuda.manual_seed(SEED)
-# torch.backends.cudnn.deterministic = True
+torch.cuda.manual_seed(SEED)
+torch.backends.cudnn.deterministic = True
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -93,8 +93,8 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     Y_hat = padded_Y_hat
     diff_hat = padded_diff_hat
     X_lengths = X_lengths[:batch_size]
-    X = torch.Tensor(X)
-    X_lengths = torch.LongTensor(X_lengths)
+    X = torch.tensor(X)
+    X_lengths = torch.tensor(X_lengths, dtype=torch.int64)
     return X, X_lengths, Y_hat, diff_hat
 
 
@@ -310,6 +310,10 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
 
+    model.to(device)
+    print(model.type())
+    print("Running on", device)
+
     optimizer = torch.optim.Adam(
         model.parameters(), lr=1e-3)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
@@ -349,8 +353,8 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                     else:
                         # reached the end
                         end = X.shape[0]
-                    indices = torch.LongTensor(
-                        range(mb_i * minibatch_size, end))
+                    indices = torch.tensor(
+                        range(mb_i * minibatch_size, end), device=device)
                     mb_X = torch.index_select(X, 0, indices)
                     mb_Xl = torch.index_select(X_lengths, 0, indices)
                     mb_Y = torch.index_select(Y, 0, indices)
