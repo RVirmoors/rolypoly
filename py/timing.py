@@ -217,7 +217,7 @@ class TimingLSTM(nn.Module):
             num_layers=self.nb_layers,
             batch_first=True,
             dropout=0.5
-        )
+        ).to(device)
 
         self.hidden = self.init_hidden()
         # output layer which projects back to Y space
@@ -226,11 +226,9 @@ class TimingLSTM(nn.Module):
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
         hidden = torch.zeros(self.nb_layers,
-                             self.batch_size, self.nb_lstm_units)
+                             self.batch_size, self.nb_lstm_units, device=device)
         cell = torch.zeros(self.nb_layers,
-                           self.batch_size, self.nb_lstm_units)
-        hidden.to(device)
-        cell.to(device)
+                           self.batch_size, self.nb_lstm_units, device=device)
         return (hidden, cell)
 
     def forward(self, X, X_lengths):
@@ -246,7 +244,6 @@ class TimingLSTM(nn.Module):
         # doesn't make sense to sort seqs by length => we lose ONNX exportability..
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
-
         # print("hidden", self.hidden[0].size(), "\n====")
 
         # now run through LSTM
@@ -258,8 +255,8 @@ class TimingLSTM(nn.Module):
         # hack for padded max length sequences:
         # https://github.com/pytorch/pytorch/issues/1591#issuecomment-365834629
         if X.size(1) < seq_len:
-            dummy_tensor = Variable(torch.zeros(
-                batch_size, seq_len - X.size(1), self.nb_lstm_units))
+            dummy_tensor = torch.zeros(
+                batch_size, seq_len - X.size(1), self.nb_lstm_units, device=device)
             X = torch.cat([X, dummy_tensor], 1)
 
         # Project to output space
@@ -310,16 +307,16 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
 
     model.to(device)
     print(model)
-    print("Running on", device)
+    print("Running on", next(model.parameters()).device)
 
+    lr = 1e-3
     optimizer = torch.optim.Adam(
-        model.parameters(), lr=1e-3)
+        model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 
     writer = SummaryWriter()
-    w_i = 0
-
-    train_hist = np.zeros(epochs)
+    w_i = {'train': 0, 'val': 0}
+    writer.add_hparams({'lr': lr, 'bsize': i, 'epochs': epochs})
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
@@ -353,9 +350,10 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                         end = X.shape[0]
                     indices = torch.tensor(
                         range(mb_i * minibatch_size, end), device=device)
-                    mb_X = torch.index_select(X, 0, indices)
-                    mb_Xl = torch.index_select(X_lengths, 0, indices)
-                    mb_Y = torch.index_select(Y, 0, indices)
+                    mb_X = torch.index_select(X, 0, indices).to(device)
+                    mb_Xl = torch.index_select(
+                        X_lengths, 0, indices).to(device)
+                    mb_Y = torch.index_select(Y, 0, indices).to(device)
 
                     optimizer.zero_grad()
 
@@ -375,8 +373,8 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                             optimizer.step()
 
                         writer.add_scalar(
-                            "Loss/" + phase, loss.item(), w_i)
-                        w_i += 1
+                            "Loss/" + phase, loss.item(), w_i[phase])
+                        w_i[phase] += 1
 
                     # detach/repackage the hidden state in between batches
                     model.hidden[0].detach_()
@@ -387,7 +385,6 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
 
             if phase == 'train':
                 scheduler.step()
-                train_hist[t] = epoch_loss
 
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:

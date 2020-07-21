@@ -1,7 +1,7 @@
 # rolypoly~ Python implementation
 work in progress
 
-tested on Windows 10 x64 only, no CUDA
+tested on Windows 10 x64, cpu & cuda
 
 (OSX version coming soon)
 

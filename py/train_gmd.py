@@ -284,7 +284,7 @@ if __name__ == '__main__':
             model, dl, minibatch_size=args.batch_size, epochs=args.epochs)
 
     if get_y_n("Save trained model? "):
-        PATH = "models/gmd_LSTM_mb" + str(batch_size) + ".pt"
+        PATH = "models/gmd_LSTM_mb" + str(args.batch_size) + ".pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
 
