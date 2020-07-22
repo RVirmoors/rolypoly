@@ -372,16 +372,15 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                             loss.backward()
                             optimizer.step()
 
-                        writer.add_scalar(
-                            "Loss/" + phase, loss.item(), w_i[phase])
-                        w_i[phase] += 1
-
                     # detach/repackage the hidden state in between batches
                     model.hidden[0].detach_()
                     model.hidden[1].detach_()
 
             epoch_loss = epoch_loss / div_loss
             print("Epoch", t + 1, phase, "loss:", epoch_loss)
+            writer.add_scalar(
+                "Loss/" + phase, epoch_loss, w_i[phase])
+            w_i[phase] += 1
 
             if phase == 'train':
                 scheduler.step()
@@ -451,7 +450,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
         print('Test loss: {:4f}'.format(total_loss))
         print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16))
 
-    writer.add_hparams({'lr': lr, 'bsize': minibatch_size, 'epochs': epochs},
+    writer.add_hparams({'layers': model.nb_layers, 'lstm_units': model.nb_lstm_units, 'lr': lr, 'bsize': minibatch_size, 'epochs': epochs},
                        {'hparam/best_val_loss': best_loss, 'hparam/test_loss': total_loss})
 
     writer.flush()
