@@ -15,6 +15,7 @@ import sys
 import pretty_midi
 import numpy as np
 import torch
+import optuna
 
 import time
 import os
@@ -54,6 +55,9 @@ parser.add_argument(
 parser.add_argument(
     '--epochs', type=int, default=0,
     help='# of epochs to train. Zero means don\'t train.')
+parser.add_argument(
+    '--optuna', action='store_true',
+    help='Optimise (tune hyperparams) using Optuna.')
 args = parser.parse_args()
 
 
@@ -280,8 +284,28 @@ if __name__ == '__main__':
     if args.epochs:
         print("Start training for", args.epochs, "epochs...")
 
-        trained_model = timing.train(
+        trained_model, loss = timing.train(
             model, dl, minibatch_size=args.batch_size, epochs=args.epochs)
+
+    # Optimisation ###            see https://optuna.org/
+    if args.optuna:
+        def objective(trial):
+            layers = trial.suggest_int('layers', 1, 2)
+            lstm_units = trial.suggest_int('lstm_units', 50, 200)
+            dropout = trial.suggest_uniform('dropout', 0.0, 1.0)
+            bs = trial.suggest_int('bs', 50, 200)
+            lr = trial.suggest_loguniform('lr', 1e-5, 1e-2)
+            ep = trial.suggest_int('ep', 20, 1000)
+
+            model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
+                                      input_dim=feat_vec_size, batch_size=bs, dropout=dropout)
+            trained_model, loss = timing.train(
+                model, dl, lr=lr, minibatch_size=bs, epochs=ep)
+
+            return loss
+
+        study = optuna.create_study(direction='minimize')
+        study.optimize(objective, n_trials=100)
 
     if get_y_n("Save trained model? "):
         PATH = "models/gmd_LSTM_mb" + str(args.batch_size) + ".pt"

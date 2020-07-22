@@ -200,7 +200,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=1, nb_lstm_units=100, input_dim=14, batch_size=10):
+    def __init__(self, nb_layers=1, nb_lstm_units=100, input_dim=14, batch_size=10, dropout=0.5):
         """
         batch_size: # of sequences in training batch
         """
@@ -210,6 +210,7 @@ class TimingLSTM(nn.Module):
         self.nb_lstm_units = nb_lstm_units
         self.input_dim = input_dim
         self.batch_size = batch_size
+        self.dropout = dropout
 
         # design LSTM
         self.lstm = nn.LSTM(
@@ -217,7 +218,7 @@ class TimingLSTM(nn.Module):
             hidden_size=self.nb_lstm_units,
             num_layers=self.nb_layers,
             batch_first=True,
-            dropout=0.5
+            dropout=self.dropout
         ).to(device)
 
         self.hidden = self.init_hidden()
@@ -301,7 +302,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=10, epochs=1):
+def train(model, dataloaders, minibatch_size=10, epochs=1, lr=1e-3):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
@@ -310,7 +311,6 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
     print(model)
     print("Running on", next(model.parameters()).device)
 
-    lr = 1e-3
     optimizer = torch.optim.Adam(
         model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
@@ -463,4 +463,4 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
 
     writer.flush()
 
-    return model
+    return model, total_loss
