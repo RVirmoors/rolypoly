@@ -306,7 +306,7 @@ if __name__ == '__main__':
 
         study = optuna.create_study(direction='minimize')
         # uses TPE Sampling: https://optuna.readthedocs.io/en/stable/reference/samplers.html#optuna.samplers.TPESampler
-        study.optimize(objective, n_trials=100)
+        study.optimize(objective, n_trials=50)
 
         print("Optimization done. Best params:", study.best_params)
         print("Best trial out of", len(study.trials), ":", study.best_trial)
