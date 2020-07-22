@@ -305,7 +305,17 @@ if __name__ == '__main__':
             return loss
 
         study = optuna.create_study(direction='minimize')
+        #uses TPE Sampling: https://optuna.readthedocs.io/en/stable/reference/samplers.html#optuna.samplers.TPESampler
         study.optimize(objective, n_trials=100)
+
+        print("Optimization done. Best params:", study.best_params)
+        print("Best trial out of", len(study.trials), ":", study.best_trial)
+
+        while get_y_n("Optimise for 10 more trials? "):
+            study.optimize(objective, n_trials=10)
+
+            print("Optimization done. Best params:", study.best_params)
+            print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
         PATH = "models/gmd_LSTM_mb" + str(args.batch_size) + ".pt"
