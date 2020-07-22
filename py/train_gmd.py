@@ -276,7 +276,7 @@ if __name__ == '__main__':
         model.load_state_dict(torch.load(trained_path))
         print("Loaded pre-trained model weights from", trained_path)
 
-    ### Training ###
+    ### Training & eval ###
     if args.epochs:
         print("Start training for", args.epochs, "epochs...")
 
@@ -287,51 +287,3 @@ if __name__ == '__main__':
         PATH = "models/gmd_LSTM_mb" + str(args.batch_size) + ".pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
-
-    ### Evaluation ###
-    if get_y_n(str(len(dl['test'])) + " test batches. Run test evaluation? "):
-        model.eval()
-        total_loss = div_loss = 0
-
-        for _, sample in enumerate(dl['test']):
-            if DEBUG:
-                print(sample['fn'])
-            # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
-            X = sample['X'][0]
-            X_lengths = sample['X_lengths'][0]
-            Y = sample['Y'][0]
-            model.hidden = model.init_hidden()
-
-            n_mb = int(np.ceil(X.shape[0] / args.batch_size))
-
-            for mb_i in range(n_mb):
-                if DEBUG:
-                    print("miniBatch", mb_i + 1, "/", n_mb)
-                # get minibatch indices
-                if (mb_i + 1) * args.batch_size < X.shape[0]:
-                    end = (mb_i + 1) * args.batch_size
-                else:
-                    # reached the end
-                    end = X.shape[0]
-                indices = torch.LongTensor(
-                    range(mb_i * args.batch_size, end))
-                mb_X = torch.index_select(X, 0, indices)
-                mb_Xl = torch.index_select(X_lengths, 0, indices)
-                mb_Y = torch.index_select(Y, 0, indices)
-
-                # forward, don't track history for eval
-                with torch.set_grad_enabled(False):
-                    mb_Y_hat = model(mb_X, mb_Xl)
-                    loss = model.loss(mb_Y_hat, mb_Y, mb_Xl)
-                    total_loss += loss.item()
-                    div_loss += 1
-                    if DEBUG:
-                        print("LOSS:", loss.item())
-
-                # detach/repackage the hidden state in between batches
-                model.hidden[0].detach_()
-                model.hidden[1].detach_()
-
-        total_loss = total_loss / div_loss
-        print('Test loss: {:4f}'.format(total_loss))
-        print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16))
