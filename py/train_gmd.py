@@ -293,9 +293,9 @@ if __name__ == '__main__':
             layers = trial.suggest_int('layers', 1, 2)
             lstm_units = trial.suggest_int('lstm_units', 50, 200)
             dropout = trial.suggest_uniform('dropout', 0.0, 1.0)
-            bs = trial.suggest_int('bs', 50, 200)
+            bs = pow(2, trial.suggest_int('bs', 4, 8))
             lr = trial.suggest_loguniform('lr', 1e-5, 1e-2)
-            ep = trial.suggest_int('ep', 20, 1000)
+            ep = trial.suggest_int('ep', 10, 1000)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout)
@@ -305,7 +305,7 @@ if __name__ == '__main__':
             return loss
 
         study = optuna.create_study(direction='minimize')
-        #uses TPE Sampling: https://optuna.readthedocs.io/en/stable/reference/samplers.html#optuna.samplers.TPESampler
+        # uses TPE Sampling: https://optuna.readthedocs.io/en/stable/reference/samplers.html#optuna.samplers.TPESampler
         study.optimize(objective, n_trials=100)
 
         print("Optimization done. Best params:", study.best_params)

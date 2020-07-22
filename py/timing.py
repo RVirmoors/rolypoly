@@ -309,6 +309,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1, lr=1e-3):
 
     model.to(device)
     print(model)
+    print("Batch size:", minibatch_size)
     print("Running on", next(model.parameters()).device)
 
     optimizer = torch.optim.Adam(
@@ -319,6 +320,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1, lr=1e-3):
     w_i = {'train': 0, 'val': 0}
 
     es = EarlyStopping(patience=20)
+    early_stop = False
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
@@ -388,16 +390,20 @@ def train(model, dataloaders, minibatch_size=10, epochs=1, lr=1e-3):
 
             if phase == 'train':
                 scheduler.step()
-            else:
-                if es.step(torch.tensor(epoch_loss)):
-                    print("Stopped early @ epoch", t + 1, "!")
-                    break
+            elif es.step(torch.tensor(epoch_loss)):
+                print("Stopping early @ epoch", t + 1, "!")
+                early_stop = True
+                break
 
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:
                 best_epoch = t + 1
                 best_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
+
+        if early_stop:
+            print('Stopped.')
+            break
 
     time_elapsed = time.time() - since
     print('====\nTraining complete in {:.0f}m {:.0f}s'.format(
@@ -410,53 +416,53 @@ def train(model, dataloaders, minibatch_size=10, epochs=1, lr=1e-3):
     model.load_state_dict(best_model_wts)
 
     ### Evaluation ###
-    if get_y_n(str(len(dataloaders['test'])) + " test batches. Run test evaluation? "):
-        model.eval()
-        total_loss = div_loss = 0
+#    if get_y_n(str(len(dataloaders['test'])) + " test batches. Run test evaluation? "):
+    model.eval()
+    total_loss = div_loss = 0
 
-        for _, sample in enumerate(dataloaders['test']):
+    for _, sample in enumerate(dataloaders['test']):
+        if DEBUG:
+            print(sample['fn'])
+        # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
+        X = sample['X'][0].to(device)
+        X_lengths = sample['X_lengths'][0].to(device)
+        Y = sample['Y'][0].to(device)
+        model.hidden = model.init_hidden()
+
+        n_mb = int(np.ceil(X.shape[0] / minibatch_size))
+
+        for mb_i in range(n_mb):
             if DEBUG:
-                print(sample['fn'])
-            # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
-            X = sample['X'][0].to(device)
-            X_lengths = sample['X_lengths'][0].to(device)
-            Y = sample['Y'][0].to(device)
-            model.hidden = model.init_hidden()
+                print("miniBatch", mb_i + 1, "/", n_mb)
+            # get minibatch indices
+            if (mb_i + 1) * minibatch_size < X.shape[0]:
+                end = (mb_i + 1) * minibatch_size
+            else:
+                # reached the end
+                end = X.shape[0]
+            indices = torch.tensor(
+                range(mb_i * minibatch_size, end), device=device)
+            mb_X = torch.index_select(X, 0, indices).to(device)
+            mb_Xl = torch.index_select(
+                X_lengths, 0, indices).to(device)
+            mb_Y = torch.index_select(Y, 0, indices).to(device)
 
-            n_mb = int(np.ceil(X.shape[0] / minibatch_size))
-
-            for mb_i in range(n_mb):
+            # forward, don't track history for eval
+            with torch.set_grad_enabled(False):
+                mb_Y_hat = model(mb_X, mb_Xl)
+                loss = model.loss(mb_Y_hat, mb_Y, mb_Xl)
+                total_loss += loss.item()
+                div_loss += 1
                 if DEBUG:
-                    print("miniBatch", mb_i + 1, "/", n_mb)
-                # get minibatch indices
-                if (mb_i + 1) * minibatch_size < X.shape[0]:
-                    end = (mb_i + 1) * minibatch_size
-                else:
-                    # reached the end
-                    end = X.shape[0]
-                indices = torch.tensor(
-                    range(mb_i * minibatch_size, end), device=device)
-                mb_X = torch.index_select(X, 0, indices).to(device)
-                mb_Xl = torch.index_select(
-                    X_lengths, 0, indices).to(device)
-                mb_Y = torch.index_select(Y, 0, indices).to(device)
+                    print("LOSS:", loss.item())
 
-                # forward, don't track history for eval
-                with torch.set_grad_enabled(False):
-                    mb_Y_hat = model(mb_X, mb_Xl)
-                    loss = model.loss(mb_Y_hat, mb_Y, mb_Xl)
-                    total_loss += loss.item()
-                    div_loss += 1
-                    if DEBUG:
-                        print("LOSS:", loss.item())
+            # detach/repackage the hidden state in between batches
+            model.hidden[0].detach_()
+            model.hidden[1].detach_()
 
-                # detach/repackage the hidden state in between batches
-                model.hidden[0].detach_()
-                model.hidden[1].detach_()
-
-        total_loss = total_loss / div_loss
-        print('Test loss: {:4f}'.format(total_loss))
-        print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16))
+    total_loss = total_loss / div_loss
+    print('Test loss: {:4f}'.format(total_loss))
+    print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16))
 
     writer.add_hparams({'layers': model.nb_layers, 'lstm_units': model.nb_lstm_units, 'lr': lr, 'bsize': minibatch_size, 'epochs': epochs},
                        {'hparam/best_val_loss': best_loss, 'hparam/test_loss': total_loss})
