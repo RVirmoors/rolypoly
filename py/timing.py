@@ -18,7 +18,7 @@ import os
 import copy
 
 from constants import ROLAND_DRUM_PITCH_CLASSES
-from helper import get_y_n
+from helper import get_y_n, EarlyStopping
 
 # Helper libraries
 import random
@@ -318,10 +318,13 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
     writer = SummaryWriter()
     w_i = {'train': 0, 'val': 0}
 
+    es = EarlyStopping(patience=20)
+
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
         # TODO shuffle batches (not minibatches!)
-        print('Epoch', t + 1, "/", epochs)
+        if t % 5 == 0:
+            print('Epoch', t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
@@ -377,13 +380,18 @@ def train(model, dataloaders, minibatch_size=10, epochs=1):
                     model.hidden[1].detach_()
 
             epoch_loss = epoch_loss / div_loss
-            print("Epoch", t + 1, phase, "loss:", epoch_loss)
+            if t % 5 == 0:
+                print("Epoch", t + 1, phase, "loss:", epoch_loss)
             writer.add_scalar(
                 "Loss/" + phase, epoch_loss, w_i[phase])
             w_i[phase] += 1
 
             if phase == 'train':
                 scheduler.step()
+            else:
+                if es.step(torch.tensor(epoch_loss)):
+                    print("Stopped early @ epoch", t + 1, "!")
+                    break
 
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:
