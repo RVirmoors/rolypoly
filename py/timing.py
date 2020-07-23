@@ -319,7 +319,7 @@ def train(model, dataloaders, minibatch_size=10, epochs=1, lr=1e-3):
     writer = SummaryWriter()
     w_i = {'train': 0, 'val': 0}
 
-    es = EarlyStopping(patience=20)
+    es = EarlyStopping(patience=25)
     early_stop = False
 
     for t in range(epochs):

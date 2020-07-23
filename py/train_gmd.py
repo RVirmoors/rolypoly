@@ -290,12 +290,12 @@ if __name__ == '__main__':
     # Optimisation ###            see https://optuna.org/
     if args.optuna:
         def objective(trial):
-            layers = trial.suggest_int('layers', 1, 2)
-            lstm_units = trial.suggest_int('lstm_units', 50, 200)
+            layers = 2  # trial.suggest_int('layers', 1, 2)
+            lstm_units = trial.suggest_int('lstm_units', 50, 250)
             dropout = trial.suggest_uniform('dropout', 0.0, 1.0)
-            bs = pow(2, trial.suggest_int('bs', 4, 8))
+            bs = pow(2, trial.suggest_int('bs', 6, 8))
             lr = trial.suggest_loguniform('lr', 1e-5, 1e-2)
-            ep = trial.suggest_int('ep', 10, 1000)
+            ep = trial.suggest_int('ep', 100, 1000)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout)
