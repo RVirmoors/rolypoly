@@ -291,8 +291,8 @@ if __name__ == '__main__':
     if args.optuna:
         def objective(trial):
             layers = trial.suggest_int('layers', 2, 3)
-            lstm_units = trial.suggest_int('lstm_units', 80, 300)
-            dropout = trial.suggest_uniform('dropout', 0.0, 1.0)
+            lstm_units = trial.suggest_int('lstm_units', 100, 250)
+            dropout = trial.suggest_uniform('dropout', 0.3, 0.9)
             bs = pow(2, trial.suggest_int('bs', 8, 10))
             lr = trial.suggest_loguniform('lr', 3e-4, 3e-3)
             ep = trial.suggest_int('ep', 500, 2000)
