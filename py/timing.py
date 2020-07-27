@@ -161,6 +161,7 @@ def save_XY(X, X_lengths, diff_hat, Y, filename=None):
     if filename == None:
         filename = "data/takes/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
     np.savetxt(filename, to_csv, fmt=fmt, header=header)
+    np.savetxt("data/takes/last.csv", to_csv, fmt=fmt, header=header)
     return cur_row
 
 

@@ -33,16 +33,16 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
-    '--preload_model', default='models/gmd_LSTM_mb16.pt', metavar='FOO.pt',
+    '--preload_model', default='models/last.pt', metavar='FOO.pt',
     help='start from a pre-trained model')
 parser.add_argument(
     '--offline', action='store_true',
     help='execute offline (learn)')
 parser.add_argument(
-    '--take', default='data/takes/20200714123034.csv', metavar='FOO.csv',
+    '--take', default='data/takes/last.csv', metavar='FOO.csv',
     help='take csv file name for offline training')
 args = parser.parse_args()
 
@@ -189,8 +189,11 @@ async def init_main():
             trained_path = args.preload_model
             model.load_state_dict(torch.load(trained_path))
             print("Loaded pre-trained model weights from", trained_path)
-        timing.train(model, batch_size)
-
+        trained_model, loss = timing.train(model, batch_size)
+        if get_y_n("Save trained model? "):
+            PATH = "models/last.pt"
+            torch.save(trained_model.state_dict(), PATH)
+            print("Saved trained model to", PATH)
     else:
         # ONLINE :
         # listen on port 5006
