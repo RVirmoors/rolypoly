@@ -51,7 +51,7 @@ parser.add_argument(
     '--load_model', metavar='FOO.pt',
     help='Load a pre-trained model.')
 parser.add_argument(
-    '--batch_size', type=int, default=16,
+    '--batch_size', type=int, default=256,
     help='Minibatch size.')
 parser.add_argument(
     '--epochs', type=int, default=0,
@@ -294,9 +294,9 @@ if __name__ == '__main__':
             layers = trial.suggest_int('layers', 2, 3)
             lstm_units = trial.suggest_int('lstm_units', 100, 250)
             dropout = trial.suggest_uniform('dropout', 0.3, 0.9)
-            bs = pow(2, 8) #pow(2, trial.suggest_int('bs', 8, 10))
-            lr = 1e-3 #trial.suggest_loguniform('lr', 3e-4, 3e-3)
-            ep = 30 #trial.suggest_int('ep', 500, 2000)
+            bs = 256  # pow(2, trial.suggest_int('bs', 8, 10))
+            lr = 4e-3  # trial.suggest_loguniform('lr', 3e-4, 3e-3)
+            ep = 100  # trial.suggest_int('ep', 500, 2000)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout)

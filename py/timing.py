@@ -303,7 +303,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=10, epochs=1, lr=1e-3):
+def train(model, dataloaders, minibatch_size=256, epochs=100, lr=4e-3):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
