@@ -118,6 +118,7 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     onsetDelay = data.ms_to_bartime(delayms, featVec)
     print("drum-guitar: {:.4f} || next drum-delay: {:.4f}".
           format(onsetDelay, y_hat.item()))
+    client.send_message("/next", y_hat.item())
     # 5.
     X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = timing.addRow(
         featVec, y_hat, onsetDelay, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
