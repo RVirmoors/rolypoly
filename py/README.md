@@ -15,3 +15,15 @@ tested on Windows 10 x64, cpu & cuda
 for pretraining, download Groove MIDI Dataset from [Magenta](https://magenta.tensorflow.org/datasets/groove#download)
 and place it in
     \data\
+
+## training
+
+to interactively train your model, do:
+    python roly.py
+
+(will automatically preload `models/last.pt`) and save your performance. Then:
+    python roly.py --offline
+
+(will automatically use `takes/last.csv`) to train and then save your new model to `models/last.pt`
+
+annnnd repeat.
