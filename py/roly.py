@@ -20,6 +20,7 @@ import asyncio
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 import timing           # ML timing module
 import data             # data helper methods
 from constants import ROLAND_DRUM_PITCH_CLASSES
@@ -106,7 +107,7 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     await asyncio.sleep(featVec[9] * 0.1 / 1000)
     featVec[13] = guitarDescr
     # 3.
-    #print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
+    # print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
     input = torch.Tensor(featVec)
     input = input[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
@@ -118,7 +119,6 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     onsetDelay = data.ms_to_bartime(delayms, featVec)
     print("drum-guitar: {:.4f} || next drum-delay: {:.4f}".
           format(onsetDelay, y_hat.item()))
-    client.send_message("/next", y_hat.item())
     # 5.
     X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = timing.addRow(
         featVec, y_hat, onsetDelay, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
@@ -157,14 +157,15 @@ async def parseMIDItoFV(model):
             featVec[11] = timesigs[index][0] / timesigs[index][1]
             featVec[12] = positions_in_bar[index]
 
-            #loop = asyncio.get_event_loop()
+            # loop = asyncio.get_event_loop()
             # next hit timing [ms]
             y_hat, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = await processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
             next_delay = data.bartime_to_ms(y_hat.item(), featVec)
 
             # reset FV and wait
             featVec = np.zeros(feat_vec_size)
-            print("GROOVIN", next_delay)
+
+            client.send_message("/next", next_delay)
             await asyncio.sleep(sleeptime + next_delay / 1000.)
     return X, Y, Y_hat, diff_hat, s_i + 1, X_lengths
 
@@ -188,9 +189,19 @@ async def init_main():
             input_dim=feat_vec_size, batch_size=batch_size)
         if args.preload_model:
             trained_path = args.preload_model
-            model.load_state_dict(torch.load(trained_path))
+            model.load_state_dict(torch.load(
+                trained_path, map_location=timing.device))
             print("Loaded pre-trained model weights from", trained_path)
-        trained_model, loss = timing.train(model, batch_size)
+
+        train_data = [{'X': x, 'X_lengths': xl, 'Y': y, 'split': 'train'}]
+        dl = {}
+        dl['train'] = DataLoader(train_data, batch_size=1,
+                                 shuffle=False)
+        dl['val'] = DataLoader(train_data, batch_size=1,
+                               shuffle=False)
+
+        trained_model, loss = timing.train(
+            model, dl, minibatch_size=batch_size, epochs=3)
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
             torch.save(trained_model.state_dict(), PATH)
@@ -208,7 +219,8 @@ async def init_main():
 
         if args.preload_model:
             trained_path = args.preload_model
-            model.load_state_dict(torch.load(trained_path))
+            model.load_state_dict(torch.load(
+                trained_path, map_location=timing.device))
             print("Loaded pre-trained model weights from", trained_path)
 
         # Enter main loop of program
