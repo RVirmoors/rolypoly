@@ -5,6 +5,10 @@ tested on Windows 10 x64 w/ cpu & Google Colab w/cuda
 
 ## build
 
+working [in a venv](https://docs.python.org/3/library/venv.html) is, of course, strongly recommended.
+
+first you need the right version of pytorch, plus the other required packages
+
     pip install -r packages.txt
     pip install torch==1.5.1+cpu torchvision==0.6.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 (see [pytorch get-started](https://pytorch.org/get-started/locally/))
