@@ -201,7 +201,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=1, nb_lstm_units=100, input_dim=14, batch_size=10, dropout=0.5):
+    def __init__(self, nb_layers=2, nb_lstm_units=200, input_dim=14, batch_size=256, dropout=0.5):
         """
         batch_size: # of sequences in training batch
         """
