@@ -275,7 +275,7 @@ class TimingLSTM(nn.Module):
         # I like to reshape for mental sanity so we're back to (batch_size, seq_len, 1 output)
         X = X.view(batch_size, seq_len, 1)
 
-        y_hat = X
+        y_hat = X[-1][(X_lengths[-1] - 1)]
         return y_hat
 
     def loss(self, Y_hat, Y):
@@ -283,6 +283,7 @@ class TimingLSTM(nn.Module):
         flatten all the targets and predictions,
         eliminate outputs on padded elements,
         compute MSE loss
+        """
         """
         Y = Y.view(-1)              # flat target
         Y_hat = Y_hat.view(-1)      # flat inference
@@ -293,11 +294,14 @@ class TimingLSTM(nn.Module):
 
         # pick the values for Y_hat and zero out the rest with the mask
         Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
+        """
+        last_index = (Y != 0).sum(dim=1)[0]
+        y = Y[0][last_index - 1]
 
         criterion = nn.MSELoss(reduction='sum')
 
         # compute MSE loss
-        return (criterion(Y_hat, Y) / nb_outputs)
+        return (criterion(Y_hat, y))  # / nb_outputs)
 
 
 # TRAIN METHOD
@@ -346,7 +350,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
                 for mb_i in range(n_mb):
-                    if True:
+                    if DEBUG:
                         print("miniBatch", mb_i + 1, "/", n_mb)
                     # get minibatch indices
                     if mb_i * minihop_size + minibatch_size < X.shape[0]:
@@ -368,7 +372,6 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                     with torch.set_grad_enabled(phase == 'train'):
                         #print(mb_X.size(), mb_Xl.size(), mb_Y.size())
                         mb_Y_hat = model(mb_X, mb_Xl)
-                        print(mb_X, mb_Y_hat)
                         loss = model.loss(mb_Y_hat, mb_Y)
                         epoch_loss += loss.item()
                         div_loss += 1
@@ -453,7 +456,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                 # forward, don't track history for eval
                 with torch.set_grad_enabled(False):
                     mb_Y_hat = model(mb_X, mb_Xl)
-                    loss = model.loss(mb_Y_hat, mb_Y, mb_Xl)
+                    loss = model.loss(mb_Y_hat, mb_Y)
                     total_loss += loss.item()
                     div_loss += 1
                     if DEBUG:
