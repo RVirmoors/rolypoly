@@ -223,15 +223,19 @@ async def init_main():
                 trained_path, map_location=timing.device))
             print("Loaded pre-trained model weights from", trained_path)
 
+        client.send_message("/record", 1)
         # Enter main loop of program
         X, Y, Y_hat, diff_hat, batch_size, X_lengths = await parseMIDItoFV(model)
+        client.send_message("/record", 0)
 
         X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
             X, X_lengths, Y_hat, diff_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y)
 
         if get_y_n("Save performance? "):
-            timing.save_XY(X, X_lengths, diff_hat, Y)
+            rows, filename = timing.save_XY(X, X_lengths, diff_hat, Y)
+            print("Saved", filename, ": ", rows, "rows.")
+            client.send_message("/save", filename[11:-3] + "wav")
 
         transport.close()  # Clean up serve endpoint
 

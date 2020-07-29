@@ -188,7 +188,7 @@ class GMDdataset(Dataset):
                 x, xl, dh, y = pm_to_XY(file_name)
                 # if get_y_n("Save to csv? "):
                 csv_filename = file_name[:-3] + 'csv'
-                rows = timing.save_XY(x, xl, dh, y, filename=csv_filename)
+                rows, _ = timing.save_XY(x, xl, dh, y, filename=csv_filename)
                 print("Saved", csv_filename, ": ", rows, "rows.")
             else:
                 # load CSV file
