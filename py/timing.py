@@ -201,7 +201,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=200, input_dim=14, batch_size=256, dropout=0.5):
+    def __init__(self, nb_layers=2, nb_lstm_units=200, input_dim=14, batch_size=2, dropout=0.3):
         """
         batch_size: # of sequences in training batch
         """
@@ -278,7 +278,7 @@ class TimingLSTM(nn.Module):
         y_hat = X
         return y_hat
 
-    def loss(self, Y_hat, Y, X_lengths):
+    def loss(self, Y_hat, Y):
         """
         flatten all the targets and predictions,
         eliminate outputs on padded elements,
@@ -303,14 +303,14 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=256, epochs=100, lr=4e-3):
+def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e-3):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
 
     model.to(device)
     print(model)
-    print("Batch size:", minibatch_size)
+    print("miniBatch size:", minibatch_size, " | hop:", minihop_size)
     print("Running on", next(model.parameters()).device)
 
     optimizer = torch.optim.Adam(
@@ -343,19 +343,19 @@ def train(model, dataloaders, minibatch_size=256, epochs=100, lr=4e-3):
                 Y = sample['Y'][0].to(device)
                 model.hidden = model.init_hidden()
 
-                n_mb = int(np.ceil(X.shape[0] / minibatch_size))
+                n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
                 for mb_i in range(n_mb):
-                    if DEBUG:
+                    if True:
                         print("miniBatch", mb_i + 1, "/", n_mb)
                     # get minibatch indices
-                    if (mb_i + 1) * minibatch_size < X.shape[0]:
-                        end = (mb_i + 1) * minibatch_size
+                    if mb_i * minihop_size + minibatch_size < X.shape[0]:
+                        end = mb_i * minihop_size + minibatch_size
                     else:
                         # reached the end
                         end = X.shape[0]
                     indices = torch.tensor(
-                        range(mb_i * minibatch_size, end), device=device)
+                        range(mb_i * minihop_size, end), device=device)
                     mb_X = torch.index_select(X, 0, indices).to(device)
                     mb_Xl = torch.index_select(
                         X_lengths, 0, indices).to(device)
@@ -368,7 +368,8 @@ def train(model, dataloaders, minibatch_size=256, epochs=100, lr=4e-3):
                     with torch.set_grad_enabled(phase == 'train'):
                         #print(mb_X.size(), mb_Xl.size(), mb_Y.size())
                         mb_Y_hat = model(mb_X, mb_Xl)
-                        loss = model.loss(mb_Y_hat, mb_Y, mb_Xl)
+                        print(mb_X, mb_Y_hat)
+                        loss = model.loss(mb_Y_hat, mb_Y)
                         epoch_loss += loss.item()
                         div_loss += 1
                         if DEBUG:

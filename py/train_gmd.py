@@ -42,7 +42,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='info.csv',
+    '--meta', default='miniinfo.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -51,8 +51,11 @@ parser.add_argument(
     '--load_model', metavar='FOO.pt',
     help='Load a pre-trained model.')
 parser.add_argument(
-    '--batch_size', type=int, default=256,
+    '--batch_size', type=int, default=2,
     help='Minibatch size.')
+parser.add_argument(
+    '--hop_size', type=int, default=1,
+    help='Training hop size.')
 parser.add_argument(
     '--epochs', type=int, default=0,
     help='# of epochs to train. Zero means don\'t train.')
@@ -285,8 +288,10 @@ if __name__ == '__main__':
     if args.epochs:
         print("Start training for", args.epochs, "epochs...")
 
-        trained_model, loss = timing.train(
-            model, dl, minibatch_size=args.batch_size, epochs=args.epochs)
+        trained_model, loss = timing.train(model, dl,
+                                           minibatch_size=args.batch_size,
+                                           minihop_size=args.hop_size,
+                                           epochs=args.epochs)
 
     # Optimisation ###            see https://optuna.org/
     if args.optuna:
