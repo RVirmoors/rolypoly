@@ -203,7 +203,7 @@ async def init_main():
                                shuffle=False)
 
         trained_model, loss = timing.train(
-            model, dl, minibatch_size=batch_size, epochs=3)
+            model, dl, minibatch_size=batch_size, epochs=10)
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
             torch.save(trained_model.state_dict(), PATH)
