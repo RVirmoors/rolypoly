@@ -138,6 +138,7 @@ async def parseMIDItoFV(model):
     X_lengths = np.zeros(1000)
     s_i = -1
     h_i = 0
+    next_delay = 0
     start = time.monotonic()
     featVec = np.zeros(feat_vec_size)  # 9+4+1 zeros
     for index, note in enumerate(drumtrack.notes):
@@ -160,13 +161,14 @@ async def parseMIDItoFV(model):
             # loop = asyncio.get_event_loop()
             # next hit timing [ms]
             y_hat, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = await processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
+            prev_delay = next_delay
             next_delay = data.bartime_to_ms(y_hat.item(), featVec)
 
             # reset FV and wait
             featVec = np.zeros(feat_vec_size)
 
             client.send_message("/next", next_delay)
-            await asyncio.sleep(sleeptime + next_delay / 1000.)
+            await asyncio.sleep(sleeptime + (next_delay - prev_delay) / 1000.)
     return X, Y, Y_hat, diff_hat, s_i + 1, X_lengths
 
 
