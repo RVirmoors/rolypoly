@@ -42,7 +42,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='miniinfo.csv',
+    '--meta', default='info.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -235,13 +235,6 @@ class GMDdataset(Dataset):
         return {'fn': self.meta.iloc[idx]['midi_filename'], 'X': self.x[idx], 'X_lengths': self.xl[idx], 'Y': self.y[idx], 'split': self.split[idx]}
 
 
-# for i in range(len(gmd)):
-#   sample = gmd[i]
-# print(i, sample['pm'].time_signature_changes, sample['bpm'], sample['split'])
-
-# print(gmd[432]['pm'].time_signature_changes,
-#      gmd.meta.iloc[432]['time_signature'])
-
 # https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
 if __name__ == '__main__':
     # for now, just use batch_size = 1 because batches have different dimensions.
@@ -324,6 +317,6 @@ if __name__ == '__main__':
             print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
-        PATH = "models/gmd_LSTM.pt"
+        PATH = "models/gmd_LSTM_1y.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
