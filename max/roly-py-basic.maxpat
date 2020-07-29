@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 173.0, -995.0, 1348.0, 920.0 ],
+		"rect" : [ 173.0, -995.0, 1294.0, 920.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 1,
 		"default_fontsize" : 12.0,
@@ -39,169 +39,289 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
-					"autosave" : 1,
-					"bgmode" : 1,
-					"border" : 0,
-					"clickthrough" : 0,
-					"enablehscroll" : 0,
-					"enablevscroll" : 0,
-					"id" : "obj-129",
-					"lockeddragscroll" : 0,
+					"fontface" : 1,
+					"fontsize" : 128.0,
+					"id" : "obj-136",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 856.745604999999955, 194.5, 136.0, 152.0 ],
+					"presentation" : 1,
+					"presentation_rect" : [ 743.745605000000069, 72.0, 190.0, 152.0 ],
+					"text" : "Ŷ",
+					"textcolor" : [ 0.129411764705882, 0.129411764705882, 0.129411764705882, 0.11 ]
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"bgcolor" : [ 0.717647058823529, 0.63921568627451, 0.63921568627451, 0.1 ],
+					"id" : "obj-132",
+					"maxclass" : "multislider",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "" ],
+					"parameter_enable" : 0,
+					"patching_rect" : [ 867.745604999999955, 233.5, 57.000000000000114, 51.0 ],
+					"presentation" : 1,
+					"presentation_rect" : [ 636.745605000000069, 68.0, 289.0, 157.0 ],
+					"setminmax" : [ -30.0, 30.0 ],
+					"setstyle" : 1,
+					"signed" : 1,
+					"size" : 175,
+					"slidercolor" : [ 0.823529411764706, 0.635294117647059, 0.384313725490196, 1.0 ]
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-133",
 					"maxclass" : "newobj",
-					"numinlets" : 3,
-					"numoutlets" : 4,
-					"offset" : [ 0.0, 0.0 ],
-					"outlettype" : [ "signal", "signal", "", "" ],
-					"patching_rect" : [ 1185.0, 450.0, 50.5, 22.0 ],
-					"saved_attribute_attributes" : 					{
-						"valueof" : 						{
-							"parameter_invisible" : 1,
-							"parameter_longname" : "amxd~",
-							"parameter_shortname" : "amxd~",
-							"parameter_type" : 3
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patcher" : 					{
+						"fileversion" : 1,
+						"appversion" : 						{
+							"major" : 8,
+							"minor" : 0,
+							"revision" : 8,
+							"architecture" : "x64",
+							"modernui" : 1
 						}
-
-					}
 ,
-					"saved_object_attributes" : 					{
-						"parameter_enable" : 1,
-						"patchername" : "Autotuna.amxd",
-						"patchername_fallback" : "C74:/packages/Max for Live/patchers/Max Audio Effect/Autotuna.amxd"
-					}
-,
-					"snapshot" : 					{
-						"filetype" : "C74Snapshot",
-						"version" : 2,
-						"minorversion" : 0,
-						"name" : "snapshotlist",
-						"origin" : "max~",
-						"type" : "list",
-						"subtype" : "Undefined",
-						"embed" : 1,
-						"snapshot" : 						{
-							"name" : "Autotuna.amxd",
-							"origname" : "C74:/packages/Max for Live/patchers/Max Audio Effect/Autotuna.amxd",
-							"valuedictionary" : 							{
-								"parameter_values" : 								{
-									"AmbienceThreshold" : 0.0,
-									"CorrectionAmount" : 100.0,
-									"CorrectionThreshold" : 0.0,
-									"Detune1" : 0.0,
-									"Detune10" : 0.0,
-									"Detune11" : 0.0,
-									"Detune12" : 0.0,
-									"Detune2" : 0.0,
-									"Detune3" : 0.0,
-									"Detune4" : 0.0,
-									"Detune5" : 0.0,
-									"Detune6" : 0.0,
-									"Detune7" : 0.0,
-									"Detune8" : 0.0,
-									"Detune9" : 0.0,
-									"Dry/Wet" : 100.0,
-									"Gain" : 0.0,
-									"Latency" : 1.0,
-									"Quality" : 0.0,
-									"SibilanceThreshold" : 100.0,
-									"Tonic" : 11.0,
-									"Pattern" : 0.0,
-									"blob" : 									{
-										"Scale" : [ 3, 1, 12, 0, 12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 2 ],
-										"Storage" : [ 											{
-												"pattrstorage" : 												{
-													"name" : "u908003917",
-													"slots" : 													{
-
-													}
-
-												}
-
-											}
- ]
-									}
-
+						"classnamespace" : "box",
+						"rect" : [ 59.0, 107.0, 640.0, 480.0 ],
+						"bglocked" : 0,
+						"openinpresentation" : 0,
+						"default_fontsize" : 12.0,
+						"default_fontface" : 0,
+						"default_fontname" : "Arial",
+						"gridonopen" : 1,
+						"gridsize" : [ 15.0, 15.0 ],
+						"gridsnaponopen" : 1,
+						"objectsnaponopen" : 1,
+						"statusbarvisible" : 2,
+						"toolbarvisible" : 1,
+						"lefttoolbarpinned" : 0,
+						"toptoolbarpinned" : 0,
+						"righttoolbarpinned" : 0,
+						"bottomtoolbarpinned" : 0,
+						"toolbars_unpinned_last_save" : 0,
+						"tallnewobj" : 0,
+						"boxanimatetime" : 200,
+						"enablehscroll" : 1,
+						"enablevscroll" : 1,
+						"devicewidth" : 0.0,
+						"description" : "",
+						"digest" : "",
+						"tags" : "",
+						"style" : "",
+						"subpatcher_template" : "",
+						"boxes" : [ 							{
+								"box" : 								{
+									"fontname" : "Arial",
+									"fontsize" : 12.0,
+									"id" : "obj-51",
+									"maxclass" : "newobj",
+									"numinlets" : 2,
+									"numoutlets" : 2,
+									"outlettype" : [ "", "" ],
+									"patching_rect" : [ 177.0, 371.0, 76.0, 22.0 ],
+									"text" : "zl 10000 join"
 								}
 
 							}
-
-						}
-,
-						"snapshotlist" : 						{
-							"current_snapshot" : 0,
-							"entries" : [ 								{
-									"filetype" : "C74Snapshot",
-									"version" : 2,
-									"minorversion" : 0,
-									"name" : "Autotuna.amxd",
-									"origin" : "Autotuna.amxd",
-									"type" : "amxd",
-									"subtype" : "Undefined",
-									"embed" : 0,
-									"snapshot" : 									{
-										"name" : "Autotuna.amxd",
-										"origname" : "C74:/packages/Max for Live/patchers/Max Audio Effect/Autotuna.amxd",
-										"valuedictionary" : 										{
-											"parameter_values" : 											{
-												"AmbienceThreshold" : 0.0,
-												"CorrectionAmount" : 100.0,
-												"CorrectionThreshold" : 0.0,
-												"Detune1" : 0.0,
-												"Detune10" : 0.0,
-												"Detune11" : 0.0,
-												"Detune12" : 0.0,
-												"Detune2" : 0.0,
-												"Detune3" : 0.0,
-												"Detune4" : 0.0,
-												"Detune5" : 0.0,
-												"Detune6" : 0.0,
-												"Detune7" : 0.0,
-												"Detune8" : 0.0,
-												"Detune9" : 0.0,
-												"Dry/Wet" : 100.0,
-												"Gain" : 0.0,
-												"Latency" : 1.0,
-												"Quality" : 0.0,
-												"SibilanceThreshold" : 100.0,
-												"Tonic" : 11.0,
-												"Pattern" : 0.0,
-												"blob" : 												{
-													"Scale" : [ 3, 1, 12, 0, 12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 2 ],
-													"Storage" : [ 														{
-															"pattrstorage" : 															{
-																"name" : "u908003917",
-																"slots" : 																{
-
-																}
-
-															}
-
-														}
- ]
-												}
-
-											}
-
-										}
-
-									}
-,
-									"fileref" : 									{
-										"name" : "Autotuna.amxd",
-										"filename" : "Autotuna.amxd.maxsnap",
-										"filepath" : "~/Documents/Max 8/Snapshots",
-										"filepos" : -1,
-										"snapshotfileid" : "c6e71152f90d2decb21e291f760fe07f"
-									}
-
+, 							{
+								"box" : 								{
+									"fontname" : "Arial",
+									"fontsize" : 12.0,
+									"id" : "obj-46",
+									"maxclass" : "newobj",
+									"numinlets" : 1,
+									"numoutlets" : 3,
+									"outlettype" : [ "int", "_", "zlclear" ],
+									"patching_rect" : [ 50.0, 100.0, 70.0, 22.0 ],
+									"text" : "t 0 _ zlclear"
 								}
- ]
-						}
 
+							}
+, 							{
+								"box" : 								{
+									"fontname" : "Arial",
+									"fontsize" : 12.0,
+									"id" : "obj-40",
+									"maxclass" : "newobj",
+									"numinlets" : 2,
+									"numoutlets" : 2,
+									"outlettype" : [ "", "" ],
+									"patching_rect" : [ 177.0, 457.0, 48.0, 22.0 ],
+									"text" : "route _"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"fontname" : "Arial",
+									"fontsize" : 12.0,
+									"id" : "obj-22",
+									"maxclass" : "newobj",
+									"numinlets" : 1,
+									"numoutlets" : 2,
+									"outlettype" : [ "bang", "float" ],
+									"patching_rect" : [ 177.0, 237.0, 29.5, 22.0 ],
+									"text" : "t b f"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"fontname" : "Arial",
+									"fontsize" : 12.0,
+									"id" : "obj-18",
+									"maxclass" : "newobj",
+									"numinlets" : 2,
+									"numoutlets" : 2,
+									"outlettype" : [ "", "" ],
+									"patching_rect" : [ 177.0, 330.0, 75.0, 22.0 ],
+									"text" : "zl 10000 reg"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"comment" : "",
+									"id" : "obj-8",
+									"index" : 1,
+									"maxclass" : "inlet",
+									"numinlets" : 0,
+									"numoutlets" : 1,
+									"outlettype" : [ "bang" ],
+									"patching_rect" : [ 50.0, 40.0, 30.0, 30.0 ]
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"comment" : "",
+									"id" : "obj-9",
+									"index" : 2,
+									"maxclass" : "inlet",
+									"numinlets" : 0,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"patching_rect" : [ 177.0, 40.0, 30.0, 30.0 ]
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"comment" : "",
+									"id" : "obj-10",
+									"index" : 1,
+									"maxclass" : "outlet",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 50.0, 539.0, 30.0, 30.0 ]
+								}
+
+							}
+ ],
+						"lines" : [ 							{
+								"patchline" : 								{
+									"destination" : [ "obj-51", 0 ],
+									"source" : [ "obj-18", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-18", 0 ],
+									"source" : [ "obj-22", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-51", 1 ],
+									"source" : [ "obj-22", 1 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-10", 0 ],
+									"midpoints" : [ 186.5, 510.0, 59.5, 510.0 ],
+									"source" : [ "obj-40", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-10", 0 ],
+									"source" : [ "obj-46", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-18", 0 ],
+									"midpoints" : [ 85.0, 297.0, 186.5, 297.0 ],
+									"source" : [ "obj-46", 1 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-51", 0 ],
+									"midpoints" : [ 110.5, 361.0, 186.5, 361.0 ],
+									"source" : [ "obj-46", 2 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-18", 1 ],
+									"midpoints" : [ 186.5, 414.0, 312.0, 414.0, 312.0, 294.0, 242.5, 294.0 ],
+									"order" : 0,
+									"source" : [ "obj-51", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-40", 0 ],
+									"order" : 1,
+									"source" : [ "obj-51", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-46", 0 ],
+									"source" : [ "obj-8", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-22", 0 ],
+									"source" : [ "obj-9", 0 ]
+								}
+
+							}
+ ]
 					}
 ,
-					"text" : "amxd~",
-					"varname" : "amxd~",
-					"viewvisibility" : 0
+					"patching_rect" : [ 867.745604999999955, 194.5, 54.0, 22.0 ],
+					"saved_object_attributes" : 					{
+						"description" : "",
+						"digest" : "",
+						"globalpatchername" : "",
+						"tags" : ""
+					}
+,
+					"text" : "p history"
 				}
 
 			}
@@ -214,7 +334,7 @@
 					"numoutlets" : 0,
 					"patching_rect" : [ 253.0, 669.0, 150.0, 34.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 753.0, 47.5, 210.0, 20.0 ],
+					"presentation_rect" : [ 715.745605000000069, 46.0, 210.0, 20.0 ],
 					"text" : "(rolypoly~ tries to keep this constant)",
 					"textjustification" : 2
 				}
@@ -638,7 +758,7 @@
 					"numoutlets" : 0,
 					"patching_rect" : [ 253.0, 649.0, 150.0, 20.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 867.0, 1.5, 96.0, 20.0 ],
+					"presentation_rect" : [ 829.745605000000069, 0.0, 96.0, 20.0 ],
 					"text" : "drum - guitar diff",
 					"textjustification" : 2
 				}
@@ -653,13 +773,13 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 776.745605000000069, 233.5, 223.0, 124.0 ],
+					"patching_rect" : [ 776.745605000000069, 233.5, 54.0, 51.0 ],
 					"presentation" : 1,
 					"presentation_rect" : [ 317.0, 68.0, 289.0, 157.0 ],
 					"setminmax" : [ -15.0, 15.0 ],
 					"setstyle" : 1,
 					"signed" : 1,
-					"size" : 209,
+					"size" : 175,
 					"slidercolor" : [ 0.388235294117647, 0.725490196078431, 0.827450980392157, 1.0 ]
 				}
 
@@ -1273,7 +1393,7 @@
 					"parameter_enable" : 0,
 					"patching_rect" : [ 963.0, 691.0, 300.0, 100.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 674.0, 125.0, 289.0, 100.0 ],
+					"presentation_rect" : [ 942.0, 125.0, 289.0, 100.0 ],
 					"setminmax" : [ 0.0, 500.0 ],
 					"setstyle" : 3,
 					"slidercolor" : [ 0.85098, 0.533333, 0.254902, 1.0 ]
@@ -1340,7 +1460,7 @@
 					"parameter_enable" : 0,
 					"patching_rect" : [ 963.0, 55.0, 100.0, 22.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 729.0, 91.0, 100.0, 22.0 ]
+					"presentation_rect" : [ 1073.0, 91.0, 100.0, 22.0 ]
 				}
 
 			}
@@ -1353,7 +1473,7 @@
 					"outlettype" : [ "signal", "signal" ],
 					"patching_rect" : [ 1089.75, 23.0, 45.0, 45.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 674.0, 68.0, 45.0, 45.0 ]
+					"presentation_rect" : [ 1186.0, 68.0, 45.0, 45.0 ]
 				}
 
 			}
@@ -1636,7 +1756,6 @@
 										"tags" : "",
 										"style" : "",
 										"subpatcher_template" : "",
-										"visible" : 1,
 										"boxes" : [ 											{
 												"box" : 												{
 													"format" : 6,
@@ -3982,7 +4101,7 @@
 					"parameter_enable" : 0,
 					"patching_rect" : [ 407.0, 649.0, 66.0, 22.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 897.0, 23.5, 66.0, 22.0 ],
+					"presentation_rect" : [ 859.745605000000069, 22.0, 66.0, 22.0 ],
 					"textcolor" : [ 0.015686274509804, 0.223529411764706, 0.349019607843137, 1.0 ],
 					"triscale" : 0.0
 				}
@@ -4599,6 +4718,22 @@
 				}
 
 			}
+, 			{
+				"box" : 				{
+					"fontface" : 1,
+					"fontsize" : 128.0,
+					"id" : "obj-135",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 761.0, 194.5, 141.0, 152.0 ],
+					"presentation" : 1,
+					"presentation_rect" : [ 411.0, 71.5, 206.0, 152.0 ],
+					"text" : "Y",
+					"textcolor" : [ 0.129411764705882, 0.129411764705882, 0.129411764705882, 0.11 ]
+				}
+
+			}
  ],
 		"lines" : [ 			{
 				"patchline" : 				{
@@ -4648,6 +4783,16 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-114", 0 ],
+					"order" : 1,
+					"source" : [ "obj-108", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"color" : [ 0.701960784313725, 0.701960784313725, 0.701960784313725, 0.0 ],
+					"destination" : [ "obj-133", 1 ],
+					"order" : 0,
 					"source" : [ "obj-108", 0 ]
 				}
 
@@ -4790,6 +4935,13 @@
 				"patchline" : 				{
 					"destination" : [ "obj-23", 0 ],
 					"source" : [ "obj-13", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-132", 0 ],
+					"source" : [ "obj-133", 0 ]
 				}
 
 			}
@@ -5079,7 +5231,7 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-105", 0 ],
-					"order" : 1,
+					"order" : 2,
 					"source" : [ "obj-85", 0 ]
 				}
 
@@ -5087,6 +5239,15 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-12", 0 ],
+					"order" : 1,
+					"source" : [ "obj-85", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-133", 0 ],
+					"midpoints" : [ 786.245605000000069, 135.0, 877.245604999999955, 135.0 ],
 					"order" : 0,
 					"source" : [ "obj-85", 0 ]
 				}
@@ -5130,7 +5291,6 @@
  ],
 		"parameters" : 		{
 			"obj-27" : [ "live.gain~", "live.gain~", 0 ],
-			"obj-129" : [ "amxd~", "amxd~", 0 ],
 			"parameterbanks" : 			{
 
 			}
@@ -5179,13 +5339,6 @@
 				"name" : "snare.aiff",
 				"bootpath" : "C74:/docs/tutorial-patchers/msp-tut",
 				"type" : "AIFF",
-				"implicit" : 1
-			}
-, 			{
-				"name" : "Autotuna.amxd.maxsnap",
-				"bootpath" : "~/Documents/Max 8/Snapshots",
-				"patcherrelativepath" : "../../../../../Max 8/Snapshots",
-				"type" : "mx@s",
 				"implicit" : 1
 			}
 , 			{
