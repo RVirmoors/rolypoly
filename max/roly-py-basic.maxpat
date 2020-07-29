@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 61.0, -989.0, 1151.0, 906.0 ],
+		"rect" : [ 173.0, -688.0, 1041.0, 283.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 1,
 		"default_fontsize" : 12.0,
@@ -38,6 +38,174 @@
 		"style" : "",
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
+				"box" : 				{
+					"autosave" : 1,
+					"bgmode" : 1,
+					"border" : 0,
+					"clickthrough" : 0,
+					"enablehscroll" : 0,
+					"enablevscroll" : 0,
+					"id" : "obj-129",
+					"lockeddragscroll" : 0,
+					"maxclass" : "newobj",
+					"numinlets" : 3,
+					"numoutlets" : 4,
+					"offset" : [ 0.0, 0.0 ],
+					"outlettype" : [ "signal", "signal", "", "" ],
+					"patching_rect" : [ 1185.0, 450.0, 50.5, 22.0 ],
+					"saved_attribute_attributes" : 					{
+						"valueof" : 						{
+							"parameter_invisible" : 1,
+							"parameter_longname" : "amxd~",
+							"parameter_shortname" : "amxd~",
+							"parameter_type" : 3
+						}
+
+					}
+,
+					"saved_object_attributes" : 					{
+						"parameter_enable" : 1,
+						"patchername" : "Autotuna.amxd",
+						"patchername_fallback" : "C74:/packages/Max for Live/patchers/Max Audio Effect/Autotuna.amxd"
+					}
+,
+					"snapshot" : 					{
+						"filetype" : "C74Snapshot",
+						"version" : 2,
+						"minorversion" : 0,
+						"name" : "snapshotlist",
+						"origin" : "max~",
+						"type" : "list",
+						"subtype" : "Undefined",
+						"embed" : 1,
+						"snapshot" : 						{
+							"name" : "Autotuna.amxd",
+							"origname" : "C74:/packages/Max for Live/patchers/Max Audio Effect/Autotuna.amxd",
+							"valuedictionary" : 							{
+								"parameter_values" : 								{
+									"AmbienceThreshold" : 0.0,
+									"CorrectionAmount" : 100.0,
+									"CorrectionThreshold" : 0.0,
+									"Detune1" : 0.0,
+									"Detune10" : 0.0,
+									"Detune11" : 0.0,
+									"Detune12" : 0.0,
+									"Detune2" : 0.0,
+									"Detune3" : 0.0,
+									"Detune4" : 0.0,
+									"Detune5" : 0.0,
+									"Detune6" : 0.0,
+									"Detune7" : 0.0,
+									"Detune8" : 0.0,
+									"Detune9" : 0.0,
+									"Dry/Wet" : 100.0,
+									"Gain" : 0.0,
+									"Latency" : 1.0,
+									"Quality" : 0.0,
+									"SibilanceThreshold" : 100.0,
+									"Tonic" : 11.0,
+									"Pattern" : 0.0,
+									"blob" : 									{
+										"Scale" : [ 3, 1, 12, 0, 12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 2 ],
+										"Storage" : [ 											{
+												"pattrstorage" : 												{
+													"name" : "u908003917",
+													"slots" : 													{
+
+													}
+
+												}
+
+											}
+ ]
+									}
+
+								}
+
+							}
+
+						}
+,
+						"snapshotlist" : 						{
+							"current_snapshot" : 0,
+							"entries" : [ 								{
+									"filetype" : "C74Snapshot",
+									"version" : 2,
+									"minorversion" : 0,
+									"name" : "Autotuna.amxd",
+									"origin" : "Autotuna.amxd",
+									"type" : "amxd",
+									"subtype" : "Undefined",
+									"embed" : 0,
+									"snapshot" : 									{
+										"name" : "Autotuna.amxd",
+										"origname" : "C74:/packages/Max for Live/patchers/Max Audio Effect/Autotuna.amxd",
+										"valuedictionary" : 										{
+											"parameter_values" : 											{
+												"AmbienceThreshold" : 0.0,
+												"CorrectionAmount" : 100.0,
+												"CorrectionThreshold" : 0.0,
+												"Detune1" : 0.0,
+												"Detune10" : 0.0,
+												"Detune11" : 0.0,
+												"Detune12" : 0.0,
+												"Detune2" : 0.0,
+												"Detune3" : 0.0,
+												"Detune4" : 0.0,
+												"Detune5" : 0.0,
+												"Detune6" : 0.0,
+												"Detune7" : 0.0,
+												"Detune8" : 0.0,
+												"Detune9" : 0.0,
+												"Dry/Wet" : 100.0,
+												"Gain" : 0.0,
+												"Latency" : 1.0,
+												"Quality" : 0.0,
+												"SibilanceThreshold" : 100.0,
+												"Tonic" : 11.0,
+												"Pattern" : 0.0,
+												"blob" : 												{
+													"Scale" : [ 3, 1, 12, 0, 12, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 2 ],
+													"Storage" : [ 														{
+															"pattrstorage" : 															{
+																"name" : "u908003917",
+																"slots" : 																{
+
+																}
+
+															}
+
+														}
+ ]
+												}
+
+											}
+
+										}
+
+									}
+,
+									"fileref" : 									{
+										"name" : "Autotuna.amxd",
+										"filename" : "Autotuna.amxd.maxsnap",
+										"filepath" : "~/Documents/Max 8/Snapshots",
+										"filepos" : -1,
+										"snapshotfileid" : "c6e71152f90d2decb21e291f760fe07f"
+									}
+
+								}
+ ]
+						}
+
+					}
+,
+					"text" : "amxd~",
+					"varname" : "amxd~",
+					"viewvisibility" : 0
+				}
+
+			}
+, 			{
 				"box" : 				{
 					"id" : "obj-128",
 					"linecount" : 2,
@@ -491,7 +659,7 @@
 					"setminmax" : [ -10.0, 10.0 ],
 					"setstyle" : 1,
 					"signed" : 1,
-					"size" : 81,
+					"size" : 256,
 					"slidercolor" : [ 0.388235294117647, 0.725490196078431, 0.827450980392157, 1.0 ]
 				}
 
@@ -4074,12 +4242,13 @@
 , 			{
 				"box" : 				{
 					"id" : "obj-9",
+					"linecount" : 2,
 					"maxclass" : "message",
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 127.0, 203.0, 238.0, 22.0 ],
-					"text" : "0. 0. 1. 0. 0. 0. 0. 0. 0. 200. 150. 1. 0.75 0."
+					"patching_rect" : [ 127.0, 203.0, 238.0, 36.0 ],
+					"text" : "0. 1. 0. 0. 0. 0. 0. 0. 0. 214.285 140. 1. 0.875 0."
 				}
 
 			}
@@ -4638,6 +4807,7 @@
  ],
 		"parameters" : 		{
 			"obj-27" : [ "live.gain~", "live.gain~", 0 ],
+			"obj-129" : [ "amxd~", "amxd~", 0 ],
 			"parameterbanks" : 			{
 
 			}
@@ -4686,6 +4856,13 @@
 				"name" : "snare.aiff",
 				"bootpath" : "C74:/docs/tutorial-patchers/msp-tut",
 				"type" : "AIFF",
+				"implicit" : 1
+			}
+, 			{
+				"name" : "Autotuna.amxd.maxsnap",
+				"bootpath" : "~/Documents/Max 8/Snapshots",
+				"patcherrelativepath" : "../../../../../Max 8/Snapshots",
+				"type" : "mx@s",
 				"implicit" : 1
 			}
 , 			{
