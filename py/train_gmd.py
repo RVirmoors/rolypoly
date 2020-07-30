@@ -290,11 +290,11 @@ if __name__ == '__main__':
     if args.optuna:
         def objective(trial):
             layers = trial.suggest_int('layers', 2, 3)
-            lstm_units = trial.suggest_int('lstm_units', 50, 250)
+            lstm_units = trial.suggest_int('lstm_units', 50, 150)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.8)
             bs = 2  # pow(2, trial.suggest_int('bs', 8, 10))
-            lr = trial.suggest_loguniform('lr', 1e-7, 1e-4)
-            ep = trial.suggest_int('ep', 3, 20)
+            lr = 1e-5  # trial.suggest_loguniform('lr', 1e-7, 1e-4)
+            ep = 5  # trial.suggest_int('ep', 3, 20)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout)
@@ -309,7 +309,7 @@ if __name__ == '__main__':
 
         print("Optimization done. Best params:", study.best_params)
         print("Best trial out of", len(study.trials), ":", study.best_trial)
-
+"""
         while get_y_n("Optimise for 10 more trials? "):
             study.optimize(objective, n_trials=10)
 
@@ -320,3 +320,4 @@ if __name__ == '__main__':
         PATH = "models/gmd_LSTM_hop1.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
+"""
