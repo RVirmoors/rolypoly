@@ -91,7 +91,7 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     Y_hat = padded_Y_hat
     diff_hat = padded_diff_hat
     X_lengths = X_lengths[:batch_size]
-    X = torch.tensor(X)
+    X = torch.tensor(X, dtype=torch.float64)
     X_lengths = torch.tensor(X_lengths, dtype=torch.int64)
     return X, X_lengths, Y_hat, diff_hat
 
@@ -110,7 +110,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
         -> a constant value for diff (see above)
     """
     if style == 'diff':
-        Y = torch.Tensor(diff_hat)
+        Y = torch.DoubleTensor(diff_hat)
         return Y_hat, Y
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
@@ -127,8 +127,8 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
         np.add(Y_hat[i], diff_hat[i], Y_hat[i])   # Y_hat = Y_hat + diff_hat
         np.subtract(Y_hat[i], diff[i], Y[i])      # Y     = Y_hat - diff
 
-    Y = torch.Tensor(Y)
-    Y_hat = torch.Tensor(Y_hat)
+    Y = torch.Tensor(Y, dtype=torch.float64)
+    Y_hat = torch.Tensor(Y_hat, dtype=torch.float64)
 
     return Y_hat, Y
 
@@ -217,25 +217,25 @@ class TimingLSTM(nn.Module):
             num_layers=self.nb_layers,
             batch_first=True,
             dropout=self.dropout
-        ).to(device)
+        ).double().to(device)
 
         self.hidden = self.init_hidden()
         # output layer which projects back to Y space
-        self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1).to(device)
+        self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1).double().to(device)
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
         hidden = torch.zeros(self.nb_layers,
-                             self.batch_size, self.nb_lstm_units, device=device)
+                             self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
         cell = torch.zeros(self.nb_layers,
-                           self.batch_size, self.nb_lstm_units, device=device)
+                           self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
         return (hidden, cell)
 
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We want the LSTM to treat
         # a new batch as a continuation of a sequence (?)
         # self.hidden = self.init_hidden()
-        X = X.float()   # float, not double...
+        # X = X.float()   # float, not double...
 
         batch_size, seq_len, _ = X.size()
         # print("X ....", X.size())
@@ -256,7 +256,7 @@ class TimingLSTM(nn.Module):
         # https://github.com/pytorch/pytorch/issues/1591#issuecomment-365834629
         if X.size(1) < seq_len:
             dummy_tensor = torch.zeros(
-                batch_size, seq_len - X.size(1), self.nb_lstm_units, device=device)
+                batch_size, seq_len - X.size(1), self.nb_lstm_units, device=device, dtype=torch.float64)
             X = torch.cat([X, dummy_tensor], 1)
 
         # Project to output space
@@ -347,6 +347,9 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
 
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
+                batch_loss = 0
+                batch_div = 0
+
                 for mb_i in range(n_mb):
                     # if DEBUG:
                     #    print("miniBatch", mb_i + 1, "/", n_mb)
@@ -357,7 +360,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
                         # reached the end
                         end = X.shape[0]
                     indices = torch.tensor(
-                        range(mb_i * minihop_size, end), device=device)
+                        range(mb_i * minihop_size, end), device=device, dtype=torch.int64)
                     mb_X = torch.index_select(X, 0, indices).to(device)
                     mb_Xl = torch.index_select(
                         X_lengths, 0, indices).to(device)
@@ -368,11 +371,13 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
                     # forward
                     # track history if only in train
                     with torch.set_grad_enabled(phase == 'train'):
-                        #print(mb_X.size(), mb_Xl.size(), mb_Y.size())
+                        # print(mb_X.size(), mb_Xl.size(), mb_Y.size())
                         mb_Y_hat = model(mb_X, mb_Xl)
                         loss = model.loss(mb_Y_hat, mb_Y)
                         epoch_loss += loss.item()
+                        batch_loss += loss.item()
                         div_loss += 1
+                        batch_div += 1
                         # backward + optimize only if in training phase
                         if phase == 'train':
                             loss.backward()
@@ -383,8 +388,8 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
                     model.hidden[1].detach_()
 
                 if DEBUG:
-                    print(phase + 'Epoch: {} [Batch {}/{}]\t{:3d} seqs\tLoss: {:.6f}'.
-                          format(t + 1, b_i, len(dataloaders[phase]), n_mb, epoch_loss / div_loss))
+                    print(phase + 'Epoch: {} [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
+                          format(t + 1, b_i, len(dataloaders[phase]), n_mb, batch_loss / batch_div))
 
             epoch_loss = epoch_loss / div_loss
             if t % 1 == 0:
@@ -438,6 +443,9 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
 
             n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
+            batch_loss = 0
+            batch_div = 0
+
             for mb_i in range(n_mb):
                 # if DEBUG:
                 #    print("miniBatch", mb_i + 1, "/", n_mb)
@@ -448,7 +456,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
                     # reached the end
                     end = X.shape[0]
                 indices = torch.tensor(
-                    range(mb_i * minihop_size, end), device=device)
+                    range(mb_i * minihop_size, end), device=device, dtype=torch.int64)
                 mb_X = torch.index_select(X, 0, indices).to(device)
                 mb_Xl = torch.index_select(
                     X_lengths, 0, indices).to(device)
@@ -459,15 +467,17 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
                     mb_Y_hat = model(mb_X, mb_Xl)
                     loss = model.loss(mb_Y_hat, mb_Y)
                     total_loss += loss.item()
+                    batch_loss += loss.item()
                     div_loss += 1
+                    batch_div += 1
 
                 # detach/repackage the hidden state in between batches
                 model.hidden[0].detach_()
                 model.hidden[1].detach_()
 
             if DEBUG:
-                print('Test: {} [Batch {}/{}]\t{:3d} seqs\tLoss: {:.6f}'.
-                      format(b_i, len(dataloaders['test']), n_mb, total_loss / div_loss))
+                print('Test: {} [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
+                      format(b_i, len(dataloaders['test']), n_mb, batch_loss / batch_div))
 
         total_loss = total_loss / div_loss
         print('Test loss: {:4f}'.format(total_loss))
