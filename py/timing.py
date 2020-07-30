@@ -381,9 +381,9 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                     model.hidden[0].detach_()
                     model.hidden[1].detach_()
 
-                if DEBUG and (phase == 'train'):
-                    print('Train Epoch: {} [Batch {}/{}]\tLoss: {:.6f}'.
-                        format(t+1, b_i, len(dataloaders[phase]), epoch_loss / div_loss))
+                if DEBUG:
+                    print(phase+'Epoch: {} [Batch {}/{}]\t{:3d} seqs\tLoss: {:.6f}'.
+                        format(t+1, b_i, len(dataloaders[phase]), n_mb, epoch_loss / div_loss))
 
             epoch_loss = epoch_loss / div_loss
             if t % 1 == 0:
