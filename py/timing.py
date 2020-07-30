@@ -272,7 +272,8 @@ class TimingLSTM(nn.Module):
         # I like to reshape for mental sanity so we're back to (batch_size, seq_len, 1 output)
         X = X.view(batch_size, seq_len, 1)
 
-        y_hat = X[-1][(X_lengths[-1] - 1)]
+        y_hat = X[-1][(X_lengths[-1] - 1)][0]
+        print("before", X[-1])
         return y_hat
 
     def loss(self, Y_hat, Y):
