@@ -317,6 +317,6 @@ if __name__ == '__main__':
             print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
-        PATH = "models/gmd_LSTM_1y.pt"
+        PATH = "models/gmd_LSTM_hop1.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
