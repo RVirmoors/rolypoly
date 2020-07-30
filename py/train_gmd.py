@@ -293,7 +293,7 @@ if __name__ == '__main__':
             lstm_units = trial.suggest_int('lstm_units', 50, 250)
             dropout = trial.suggest_uniform('dropout', 0.3, 0.9)
             bs = 2  # pow(2, trial.suggest_int('bs', 8, 10))
-            lr = trial.suggest_loguniform('lr', 1e-5, 3e-3)
+            lr = trial.suggest_loguniform('lr', 1e-7, 3e-4)
             ep = trial.suggest_int('ep', 1, 3)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
