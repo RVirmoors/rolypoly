@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = False
+DEBUG = True
 
 import torch
 import torch.nn as nn
@@ -49,10 +49,10 @@ def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
             # last hit plus one doesn't make sense
             Y_hat[s_i][h_i + 1] = 0
-            if DEBUG:
-                print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
-                print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
-                print("==========")
+            #if DEBUG:
+            #    print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
+            #    print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
+            #    print("==========")
         s_i += 1
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
@@ -73,8 +73,8 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
     """
     longest_seq = int(max(X_lengths))
-    if DEBUG:
-        print("longest: ", longest_seq, " | batch size: ", batch_size)
+    #if DEBUG:
+    #    print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.zeros((batch_size, longest_seq, feat_vec_size))
     padded_Y_hat = np.zeros((batch_size, longest_seq))
     padded_diff_hat = np.zeros_like(padded_Y_hat)
@@ -188,8 +188,8 @@ def load_XY(filename):
     # last seq
     X_lengths[s_i] = h_i
     batch_size = s_i + 1
-    if DEBUG:
-        print("Done loading sequences of lengths: ", X_lengths[:batch_size])
+    #if DEBUG:
+    #    print("Done loading sequences of lengths: ", X_lengths[:batch_size])
     return X, X_lengths, diff_hat, Y, batch_size
 
 
@@ -347,8 +347,8 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
                 for mb_i in range(n_mb):
-                    if DEBUG:
-                        print("miniBatch", mb_i + 1, "/", n_mb)
+                    #if DEBUG:
+                    #    print("miniBatch", mb_i + 1, "/", n_mb)
                     # get minibatch indices
                     if mb_i * minihop_size + minibatch_size < X.shape[0]:
                         end = mb_i * minihop_size + minibatch_size
@@ -380,6 +380,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                     # detach/repackage the hidden state in between batches
                     model.hidden[0].detach_()
                     model.hidden[1].detach_()
+
                 if DEBUG and (phase == 'train'):
                     print('Train Epoch: {} [Batch {}/{}]\tLoss: {:.6f}'.
                         format(t+1, b_i, len(dataloaders[phase]), epoch_loss / div_loss))
@@ -436,8 +437,8 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
             n_mb = int(np.ceil(X.shape[0] / minibatch_size))
 
             for mb_i in range(n_mb):
-                if DEBUG:
-                    print("miniBatch", mb_i + 1, "/", n_mb)
+                #if DEBUG:
+                #    print("miniBatch", mb_i + 1, "/", n_mb)
                 # get minibatch indices
                 if (mb_i + 1) * minibatch_size < X.shape[0]:
                     end = (mb_i + 1) * minibatch_size
@@ -457,8 +458,6 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                     loss = model.loss(mb_Y_hat, mb_Y)
                     total_loss += loss.item()
                     div_loss += 1
-                    if DEBUG:
-                        print("LOSS:", loss.item())
 
                 # detach/repackage the hidden state in between batches
                 model.hidden[0].detach_()
