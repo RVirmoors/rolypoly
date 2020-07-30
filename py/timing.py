@@ -388,7 +388,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
 
                 if DEBUG:
                     print(phase + 'Epoch: {} [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
-                          format(t + 1, b_i, len(dataloaders[phase]), n_mb, batch_loss / batch_div))
+                          format(t + 1, b_i + 1, len(dataloaders[phase]), n_mb, batch_loss / batch_div))
 
             epoch_loss = epoch_loss / div_loss
             if t % 1 == 0:
@@ -476,7 +476,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
 
             if DEBUG:
                 print('Test: [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
-                      format(b_i, len(dataloaders['test']), n_mb, batch_loss / batch_div))
+                      format(b_i + 1, len(dataloaders['test']), n_mb, batch_loss / batch_div))
 
         total_loss = total_loss / div_loss
         print('Test loss: {:4f}'.format(total_loss))
