@@ -245,6 +245,7 @@ class TimingLSTM(nn.Module):
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
         # print("hidden", self.hidden[0].size(), "\n====")
+        print("before", X[0][:3])
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
@@ -273,7 +274,6 @@ class TimingLSTM(nn.Module):
         X = X.view(batch_size, seq_len, 1)
 
         y_hat = X[-1][(X_lengths[-1] - 1)][0]
-        print("before", X[-1])
         return y_hat
 
     def loss(self, Y_hat, Y):
