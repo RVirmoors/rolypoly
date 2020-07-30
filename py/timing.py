@@ -475,7 +475,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e
                 model.hidden[1].detach_()
 
             if DEBUG:
-                print('Test: {} [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
+                print('Test: [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
                       format(b_i, len(dataloaders['test']), n_mb, batch_loss / batch_div))
 
         total_loss = total_loss / div_loss
