@@ -2,6 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
+DEBUG = False
 
 import torch
 import torch.nn as nn
@@ -34,11 +35,7 @@ torch.backends.cudnn.deterministic = True
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-DEBUG = False
-
 feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
-
-loss = 0
 
 # METHODS FOR BUILDING X, Y
 # =========================
@@ -340,7 +337,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
             else:
                 model.eval()   # Set model to evaluate mode
 
-            for _, sample in enumerate(dataloaders[phase]):
+            for b_i, sample in enumerate(dataloaders[phase]):
                 # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
                 X = sample['X'][0].to(device)
                 X_lengths = sample['X_lengths'][0].to(device)
@@ -375,8 +372,6 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                         loss = model.loss(mb_Y_hat, mb_Y)
                         epoch_loss += loss.item()
                         div_loss += 1
-                        if DEBUG:
-                            print("LOSS:", loss.item())
                         # backward + optimize only if in training phase
                         if phase == 'train':
                             loss.backward()
@@ -385,9 +380,12 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                     # detach/repackage the hidden state in between batches
                     model.hidden[0].detach_()
                     model.hidden[1].detach_()
+                if DEBUG and (phase == 'train'):
+                    print('Train Epoch: {} [Batch {}/{}]\tLoss: {:.6f}'.
+                        format(t+1, b_i, len(dataloaders[phase]), epoch_loss / div_loss))
 
             epoch_loss = epoch_loss / div_loss
-            if t % 5 == 0:
+            if t % 1 == 0:
                 print("Epoch", t + 1, phase, "loss:", epoch_loss)
             writer.add_scalar(
                 "Loss/" + phase, epoch_loss, w_i[phase])
@@ -415,7 +413,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
         time_elapsed // 60, time_elapsed % 60))
     print('Best validation loss: {:4f}, found in Epoch #{:d}'.format(
         best_loss, best_epoch))
-    print('Best validation MSE (16th note) loss: {:4f}'.format(best_loss * 16))
+    print('Best validation MSE (16th note) loss: {:4f}'.format(best_loss * 16 * 16))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
@@ -468,7 +466,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
 
         total_loss = total_loss / div_loss
         print('Test loss: {:4f}'.format(total_loss))
-        print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16))
+        print('Test MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 
     writer.add_hparams({'layers': model.nb_layers, 'lstm_units': model.nb_lstm_units, 'lr': lr, 'bsize': minibatch_size, 'epochs': epochs},
                        {'hparam/best_val_loss': best_loss, 'hparam/test_loss': total_loss})
