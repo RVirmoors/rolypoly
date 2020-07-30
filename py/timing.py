@@ -247,7 +247,6 @@ class TimingLSTM(nn.Module):
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
-        print("before", X[0][:3])
 
         # undo the packing operation
         X, _ = torch.nn.utils.rnn.pad_packed_sequence(X, batch_first=True)
