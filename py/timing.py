@@ -295,7 +295,6 @@ class TimingLSTM(nn.Module):
         y = Y[0][last_index - 1]
 
         criterion = nn.MSELoss(reduction='sum')
-        print("loss between", Y_hat, "and", y)
 
         # compute MSE loss
         return (criterion(Y_hat, y))  # / nb_outputs)
