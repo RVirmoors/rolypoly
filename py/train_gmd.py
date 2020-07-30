@@ -290,11 +290,11 @@ if __name__ == '__main__':
     if args.optuna:
         def objective(trial):
             layers = trial.suggest_int('layers', 2, 3)
-            lstm_units = trial.suggest_int('lstm_units', 100, 250)
+            lstm_units = trial.suggest_int('lstm_units', 50, 250)
             dropout = trial.suggest_uniform('dropout', 0.3, 0.9)
-            bs = 256  # pow(2, trial.suggest_int('bs', 8, 10))
-            lr = 4e-3  # trial.suggest_loguniform('lr', 3e-4, 3e-3)
-            ep = 100  # trial.suggest_int('ep', 500, 2000)
+            bs = 2  # pow(2, trial.suggest_int('bs', 8, 10))
+            lr = trial.suggest_loguniform('lr', 1e-5, 3e-3)
+            ep = trial.suggest_int('ep', 1, 3)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout)

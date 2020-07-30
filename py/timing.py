@@ -49,7 +49,7 @@ def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
             # last hit plus one doesn't make sense
             Y_hat[s_i][h_i + 1] = 0
-            #if DEBUG:
+            # if DEBUG:
             #    print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
             #    print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
             #    print("==========")
@@ -73,7 +73,7 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
     """
     longest_seq = int(max(X_lengths))
-    #if DEBUG:
+    # if DEBUG:
     #    print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.zeros((batch_size, longest_seq, feat_vec_size))
     padded_Y_hat = np.zeros((batch_size, longest_seq))
@@ -188,7 +188,7 @@ def load_XY(filename):
     # last seq
     X_lengths[s_i] = h_i
     batch_size = s_i + 1
-    #if DEBUG:
+    # if DEBUG:
     #    print("Done loading sequences of lengths: ", X_lengths[:batch_size])
     return X, X_lengths, diff_hat, Y, batch_size
 
@@ -304,14 +304,15 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e-3):
+def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=1e-4):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
 
     model.to(device)
     print(model)
-    print("miniBatch size:", minibatch_size, " | hop:", minihop_size)
+    print("miniBatch size:", minibatch_size,
+          " | hop:", minihop_size, " | lr:", lr)
     print("Running on", next(model.parameters()).device)
 
     optimizer = torch.optim.Adam(
@@ -347,7 +348,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
                 for mb_i in range(n_mb):
-                    #if DEBUG:
+                    # if DEBUG:
                     #    print("miniBatch", mb_i + 1, "/", n_mb)
                     # get minibatch indices
                     if mb_i * minihop_size + minibatch_size < X.shape[0]:
@@ -382,8 +383,8 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                     model.hidden[1].detach_()
 
                 if DEBUG:
-                    print(phase+'Epoch: {} [Batch {}/{}]\t{:3d} seqs\tLoss: {:.6f}'.
-                        format(t+1, b_i, len(dataloaders[phase]), n_mb, epoch_loss / div_loss))
+                    print(phase + 'Epoch: {} [Batch {}/{}]\t{:3d} seqs\tLoss: {:.6f}'.
+                          format(t + 1, b_i, len(dataloaders[phase]), n_mb, epoch_loss / div_loss))
 
             epoch_loss = epoch_loss / div_loss
             if t % 1 == 0:
@@ -414,7 +415,8 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
         time_elapsed // 60, time_elapsed % 60))
     print('Best validation loss: {:4f}, found in Epoch #{:d}'.format(
         best_loss, best_epoch))
-    print('Best validation MSE (16th note) loss: {:4f}'.format(best_loss * 16 * 16))
+    print('Best validation MSE (16th note) loss: {:4f}'.format(
+        best_loss * 16 * 16))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
@@ -425,7 +427,7 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
     total_loss = div_loss = 0
 
     if 'test' in dataloaders:
-        for _, sample in enumerate(dataloaders['test']):
+        for b_i, sample in enumerate(dataloaders['test']):
             if DEBUG:
                 print(sample['fn'])
             # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
@@ -434,19 +436,19 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
             Y = sample['Y'][0].to(device)
             model.hidden = model.init_hidden()
 
-            n_mb = int(np.ceil(X.shape[0] / minibatch_size))
+            n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
             for mb_i in range(n_mb):
-                #if DEBUG:
+                # if DEBUG:
                 #    print("miniBatch", mb_i + 1, "/", n_mb)
                 # get minibatch indices
-                if (mb_i + 1) * minibatch_size < X.shape[0]:
-                    end = (mb_i + 1) * minibatch_size
+                if mb_i * minihop_size + minibatch_size < X.shape[0]:
+                    end = mb_i * minihop_size + minibatch_size
                 else:
                     # reached the end
                     end = X.shape[0]
                 indices = torch.tensor(
-                    range(mb_i * minibatch_size, end), device=device)
+                    range(mb_i * minihop_size, end), device=device)
                 mb_X = torch.index_select(X, 0, indices).to(device)
                 mb_Xl = torch.index_select(
                     X_lengths, 0, indices).to(device)
@@ -462,6 +464,10 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=10, lr=4e
                 # detach/repackage the hidden state in between batches
                 model.hidden[0].detach_()
                 model.hidden[1].detach_()
+
+            if DEBUG:
+                print('Test: {} [Batch {}/{}]\t{:3d} seqs\tLoss: {:.6f}'.
+                      format(b_i, len(dataloaders['test']), n_mb, total_loss / div_loss))
 
         total_loss = total_loss / div_loss
         print('Test loss: {:4f}'.format(total_loss))
