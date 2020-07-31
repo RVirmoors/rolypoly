@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = False
+DEBUG = True
 
 import torch
 import torch.nn as nn
@@ -271,7 +271,7 @@ class TimingLSTM(nn.Module):
         # I like to reshape for mental sanity so we're back to (batch_size, seq_len, 1 output)
         X = X.view(batch_size, seq_len, 1)
 
-        y_hat = X[-1][(X_lengths[-1] - 1)][0]
+        y_hat = X  # [-1][(X_lengths[-1] - 1)][0]
         return y_hat
 
     def loss(self, Y_hat, Y):
@@ -279,7 +279,6 @@ class TimingLSTM(nn.Module):
         flatten all the targets and predictions,
         eliminate outputs on padded elements,
         compute MSE loss
-        """
         """
         Y = Y.view(-1)              # flat target
         Y_hat = Y_hat.view(-1)      # flat inference
@@ -290,14 +289,11 @@ class TimingLSTM(nn.Module):
 
         # pick the values for Y_hat and zero out the rest with the mask
         Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
-        """
-        last_index = (Y != 0).sum(dim=1)[0]
-        y = Y[0][last_index - 1]
 
         criterion = nn.MSELoss(reduction='sum')
 
         # compute MSE loss
-        return (criterion(Y_hat, y))  # / nb_outputs)
+        return (criterion(Y_hat, Y) / nb_outputs)
 
 
 # TRAIN METHOD
