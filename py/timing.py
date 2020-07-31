@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = True
+DEBUG = False
 
 import torch
 import torch.nn as nn
@@ -300,7 +300,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr=5e-4):
+def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr=1e-3):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
