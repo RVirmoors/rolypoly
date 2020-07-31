@@ -3,7 +3,7 @@
 
 Requires pythonosc, numpy, librosa.
 """
-RUNSEQ = True
+RUNSEQ = False
 
 import argparse
 import queue
@@ -114,35 +114,35 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
             lastBar = X[s_i]
             newBar = np.zeros_like(lastBar)
             newBar[0] = featVec
-            in_lengths = [X_lengths[s_i], 1]
+            in_lengths = [int(X_lengths[s_i]) + 1]
         elif s_i > 0:
             lastBar = X[s_i - 1]
             newBar = X[s_i]
             newBar[h_i + 1] = featVec
-            in_lengths = [X_lengths[s_i - 1], h_i + 2]
+            in_lengths = [int(X_lengths[s_i - 1]) + h_i + 2]
         else:
             # first bar. Second bar is still empty
             lastBar = X[s_i]
             lastBar[h_i + 1] = featVec
-            newBar = None
+            newBar = np.zeros_like(lastBar)
             in_lengths = [h_i + 2]
-        if hasattr(newBar, 'shape'):
-            twoBars = np.stack((lastBar, newBar))
-            x = torch.Tensor(twoBars).double()  # dtype=torch.float64)
-        else:
-            x = torch.Tensor(lastBar).double()  # dtype=torch.float64)
-            x = x[None, :, :]       # one batch, 1 or 2 seqs
+
+        twoBars = np.concatenate((lastBar, newBar), axis=0)
+        x = torch.Tensor(twoBars).double()  # dtype=torch.float64)
+        x = x[None, :, :]       # one batch, 1 or 2 seqs
         print(x.size())
     else:
-        x = torch.Tensor(featVec, dtype=torch.float64)
+        x = torch.Tensor(featVec).double()  # dtype=torch.float64)
         x = x[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
     with torch.no_grad():
         if RUNSEQ:
             y_hat = model(x, in_lengths)    # 1-2 bars
-            y_hat = y_hat[-1][in_lengths[-1] - 1][0]
+            y_hat = y_hat[-1][in_lengths[0] - 1][0]
+            print("-->", y_hat)
         else:
-            y_hat = model(x, [1])[-1][h_i]           # one fV
+            y_hat = model(x, [1])[0][0]     # one fV
+            print("-->", y_hat)
     # 4.
     await asyncio.sleep(featVec[9] * 0.4 / 1000)
     # remains constant if no guit onset?
@@ -247,11 +247,7 @@ async def init_main():
         transport, protocol = await server.create_serve_endpoint()
 
         # define model for LIVE.
-        if RUNSEQ:
-            # batch_size = 2 : current bar + previous one
-            model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=2)
-        else:
-            model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
+        model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
 
         if args.preload_model:
             trained_path = args.preload_model
