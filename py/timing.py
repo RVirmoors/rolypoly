@@ -19,7 +19,8 @@ import os
 import copy
 
 from constants import ROLAND_DRUM_PITCH_CLASSES
-from helper import get_y_n, EarlyStopping
+from helper import get_y_n, EarlyStopping, plot_grad_flow
+import matplotlib.pyplot as plt
 
 # Helper libraries
 import random
@@ -198,7 +199,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=2, dropout=0.3):
+    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=256, dropout=0.3):
         """
         batch_size: # of sequences in training batch
         """
@@ -299,7 +300,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=5, lr=1e-5):
+def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr=3e-4):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
@@ -326,6 +327,8 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=5, lr=1e-
         if t % 5 == 0:
             print('Epoch', t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
+        if DEBUG:
+            plt.ion()
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if phase == 'train':
@@ -395,6 +398,9 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=5, lr=1e-
 
             if phase == 'train':
                 scheduler.step()
+                if DEBUG:
+                    plot_grad_flow(model.named_parameters())
+                    plt.pause(0.01)
             elif es.step(torch.tensor(epoch_loss)):
                 print("Stopping early @ epoch", t + 1, "!")
                 early_stop = True
@@ -417,6 +423,8 @@ def train(model, dataloaders, minibatch_size=2, minihop_size=1, epochs=5, lr=1e-
         best_loss, best_epoch))
     print('Best validation MSE (16th note) loss: {:4f}'.format(
         best_loss * 16 * 16))
+    if DEBUG:
+        plt.show()
 
     # load best model weights
     model.load_state_dict(best_model_wts)

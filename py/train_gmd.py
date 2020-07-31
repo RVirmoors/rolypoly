@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='info.csv',
+    '--meta', default='miniinfo.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -47,10 +47,10 @@ parser.add_argument(
     '--load_model', metavar='FOO.pt',
     help='Load a pre-trained model.')
 parser.add_argument(
-    '--batch_size', type=int, default=2,
+    '--batch_size', type=int, default=256,
     help='Minibatch size.')
 parser.add_argument(
-    '--hop_size', type=int, default=1,
+    '--hop_size', type=int, default=16,
     help='Training hop size.')
 parser.add_argument(
     '--epochs', type=int, default=0,
@@ -288,7 +288,7 @@ if __name__ == '__main__':
             layers = trial.suggest_int('layers', 2, 3)
             lstm_units = trial.suggest_int('lstm_units', 50, 150)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.6)
-            bs = 2  # pow(2, trial.suggest_int('bs', 8, 10))
+            bs = pow(2, trial.suggest_int('bs', 4, 8))
             lr = 1e-5  # trial.suggest_loguniform('lr', 1e-7, 1e-4)
             ep = 7  # trial.suggest_int('ep', 3, 20)
 
@@ -305,7 +305,7 @@ if __name__ == '__main__':
 
         print("Optimization done. Best params:", study.best_params)
         print("Best trial out of", len(study.trials), ":", study.best_trial)
-"""
+
         while get_y_n("Optimise for 10 more trials? "):
             study.optimize(objective, n_trials=10)
 
@@ -316,7 +316,6 @@ if __name__ == '__main__':
         PATH = "models/gmd_LSTM_hop1.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
-"""
 
 """
 [I 2020-07-30 19:49:15,228] Trial 0 finished with value: 5.4279108326188114e-05 and parameters: {'layers': 2, 'lstm_units': 96, 'dropout': 0.36116704798522165}. Best is trial 0 with value: 5.4279108326188114e-05.
