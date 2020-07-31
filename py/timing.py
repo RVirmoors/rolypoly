@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = Fasle
+DEBUG = False
 
 import torch
 import torch.nn as nn
@@ -321,6 +321,11 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
     es = EarlyStopping(patience=25)
     early_stop = False
 
+    if 'val' in dataloaders:
+        phases = ['train', 'val']
+    else:
+        phases = ['train']
+
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
         # TODO shuffle batches (not minibatches!)
@@ -330,7 +335,7 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
         if DEBUG:
             plt.ion()
         # Each epoch has a training and validation phase
-        for phase in ['train', 'val']:
+        for phase in phases:
             if phase == 'train':
                 model.train()  # Set model to training mode
             else:

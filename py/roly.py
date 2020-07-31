@@ -199,11 +199,11 @@ async def init_main():
         dl = {}
         dl['train'] = DataLoader(train_data, batch_size=1,
                                  shuffle=False)
-        dl['val'] = DataLoader(train_data, batch_size=1,
-                               shuffle=False)
 
-        trained_model, loss = timing.train(
-            model, dl, minibatch_size=batch_size, epochs=30, lr=5e-4)
+        trained_model, loss = timing.train(model, dl,
+                                           minibatch_size=batch_size / 2,
+                                           minihop_size=batch_size / 4,
+                                           epochs=10)
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
             torch.save(trained_model.state_dict(), PATH)

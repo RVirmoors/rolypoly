@@ -58,6 +58,9 @@ parser.add_argument(
 parser.add_argument(
     '--optuna', action='store_true',
     help='Optimise (tune hyperparams) using Optuna.')
+parser.add_argument(
+    '--final', action='store_true',
+    help='Final training, using the entire dataset.')
 args = parser.parse_args()
 
 
@@ -251,18 +254,25 @@ if __name__ == '__main__':
                 for i in range(len(gmd)) if gmd[i]['split'] == 'validation']
 
     dl = {}
-    dl['train'] = DataLoader(train_data, batch_size=1,
-                             shuffle=False, num_workers=1)
-    dl['test'] = DataLoader(test_data, batch_size=1,
-                            shuffle=False, num_workers=1)
-    dl['val'] = DataLoader(val_data, batch_size=1,
-                           shuffle=False, num_workers=1)
+    if args.final:
+        dl['train'] = DataLoader(gmd, batch_size=1,
+                                 shuffle=False, num_workers=1)
+    else:
+        dl['train'] = DataLoader(train_data, batch_size=1,
+                                 shuffle=False, num_workers=1)
+        dl['test'] = DataLoader(test_data, batch_size=1,
+                                shuffle=False, num_workers=1)
+        dl['val'] = DataLoader(val_data, batch_size=1,
+                               shuffle=False, num_workers=1)
 
     time_elapsed = time.time() - since
     print('Data loaded in {:.0f}m {:.0f}s\n==========='.format(
         time_elapsed // 60, time_elapsed % 60))
-    print(len(dl['train']), "training batches.",
-          len(dl['val']), "val batches.")
+    if args.final:
+        print(len(dl['train']), "final training batches.")
+    else:
+        print(len(dl['train']), "training batches.",
+              len(dl['val']), "val batches.")
 
     model = timing.TimingLSTM(
         input_dim=feat_vec_size, batch_size=args.batch_size)
