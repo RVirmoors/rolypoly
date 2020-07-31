@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='miniinfo.csv',
+    '--meta', default='info.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -313,7 +313,7 @@ if __name__ == '__main__':
             print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
-        PATH = "models/gmd_LSTM_hop1.pt"
+        PATH = "models/gmd_LSTM_hop16.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
 

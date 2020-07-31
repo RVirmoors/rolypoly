@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = True
+DEBUG = Fasle
 
 import torch
 import torch.nn as nn
