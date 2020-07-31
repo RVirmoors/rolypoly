@@ -130,8 +130,8 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
         np.add(Y_hat[i], diff_hat[i], Y_hat[i])   # Y_hat = Y_hat + diff_hat
         np.subtract(Y_hat[i], diff[i], Y[i])      # Y     = Y_hat - diff
 
-    Y = torch.Tensor(Y, dtype=torch.float64)
-    Y_hat = torch.Tensor(Y_hat, dtype=torch.float64)
+    Y = torch.Tensor(Y).double()# dtype=torch.float64)
+    Y_hat = torch.Tensor(Y_hat).double()# dtype=torch.float64)
 
     return Y_hat, Y
 

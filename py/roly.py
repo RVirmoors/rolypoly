@@ -3,7 +3,7 @@
 
 Requires pythonosc, numpy, librosa.
 """
-RUNSEQ = False
+RUNSEQ = True
 
 import argparse
 import queue
@@ -139,10 +139,8 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
         if RUNSEQ:
             y_hat = model(x, in_lengths)    # 1-2 bars
             y_hat = y_hat[-1][in_lengths[0] - 1][0]
-            print("-->", y_hat)
         else:
             y_hat = model(x, [1])[0][0]     # one fV
-            print("-->", y_hat)
     # 4.
     await asyncio.sleep(featVec[9] * 0.4 / 1000)
     # remains constant if no guit onset?
@@ -263,6 +261,10 @@ async def init_main():
         X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
             X, X_lengths, Y_hat, diff_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y)
+
+        total_loss = model.loss(Y_hat, Y)
+        print('Take loss: {:4f}'.format(total_loss))
+        print('Take MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 
         if get_y_n("Save performance? "):
             rows, filename = timing.save_XY(X, X_lengths, diff_hat, Y)
