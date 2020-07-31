@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='miniinfo.csv',
+    '--meta', default='info.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -47,10 +47,13 @@ parser.add_argument(
     '--load_model', metavar='FOO.pt',
     help='Load a pre-trained model.')
 parser.add_argument(
-    '--batch_size', type=int, default=256,
-    help='Minibatch size.')
+    '--batch_size', type=int, default=10,
+    help='Batch size: how many files/takes to process at a time.')
 parser.add_argument(
-    '--hop_size', type=int, default=16,
+    '--window_size', type=int, default=128,
+    help='Minibatch / window size: number of 2*bars to train on.')
+parser.add_argument(
+    '--hop_size', type=int, default=2,
     help='Training hop size.')
 parser.add_argument(
     '--epochs', type=int, default=0,
@@ -154,11 +157,11 @@ def pm_to_XY(file_name):
     positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 
     hits, offsets, vels = quantizeDrumTrack(drumtrack, positions_in_bar)
-    X, Y, Y_hat, diff_hat, batch_size, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
-                                                                tempos, timesigs, positions_in_bar)
+    X, Y, Y_hat, diff_hat, take_size, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
+                                                               tempos, timesigs, positions_in_bar)
 
     X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
-        X, X_lengths, Y_hat, diff_hat, batch_size)
+        X, X_lengths, Y_hat, diff_hat, take_size)
     Y_hat, Y = timing.prepare_Y(
         X_lengths, diff_hat, Y_hat, Y, style='diff')
 
@@ -234,14 +237,31 @@ class GMDdataset(Dataset):
         return {'fn': self.meta.iloc[idx]['midi_filename'], 'X': self.x[idx], 'X_lengths': self.xl[idx], 'Y': self.y[idx], 'split': self.split[idx]}
 
 
+def pad_collate(batch):
+    # used in dataLoader below
+    xx = [torch.cat((batch[i]['X'][j], batch[i]['X'][j + 1]), dim=0)  # 2 bars at a time
+          for i in range(len(batch))
+          for j in range(len(batch[i]['X']) - 1)]
+    xl = torch.tensor([batch[i]['X_lengths'][j]  # + batch[i]['X_lengths'][j + 1]
+                       for i in range(len(batch))
+                       for j in range(len(batch[i]['X_lengths']) - 1)])
+    yy = [torch.cat((batch[i]['Y'][j], batch[i]['Y'][j + 1]), dim=0)
+          for i in range(len(batch))
+          for j in range(len(batch[i]['Y']) - 1)]
+
+    take_lens = [len(x) for x in xx]
+
+    xx_pad = torch.nn.utils.rnn.pad_sequence(
+        xx, batch_first=True, padding_value=0)
+    yy_pad = torch.nn.utils.rnn.pad_sequence(
+        yy, batch_first=True, padding_value=0)
+
+    return {'X': xx_pad, 'Y': yy_pad, 'X_lengths': xl, 'sample_lens': take_lens}
+
+
 # https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
+# https://suzyahyah.github.io/pytorch/2019/07/01/DataLoader-Pad-Pack-Sequence.html
 if __name__ == '__main__':
-    # for now, just use batch_size = 1 because batches have different dimensions.
-    # possible solutions:
-    #   https://discuss.pytorch.org/t/tensorflow-esque-bucket-by-sequence-length/41284/17
-    #   https://github.com/jihunchoi/recurrent-batch-normalization-pytorch
-    #   https://discuss.pytorch.org/t/dataloader-for-various-length-of-data/6418/11
-    #   https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
     since = time.time()
     gmd = GMDdataset(csv_file=args.root_dir + args.meta,
                      root_dir=args.root_dir,
@@ -258,27 +278,28 @@ if __name__ == '__main__':
 
     dl = {}
     if args.final:
-        dl['train'] = DataLoader(all_data, batch_size=1,
-                                 shuffle=False, num_workers=1)
+        dl['train'] = DataLoader(all_data, batch_size=args.batch_size,
+                                 shuffle=True, num_workers=1, collate_fn=pad_collate)
     else:
-        dl['train'] = DataLoader(train_data, batch_size=1,
-                                 shuffle=False, num_workers=1)
-        dl['test'] = DataLoader(test_data, batch_size=1,
-                                shuffle=False, num_workers=1)
-        dl['val'] = DataLoader(val_data, batch_size=1,
-                               shuffle=False, num_workers=1)
+        dl['train'] = DataLoader(train_data, batch_size=args.batch_size,
+                                 shuffle=True, num_workers=1, collate_fn=pad_collate)
+        dl['test'] = DataLoader(test_data, batch_size=args.batch_size,
+                                shuffle=True, num_workers=1, collate_fn=pad_collate)
+        dl['val'] = DataLoader(val_data, batch_size=args.batch_size,
+                               shuffle=True, num_workers=1, collate_fn=pad_collate)
 
     time_elapsed = time.time() - since
     print('Data loaded in {:.0f}m {:.0f}s\n==========='.format(
         time_elapsed // 60, time_elapsed % 60))
     if args.final:
-        print(len(dl['train']), "final training batches.")
+        print(len(dl['train']),
+              "final training batches (", len(all_data), "files).")
     else:
-        print(len(dl['train']), "training batches.",
-              len(dl['val']), "val batches.")
+        print(len(dl['train']), "training batches (", len(train_data), "files ).",
+              len(dl['val']), "val batches (", len(val_data), "files ).")
 
     model = timing.TimingLSTM(
-        input_dim=feat_vec_size, batch_size=args.batch_size)
+        input_dim=feat_vec_size, batch_size=args.window_size)
 
     ### Pre-load ###
     if args.load_model:
@@ -291,7 +312,7 @@ if __name__ == '__main__':
         print("Start training for", args.epochs, "epochs...")
 
         trained_model, loss = timing.train(model, dl,
-                                           minibatch_size=args.batch_size,
+                                           minibatch_size=args.window_size,
                                            minihop_size=args.hop_size,
                                            epochs=args.epochs)
 

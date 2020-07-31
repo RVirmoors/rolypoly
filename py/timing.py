@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = False
+DEBUG = True
 
 import torch
 import torch.nn as nn
@@ -33,6 +33,8 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
+
+torch.set_printoptions(sci_mode=False)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -248,6 +250,8 @@ class TimingLSTM(nn.Module):
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
+        #p, _, _, _ = X
+        # print(p[0])
 
         # undo the packing operation
         X, _ = torch.nn.utils.rnn.pad_packed_sequence(X, batch_first=True)
@@ -300,15 +304,15 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr=1e-3):
+def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=1e-3):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
 
     model.to(device)
     print(model)
-    print("miniBatch size:", minibatch_size,
-          " | hop:", minihop_size, " | lr:", lr)
+    print("window size:", minibatch_size,
+          "bars | hop:", minihop_size, "bars | lr:", lr)
     print("Running on", next(model.parameters()).device)
 
     optimizer = torch.optim.Adam(
@@ -328,7 +332,6 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
-        # TODO shuffle batches (not minibatches!)
         if t % 5 == 0:
             print('Epoch', t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
@@ -342,10 +345,9 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
                 model.eval()   # Set model to evaluate mode
 
             for b_i, sample in enumerate(dataloaders[phase]):
-                # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
-                X = sample['X'][0].to(device)
-                X_lengths = sample['X_lengths'][0].to(device)
-                Y = sample['Y'][0].to(device)
+                X = sample['X'].to(device)
+                X_lengths = sample['X_lengths'].to(device)
+                Y = sample['Y'].to(device)
                 model.hidden = model.init_hidden()
 
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
@@ -442,12 +444,9 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
 
     if 'test' in dataloaders:
         for b_i, sample in enumerate(dataloaders['test']):
-            if DEBUG:
-                print(sample['fn'])
-            # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
-            X = sample['X'][0].to(device)
-            X_lengths = sample['X_lengths'][0].to(device)
-            Y = sample['Y'][0].to(device)
+            X = sample['X'].to(device)
+            X_lengths = sample['X_lengths'].to(device)
+            Y = sample['Y'].to(device)
             model.hidden = model.init_hidden()
 
             n_mb = int(np.ceil(X.shape[0] / minihop_size))

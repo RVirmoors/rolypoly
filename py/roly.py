@@ -141,7 +141,6 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
         if RUNSEQ:
             y_hat = model(x, in_lengths)    # 1-2 bars
             y_hat = y_hat[-1][in_lengths[-1] - 1][0]
-            print(y_hat)
         else:
             y_hat = model(x, [1])[-1][h_i]           # one fV
     # 4.
