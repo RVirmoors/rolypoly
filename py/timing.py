@@ -248,6 +248,8 @@ class TimingLSTM(nn.Module):
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
 
+        print(X)
+
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
         #p, _, _, _ = X

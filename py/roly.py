@@ -114,12 +114,12 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
             lastBar = X[s_i]
             newBar = np.zeros_like(lastBar)
             newBar[0] = featVec
-            in_lengths = [h_i, 1]
+            in_lengths = [X_lengths[s_i], 1]
         elif s_i > 0:
             lastBar = X[s_i - 1]
             newBar = X[s_i]
             newBar[h_i + 1] = featVec
-            in_lengths = [X_lengths[s_i], h_i + 2]
+            in_lengths = [X_lengths[s_i - 1], h_i + 2]
         else:
             # first bar. Second bar is still empty
             lastBar = X[s_i]
