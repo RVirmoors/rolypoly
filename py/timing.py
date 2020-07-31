@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = False
+DEBUG = True
 
 import torch
 import torch.nn as nn
@@ -300,7 +300,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr=3e-4):
+def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr=5e-4):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
@@ -342,6 +342,8 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
                 model.eval()   # Set model to evaluate mode
 
             for b_i, sample in enumerate(dataloaders[phase]):
+                print(b_i, " / ", len(dataloaders[phase]))
+                print(sample['fn'])
                 # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
                 X = sample['X'][0].to(device)
                 X_lengths = sample['X_lengths'][0].to(device)
@@ -424,15 +426,16 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
     time_elapsed = time.time() - since
     print('====\nTraining complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
-    print('Best validation loss: {:4f}, found in Epoch #{:d}'.format(
-        best_loss, best_epoch))
-    print('Best validation MSE (16th note) loss: {:4f}'.format(
-        best_loss * 16 * 16))
+    if 'val' in dataloaders:
+        print('Best validation loss: {:4f}, found in Epoch #{:d}'.format(
+            best_loss, best_epoch))
+        print('Best validation MSE (16th note) loss: {:4f}'.format(
+            best_loss * 16 * 16))
+        # load best model weights
+        model.load_state_dict(best_model_wts)
+
     if DEBUG:
         plt.show()
-
-    # load best model weights
-    model.load_state_dict(best_model_wts)
 
     ### Evaluation ###
 #    if get_y_n(str(len(dataloaders['test'])) + " test batches. Run test evaluation? "):

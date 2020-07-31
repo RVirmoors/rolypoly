@@ -211,10 +211,10 @@ class GMDdataset(Dataset):
                 self.xl[idx] = xl
                 self.y[idx] = y
                 self.split[idx] = self.meta.iloc[idx]['split']
-            elif not self.meta.iloc[idx]['bpm'].item():
+            else:  # not self.meta.iloc[idx]['bpm'].item():
                 # drop one-bar takes that weren't dropped already
-                self.meta.drop(idx)
-                print("Dropped one-bar sample #", idx)
+                self.split[idx] = 'dropped'
+                # print("Dropped one-bar sample #", idx)
 
     def _remove_short_takes(self, min_dur=1):
         print("Filtering out samples shorter than", min_dur, "seconds...")
@@ -253,9 +253,12 @@ if __name__ == '__main__':
     val_data = [gmd[i]
                 for i in range(len(gmd)) if gmd[i]['split'] == 'validation']
 
+    all_data = [gmd[i]
+                for i in range(len(gmd)) if gmd[i]['split'] != 'dropped']
+
     dl = {}
     if args.final:
-        dl['train'] = DataLoader(gmd, batch_size=1,
+        dl['train'] = DataLoader(all_data, batch_size=1,
                                  shuffle=False, num_workers=1)
     else:
         dl['train'] = DataLoader(train_data, batch_size=1,
@@ -299,7 +302,7 @@ if __name__ == '__main__':
             lstm_units = trial.suggest_int('lstm_units', 50, 150)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.6)
             bs = pow(2, trial.suggest_int('bs', 4, 8))
-            lr = 1e-5  # trial.suggest_loguniform('lr', 1e-7, 1e-4)
+            lr = trial.suggest_loguniform('lr', 1e-5, 1e-3)
             ep = 7  # trial.suggest_int('ep', 3, 20)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
