@@ -342,8 +342,6 @@ def train(model, dataloaders, minibatch_size=256, minihop_size=16, epochs=10, lr
                 model.eval()   # Set model to evaluate mode
 
             for b_i, sample in enumerate(dataloaders[phase]):
-                print(b_i, " / ", len(dataloaders[phase]))
-                print(sample['fn'])
                 # always _[0] because dataloader.batch_size=1 (see train_gmd.py)
                 X = sample['X'][0].to(device)
                 X_lengths = sample['X_lengths'][0].to(device)
