@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='info.csv',
+    '--meta', default='miniinfo.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',

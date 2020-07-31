@@ -3,7 +3,7 @@
 
 Requires pythonosc, numpy, librosa.
 """
-
+RUNSEQ = True
 
 import argparse
 import queue
@@ -108,11 +108,42 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     featVec[13] = guitarDescr
     # 3.
     # print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
-    input = torch.Tensor(featVec)
-    input = input[None, None, :]    # one batch, one seq
+    if RUNSEQ:
+        # if new bar, finish existing sequence and start a new one
+        if featVec[12] <= X[s_i][h_i][12] and h_i:
+            lastBar = X[s_i]
+            newBar = np.zeros_like(lastBar)
+            newBar[0] = featVec
+            in_lengths = [h_i, 1]
+        elif s_i > 0:
+            lastBar = X[s_i - 1]
+            newBar = X[s_i]
+            newBar[h_i + 1] = featVec
+            in_lengths = [X_lengths[s_i], h_i + 2]
+        else:
+            # first bar. Second bar is still empty
+            lastBar = X[s_i]
+            lastBar[h_i + 1] = featVec
+            newBar = None
+            in_lengths = [h_i + 2]
+        if hasattr(newBar, 'shape'):
+            twoBars = np.stack((lastBar, newBar))
+            x = torch.Tensor(twoBars).double()  # dtype=torch.float64)
+        else:
+            x = torch.Tensor(lastBar).double()  # dtype=torch.float64)
+            x = x[None, :, :]       # one batch, 1 or 2 seqs
+        print(x.size())
+    else:
+        x = torch.Tensor(featVec, dtype=torch.float64)
+        x = x[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
     with torch.no_grad():
-        y_hat = model(input, [1])           # one fV
+        if RUNSEQ:
+            y_hat = model(x, in_lengths)    # 1-2 bars
+            y_hat = y_hat[-1][in_lengths[-1] - 1][0]
+            print(y_hat)
+        else:
+            y_hat = model(x, [1])[-1][h_i]           # one fV
     # 4.
     await asyncio.sleep(featVec[9] * 0.4 / 1000)
     # remains constant if no guit onset?
@@ -217,7 +248,11 @@ async def init_main():
         transport, protocol = await server.create_serve_endpoint()
 
         # define model for LIVE.
-        model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
+        if RUNSEQ:
+            # batch_size = 2 : current bar + previous one
+            model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=2)
+        else:
+            model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
 
         if args.preload_model:
             trained_path = args.preload_model
