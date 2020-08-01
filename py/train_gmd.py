@@ -320,7 +320,7 @@ if __name__ == '__main__':
     if args.optuna:
         def objective(trial):
             layers = 2  # trial.suggest_int('layers', 2, 3)
-            lstm_units = trial.suggest_int('lstm_units', 50, 150)
+            lstm_units = 100 # trial.suggest_int('lstm_units', 50, 150)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.6)
             bs = pow(2, trial.suggest_int('bs', 1, 7))
             lr = trial.suggest_loguniform('lr', 1e-5, 1e-3)

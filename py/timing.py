@@ -309,7 +309,8 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
-
+    minihop_size = int(minihop_size)
+    
     model.to(device)
     print(model)
     print("window size:", minibatch_size,
