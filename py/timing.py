@@ -201,7 +201,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=256, dropout=0.3):
+    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=128, dropout=0.3):
         """
         batch_size: # of sequences in training batch
         """
@@ -323,7 +323,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
     writer = SummaryWriter()
     w_i = {'train': 0, 'val': 0}
 
-    es = EarlyStopping(patience=25)
+    es = EarlyStopping(patience=5)
     early_stop = False
 
     if 'val' in dataloaders:
