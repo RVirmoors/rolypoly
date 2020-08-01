@@ -3,7 +3,7 @@
 
 Requires pythonosc, numpy, librosa.
 """
-RUNSEQ = True
+RUNSEQ = False
 
 import argparse
 import queue
