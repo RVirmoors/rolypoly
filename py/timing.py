@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 # Helper libraries
 import random
 # from tqdm import tqdm
+from tqdm import tqdm, trange
 
 # Deterministic results
 SEED = 1234
@@ -310,7 +311,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
     minihop_size = int(minihop_size)
-    
+
     model.to(device)
     print(model)
     print("window size:", minibatch_size,
@@ -334,8 +335,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
-        if t % 5 == 0:
-            print('Epoch', t + 1, "/", epochs)
+        print("Epoch", t+1, "/", epochs)
         epoch_loss = div_loss = 0.
         if DEBUG:
             plt.ion()
@@ -346,7 +346,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
             else:
                 model.eval()   # Set model to evaluate mode
 
-            for b_i, sample in enumerate(dataloaders[phase]):
+            for b_i, sample in enumerate(tqdm(dataloaders[phase], postfix={'phase':phase[0]} )):
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)
