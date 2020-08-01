@@ -24,7 +24,6 @@ import matplotlib.pyplot as plt
 
 # Helper libraries
 import random
-# from tqdm import tqdm
 from tqdm import tqdm, trange
 
 # Deterministic results
@@ -325,7 +324,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
     writer = SummaryWriter()
     w_i = {'train': 0, 'val': 0}
 
-    es = EarlyStopping(patience=5)
+    es = EarlyStopping(patience=10)
     early_stop = False
 
     if 'val' in dataloaders:
@@ -357,7 +356,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
                 batch_loss = 0
                 batch_div = 0
 
-                for mb_i in range(n_mb):
+                for mb_i in trange(n_mb):
                     # if DEBUG:
                     #    print("miniBatch", mb_i + 1, "/", n_mb)
                     # get minibatch indices

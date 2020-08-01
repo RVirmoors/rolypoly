@@ -323,8 +323,8 @@ if __name__ == '__main__':
             lstm_units = 100 # trial.suggest_int('lstm_units', 50, 150)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.6)
             bs = pow(2, trial.suggest_int('bs', 1, 7))
-            lr = trial.suggest_loguniform('lr', 1e-5, 1e-3)
-            ep = 10  # trial.suggest_int('ep', 3, 20)
+            lr = trial.suggest_loguniform('lr', 1e-4, 1e-2)
+            ep = bs + 8  # trial.suggest_int('ep', 3, 20)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout)
