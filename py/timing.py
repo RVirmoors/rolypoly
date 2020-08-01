@@ -130,8 +130,8 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
         np.add(Y_hat[i], diff_hat[i], Y_hat[i])   # Y_hat = Y_hat + diff_hat
         np.subtract(Y_hat[i], diff[i], Y[i])      # Y     = Y_hat - diff
 
-    Y = torch.Tensor(Y).double()# dtype=torch.float64)
-    Y_hat = torch.Tensor(Y_hat).double()# dtype=torch.float64)
+    Y = torch.Tensor(Y).double()  # dtype=torch.float64)
+    Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
 
     return Y_hat, Y
 
@@ -235,10 +235,9 @@ class TimingLSTM(nn.Module):
         return (hidden, cell)
 
     def forward(self, X, X_lengths):
-        # DON'T reset the LSTM hidden state. We want the LSTM to treat
-        # a new batch as a continuation of a sequence (?)
+        # DON'T reset the LSTM hidden state. We DO want the LSTM to treat
+        # a new batch as a continuation of a sequence!
         # self.hidden = self.init_hidden()
-        # X = X.float()   # float, not double...
 
         batch_size, seq_len, _ = X.size()
         # print("X ....", X.size())
@@ -248,7 +247,7 @@ class TimingLSTM(nn.Module):
         X = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
 
-        #print(X)
+        # print(X)
 
         # now run through LSTM
         X, self.hidden = self.lstm(X, self.hidden)
@@ -350,7 +349,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)
-                model.hidden = model.init_hidden()
+                model.hidden = model.init_hidden()  # reset the state at the start of a take
 
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
 
