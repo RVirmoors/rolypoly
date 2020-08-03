@@ -245,8 +245,6 @@ class TimingLSTM(nn.Module):
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
-        for name, param in self.named_parameters():
-            nn.init.uniform_(param.data, -0.08, 0.08)
         hidden = torch.zeros(self.nb_layers,
                              self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
         cell = torch.zeros(self.nb_layers,
