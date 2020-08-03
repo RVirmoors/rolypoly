@@ -201,7 +201,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=128, dropout=0.3):
+    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=128, dropout=0.3, bootstrap=True):
         """
         batch_size: # of sequences in training batch
         """
@@ -212,8 +212,9 @@ class TimingLSTM(nn.Module):
         self.input_dim = input_dim
         self.batch_size = batch_size
         self.dropout = dropout
+        self.bootstrap = bootstrap
 
-        # design LSTM
+        # LSTM layer
         self.lstm = nn.LSTM(
             input_size=self.input_dim,
             hidden_size=self.nb_lstm_units,
@@ -224,7 +225,12 @@ class TimingLSTM(nn.Module):
 
         self.hidden = self.init_hidden()
         # output layer which projects back to Y space
-        self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1).double().to(device)
+        if self.bootstrap:
+            lstm_outs = self.nb_lstm_units + 2
+        else:
+            lstm_outs = self.nb_lstm_units
+
+        self.hidden_to_y = nn.Linear(lstm_outs, 1).double().to(device)
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
@@ -240,29 +246,36 @@ class TimingLSTM(nn.Module):
         # self.hidden = self.init_hidden()
 
         batch_size, seq_len, _ = X.size()
-        # print("X ....", X.size())
+        #print("X ....", X.size())
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability..
-        X = torch.nn.utils.rnn.pack_padded_sequence(
+        X_lstm = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
 
         # print(X)
 
         # now run through LSTM
-        X, self.hidden = self.lstm(X, self.hidden)
-        #p, _, _, _ = X
+        X_lstm, self.hidden = self.lstm(X_lstm, self.hidden)
+        # p, _, _, _ = X
         # print(p[0])
 
         # undo the packing operation
-        X, _ = torch.nn.utils.rnn.pad_packed_sequence(X, batch_first=True)
+        X_lstm, _ = torch.nn.utils.rnn.pad_packed_sequence(
+            X_lstm, batch_first=True)
 
         # hack for padded max length sequences:
         # https://github.com/pytorch/pytorch/issues/1591#issuecomment-365834629
-        if X.size(1) < seq_len:
+        if X_lstm.size(1) < seq_len:
             dummy_tensor = torch.zeros(
-                batch_size, seq_len - X.size(1), self.nb_lstm_units, device=device, dtype=torch.float64)
-            X = torch.cat([X, dummy_tensor], 1)
+                batch_size, seq_len - X_lstm.size(1), self.nb_lstm_units, device=device, dtype=torch.float64)
+            X_lstm = torch.cat([X_lstm, dummy_tensor], 1)
+
+        if self.bootstrap:
+            boot = X[:, :, 12:14]           # pos_in_bar and guitarDescr
+            X = torch.cat((X_lstm, boot), dim=2)
+        else:
+            X = X_lstm
 
         # Project to output space
         # Dim transformation: (batch_size, seq_len, nb_lstm_units) -> (batch_size * seq_len, nb_lstm_units)
@@ -334,7 +347,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
-        print("Epoch", t+1, "/", epochs)
+        print("Epoch", t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
         if DEBUG:
             plt.ion()
@@ -345,7 +358,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
             else:
                 model.eval()   # Set model to evaluate mode
 
-            for b_i, sample in enumerate(tqdm(dataloaders[phase], postfix={'phase':phase[0]} )):
+            for b_i, sample in enumerate(tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)
