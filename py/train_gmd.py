@@ -322,9 +322,9 @@ if __name__ == '__main__':
             layers = 2  # trial.suggest_int('layers', 2, 3)
             lstm_units = 100 # trial.suggest_int('lstm_units', 50, 150)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.6)
-            bs = pow(2, trial.suggest_int('bs', 1, 7))
+            bs = 256 # pow(2, trial.suggest_int('bs', 1, 7))
             lr = trial.suggest_loguniform('lr', 1e-4, 1e-2)
-            ep = bs + 8  # trial.suggest_int('ep', 3, 20)
+            ep = 100  # trial.suggest_int('ep', 3, 20)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout)
@@ -347,7 +347,7 @@ if __name__ == '__main__':
             print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
-        PATH = "models/gmd_LSTM.pt"
+        PATH = "models/gmd_LSTM_boot.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
 

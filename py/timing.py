@@ -224,12 +224,12 @@ class TimingLSTM(nn.Module):
         ).double().to(device)
 
         self.hidden = self.init_hidden()
-        # output layer which projects back to Y space
         if self.bootstrap:
             lstm_outs = self.nb_lstm_units + 2
         else:
             lstm_outs = self.nb_lstm_units
-
+        
+        # output layer which projects back to Y space
         self.hidden_to_y = nn.Linear(lstm_outs, 1).double().to(device)
 
     def init_hidden(self):
