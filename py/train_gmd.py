@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='miniinfo.csv',
+    '--meta', default='info.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -328,11 +328,11 @@ if __name__ == '__main__':
     if args.optuna:
         def objective(trial):
             layers = 2  # trial.suggest_int('layers', 2, 3)
-            lstm_units = 100 # trial.suggest_int('lstm_units', 50, 150)
+            lstm_units = trial.suggest_int('lstm_units', 50, 150)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.6)
             bs = 256 # pow(2, trial.suggest_int('bs', 1, 7))
-            lr = trial.suggest_loguniform('lr', 1e-4, 1e-2)
-            ep = 100  # trial.suggest_int('ep', 3, 20)
+            lr = trial.suggest_loguniform('lr', 1e-5, 1e-2)
+            ep = 150  # trial.suggest_int('ep', 3, 20)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout, 
