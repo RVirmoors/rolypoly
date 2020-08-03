@@ -245,6 +245,8 @@ class TimingLSTM(nn.Module):
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
+        for name, param in self.named_parameters():
+            nn.init.uniform_(param.data, -0.08, 0.08)
         hidden = torch.zeros(self.nb_layers,
                              self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
         cell = torch.zeros(self.nb_layers,
@@ -367,7 +369,8 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
             else:
                 model.eval()   # Set model to evaluate mode
 
-            for b_i, sample in enumerate(dataloaders[phase]):#(tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
+            # (tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
+            for b_i, sample in enumerate(dataloaders[phase]):
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)
