@@ -228,7 +228,7 @@ class TimingLSTM(nn.Module):
         lstm_outs = self.nb_lstm_units
 
         if self.seq2seq:
-            # decoder is an LSTM network
+            # decoder is an LSTM net
             self.decoder = nn.LSTM(
                 input_size=self.input_dim,
                 hidden_size=self.nb_lstm_units,
@@ -356,7 +356,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
 
     for t in range(epochs):
         # train loop. TODO add several epochs, w/ noise?
-        print("Epoch", t + 1, "/", epochs)
+        #print("Epoch", t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
         if DEBUG:
             plt.ion()
@@ -367,7 +367,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
             else:
                 model.eval()   # Set model to evaluate mode
 
-            for b_i, sample in enumerate(tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
+            for b_i, sample in enumerate(dataloaders[phase]):#(tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)

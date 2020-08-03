@@ -320,7 +320,9 @@ if __name__ == '__main__':
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=args.window_size,
                                            minihop_size=args.hop_size,
-                                           epochs=args.epochs)
+                                           epochs=args.epochs,
+                                           bootstrap=args.bootstrap,
+                                           seq2seq=args.seq2seq)
 
     # Optimisation ###            see https://optuna.org/
     if args.optuna:
@@ -333,7 +335,8 @@ if __name__ == '__main__':
             ep = 100  # trial.suggest_int('ep', 3, 20)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
-                                      input_dim=feat_vec_size, batch_size=bs, dropout=dropout)
+                                      input_dim=feat_vec_size, batch_size=bs, dropout=dropout, 
+                                      bootstrap=args.bootstrap, seq2seq=args.seq2seq)
             trained_model, loss = timing.train(
                 model, dl, lr=lr, minibatch_size=bs, minihop_size=bs / 2, epochs=ep)
 
