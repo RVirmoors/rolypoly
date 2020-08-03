@@ -201,7 +201,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=128, dropout=0.3, bootstrap=True):
+    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=128, dropout=0.3, bootstrap=False, seq2seq=False):
         """
         batch_size: # of sequences in training batch
         """
@@ -213,6 +213,7 @@ class TimingLSTM(nn.Module):
         self.batch_size = batch_size
         self.dropout = dropout
         self.bootstrap = bootstrap
+        self.seq2seq = seq2seq
 
         # LSTM layer
         self.lstm = nn.LSTM(
@@ -224,11 +225,21 @@ class TimingLSTM(nn.Module):
         ).double().to(device)
 
         self.hidden = self.init_hidden()
-        if self.bootstrap:
+        lstm_outs = self.nb_lstm_units
+
+        if self.seq2seq:
+            # decoder is an LSTM network
+            self.decoder = nn.LSTM(
+                input_size=self.input_dim,
+                hidden_size=self.nb_lstm_units,
+                num_layers=self.nb_layers,
+                batch_first=True,
+                dropout=self.dropout
+            ).double().to(device)
+
+        elif self.bootstrap:
             lstm_outs = self.nb_lstm_units + 2
-        else:
-            lstm_outs = self.nb_lstm_units
-        
+
         # output layer which projects back to Y space
         self.hidden_to_y = nn.Linear(lstm_outs, 1).double().to(device)
 
@@ -250,13 +261,13 @@ class TimingLSTM(nn.Module):
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability..
-        X_lstm = torch.nn.utils.rnn.pack_padded_sequence(
+        X_pack = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
 
         # print(X)
 
         # now run through LSTM
-        X_lstm, self.hidden = self.lstm(X_lstm, self.hidden)
+        X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
         # p, _, _, _ = X
         # print(p[0])
 
@@ -271,26 +282,24 @@ class TimingLSTM(nn.Module):
                 batch_size, seq_len - X_lstm.size(1), self.nb_lstm_units, device=device, dtype=torch.float64)
             X_lstm = torch.cat([X_lstm, dummy_tensor], 1)
 
-        if self.bootstrap:
+        # Project to output space (LSTM or Linear decoder)
+        if self.seq2seq:
+            X_lstm, _ = self.decoder(X, self.hidden)
+        # Bootstrap (without seq2seq)
+        elif self.bootstrap:
             boot = X[:, :, 12:14]           # pos_in_bar and guitarDescr
-            X = torch.cat((X_lstm, boot), dim=2)
-        else:
-            X = X_lstm
+            X_lstm = torch.cat((X_lstm, boot), dim=2)
 
-        # Project to output space
         # Dim transformation: (batch_size, seq_len, nb_lstm_units) -> (batch_size * seq_len, nb_lstm_units)
-
-        # this one is a bit tricky as well. First we need to reshape the data so it goes into the linear layer
-        X = X.contiguous()
-        X = X.view(-1, X.shape[2])
-
+        # First we need to reshape the data so it goes into the linear layer
+        X_lstm = X_lstm.contiguous()
+        X_lstm = X_lstm.view(-1, X_lstm.shape[2])
         # run through actual linear layer
-        X = self.hidden_to_y(X)
+        X_out = self.hidden_to_y(X_lstm)
+        # Then back to (batch_size, seq_len, 1 output)
+        X_out = X_out.view(batch_size, seq_len, 1)
 
-        # I like to reshape for mental sanity so we're back to (batch_size, seq_len, 1 output)
-        X = X.view(batch_size, seq_len, 1)
-
-        y_hat = X  # [-1][(X_lengths[-1] - 1)][0]
+        y_hat = X_out  # [-1][(X_lengths[-1] - 1)][0]
         return y_hat
 
     def loss(self, Y_hat, Y):
@@ -400,6 +409,8 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
                         # backward + optimize only if in training phase
                         if phase == 'train':
                             loss.backward()
+                            torch.nn.utils.clip_grad_norm_(
+                                model.parameters(), 1)  # clip gradients
                             optimizer.step()
 
                     # detach/repackage the hidden state in between batches

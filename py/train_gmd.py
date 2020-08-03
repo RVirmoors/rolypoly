@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='info.csv',
+    '--meta', default='miniinfo.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -58,6 +58,12 @@ parser.add_argument(
 parser.add_argument(
     '--epochs', type=int, default=0,
     help='# of epochs to train. Zero means don\'t train.')
+parser.add_argument(
+    '--bootstrap', action='store_true',
+    help='Bootstrap LSTM with position & guitar.')
+parser.add_argument(
+    '--seq2seq', action='store_true',
+    help='Add LSTM decoder for a Seq2Seq model.')
 parser.add_argument(
     '--optuna', action='store_true',
     help='Optimise (tune hyperparams) using Optuna.')
@@ -347,7 +353,12 @@ if __name__ == '__main__':
             print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
-        PATH = "models/gmd_LSTM_boot.pt"
+        if args.seq2seq:
+            PATH = "models/gmd_seq2seq.pt"
+        elif args.bootstrap:
+            PATH = "models/gmd_LSTM_boot.pt"
+        else:
+            PATH = "models/gmd_LSTM.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
 
