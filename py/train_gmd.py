@@ -305,7 +305,7 @@ if __name__ == '__main__':
               len(dl['val']), "val batches (", len(val_data), "files ).")
 
     model = timing.TimingLSTM(
-        input_dim=feat_vec_size, 
+        input_dim=feat_vec_size,
         batch_size=args.window_size,
         bootstrap=args.bootstrap,
         seq2seq=args.seq2seq)
@@ -313,7 +313,8 @@ if __name__ == '__main__':
     ### Pre-load ###
     if args.load_model:
         trained_path = args.load_model
-        model.load_state_dict(torch.load(trained_path))
+        model.load_state_dict(torch.load(
+            trained_path, map_location=timing.device))
         print("Loaded pre-trained model weights from", trained_path)
 
     ### Training & eval ###
@@ -331,12 +332,12 @@ if __name__ == '__main__':
             layers = 2  # trial.suggest_int('layers', 2, 3)
             lstm_units = trial.suggest_int('lstm_units', 50, 550)
             dropout = trial.suggest_uniform('dropout', 0.2, 0.6)
-            bs = 256 # pow(2, trial.suggest_int('bs', 1, 7))
+            bs = 256  # pow(2, trial.suggest_int('bs', 1, 7))
             lr = trial.suggest_loguniform('lr', 1e-5, 1e-2)
             ep = 150  # trial.suggest_int('ep', 3, 20)
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
-                                      input_dim=feat_vec_size, batch_size=bs, dropout=dropout, 
+                                      input_dim=feat_vec_size, batch_size=bs, dropout=dropout,
                                       bootstrap=args.bootstrap, seq2seq=args.seq2seq)
             trained_model, loss = timing.train(
                 model, dl, lr=lr, minibatch_size=bs, minihop_size=bs / 2, epochs=ep)
@@ -369,8 +370,8 @@ if __name__ == '__main__':
 """
 
 models:
-simple - 	1e-4 bs2 epochs ??? -- to beat 0.0000067649 0.000056205
-boots - 	1e-4 bs 256 epochs ??? -- to beat 0.0000071667 0.000059781
-s2s - 		4e-4 bs 256 epochs??? --- 0.0000067188 0.000056961
+simple -    1e-4 bs2 epochs ??? -- to beat 0.0000067649 0.000056205
+boots -     1e-4 bs 256 epochs ??? -- to beat 0.0000071667 0.000059781
+s2s -       4e-4 bs 256 epochs??? --- 0.0000067188 0.000056961
 
 """

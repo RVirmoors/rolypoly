@@ -45,6 +45,12 @@ parser.add_argument(
 parser.add_argument(
     '--take', default='data/takes/last.csv', metavar='FOO.csv',
     help='take csv file name for offline training')
+parser.add_argument(
+    '--bootstrap', action='store_true',
+    help='Bootstrap LSTM with position & guitar.')
+parser.add_argument(
+    '--seq2seq', action='store_true',
+    help='Add LSTM decoder for a Seq2Seq model.')
 args = parser.parse_args()
 
 # load MIDI file
@@ -216,7 +222,11 @@ async def init_main():
         y = torch.Tensor(y[:batch_size, :longest_seq])
         # define model for offline: learn a batch
         model = timing.TimingLSTM(
-            input_dim=feat_vec_size, batch_size=batch_size)
+            input_dim=feat_vec_size,
+            batch_size=batch_size,
+            bootstrap=args.bootstrap,
+            seq2seq=args.seq2seq)
+
         if args.preload_model:
             trained_path = args.preload_model
             model.load_state_dict(torch.load(
@@ -232,6 +242,7 @@ async def init_main():
                                            minibatch_size=batch_size / 2,
                                            minihop_size=batch_size / 4,
                                            epochs=10)
+
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
             torch.save(trained_model.state_dict(), PATH)
@@ -245,7 +256,11 @@ async def init_main():
         transport, protocol = await server.create_serve_endpoint()
 
         # define model for LIVE.
-        model = timing.TimingLSTM(input_dim=feat_vec_size, batch_size=1)
+        model = timing.TimingLSTM(
+            input_dim=feat_vec_size,
+            batch_size=1,
+            bootstrap=args.bootstrap,
+            seq2seq=args.seq2seq)
 
         if args.preload_model:
             trained_path = args.preload_model
