@@ -47,7 +47,7 @@ parser.add_argument(
     '--load_model', metavar='FOO.pt',
     help='Load a pre-trained model.')
 parser.add_argument(
-    '--batch_size', type=int, default=10,
+    '--batch_size', type=int, default=512,
     help='Batch size: how many files/takes to process at a time.')
 parser.add_argument(
     '--window_size', type=int, default=128,
@@ -305,7 +305,10 @@ if __name__ == '__main__':
               len(dl['val']), "val batches (", len(val_data), "files ).")
 
     model = timing.TimingLSTM(
-        input_dim=feat_vec_size, batch_size=args.window_size)
+        input_dim=feat_vec_size, 
+        batch_size=args.window_size,
+        bootstrap=args.bootstrap,
+        seq2seq=args.seq2seq)
 
     ### Pre-load ###
     if args.load_model:
@@ -320,9 +323,7 @@ if __name__ == '__main__':
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=args.window_size,
                                            minihop_size=args.hop_size,
-                                           epochs=args.epochs,
-                                           bootstrap=args.bootstrap,
-                                           seq2seq=args.seq2seq)
+                                           epochs=args.epochs)
 
     # Optimisation ###            see https://optuna.org/
     if args.optuna:
@@ -366,16 +367,10 @@ if __name__ == '__main__':
         print("Saved trained model to", PATH)
 
 """
-[I 2020-07-30 19:49:15,228] Trial 0 finished with value: 5.4279108326188114e-05 and parameters: {'layers': 2, 'lstm_units': 96, 'dropout': 0.36116704798522165}. Best is trial 0 with value: 5.4279108326188114e-05.
-[I 2020-07-30 20:06:48,166] Trial 1 finished with value: 5.6293804895667584e-05 and parameters: {'layers': 3, 'lstm_units': 76, 'dropout': 0.7655748051457263}. Best is trial 0 with value: 5.4279108326188114e-05.
-[I 2020-07-30 20:20:08,448] Trial 2 finished with value: 5.521788244362895e-05 and parameters: {'layers': 2, 'lstm_units': 83, 'dropout': 0.3669492859191249}. Best is trial 0 with value: 5.4279108326188114e-05.
-[I 2020-07-30 20:33:20,262] Trial 3 finished with value: 5.597054935721958e-05 and parameters: {'layers': 2, 'lstm_units': 76, 'dropout': 0.2787769789928112}. Best is trial 0 with value: 5.4279108326188114e-05.
-[I 2020-07-30 20:46:54,300] Trial 4 finished with value: 5.614888685529846e-05 and parameters: {'layers': 2, 'lstm_units': 113, 'dropout': 0.5025545093135102}. Best is trial 0 with value: 5.4279108326188114e-05.
-[I 2020-07-30 21:00:44,023] Trial 5 finished with value: 5.621860841961644e-05 and parameters: {'layers': 2, 'lstm_units': 131, 'dropout': 0.21875945580556236}. Best is trial 0 with value: 5.4279108326188114e-05.
-[I 2020-07-30 21:19:15,729] Trial 6 finished with value: 5.405071509594314e-05 and parameters: {'layers': 3, 'lstm_units': 144, 'dropout': 0.29038152405608725}. Best is trial 6 with value: 5.405071509594314e-05.
-[I 2020-07-30 21:36:36,791] Trial 7 finished with value: 5.6443440071678786e-05 and parameters: {'layers': 3, 'lstm_units': 55, 'dropout': 0.6460760596875088}. Best is trial 6 with value: 5.405071509594314e-05.
-[I 2020-07-30 21:50:16,623] Trial 8 finished with value: 5.458007610872348e-05 and parameters: {'layers': 2, 'lstm_units': 119, 'dropout': 0.6986539530356477}. Best is trial 6 with value: 5.405071509594314e-05.
-[I 2020-07-30 22:04:06,334] Trial 9 finished with value: 5.5564957211898746e-05 and parameters: {'layers': 2, 'lstm_units': 129, 'dropout': 0.3438758806117629}. Best is trial 6 with value: 5.405071509594314e-05.
-[I 2020-07-30 22:22:42,517] Trial 10 finished with value: 5.558185038321966e-05 and parameters: {'layers': 3, 'lstm_units': 135, 'dropout': 0.4844698415965379}. Best is trial 6 with value: 5.405071509594314e-05.
-[I 2020-07-30 22:40:35,044] Trial 11 finished with value: 5.544606147685907e-05 and parameters: {'layers': 3, 'lstm_units': 98, 'dropout': 0.4220523212604985}. Best is trial 6 with value: 5.405071509594314e-05.
+
+models:
+simple - 	1e-4 bs2 epochs ??? -- to beat 0.0000067649 0.000056205
+boots - 	1e-4 bs 256 epochs ??? -- to beat 0.0000071667 0.000059781
+s2s - 		4e-4 bs 256 epochs??? --- 0.0000067188 0.000056961
+
 """
