@@ -19,7 +19,7 @@ import os
 import copy
 
 from constants import ROLAND_DRUM_PITCH_CLASSES
-from helper import get_y_n, EarlyStopping, plot_grad_flow
+from helper import get_y_n, EarlyStopping, plot_grad_flow, ewma
 import matplotlib.pyplot as plt
 
 # Helper libraries
@@ -105,10 +105,14 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
 
     Parameters for determining diff:
-        - style = 'constant' or 'diff' (copies diff_hat) or 'EMA' (tba)
+        - style = 'constant'                -> we want to bring next d-g delay close to avg
+                or 'EMA'                    -> we want to bring next d-g delay close to EMA
+                or 'diff' (copies diff_hat) -> we want to minimize next drum-guitar delay
         - value = if None, will be computed as avg(diff_hat) over the present seq
-                  if style='constant', diff = value
-                  if style='EMA',      EMA period = value
+                  if style='constant', value -> diff
+                  if style='EMA',      value -> EMA alpha in (0,1)
+
+    (for style == 'constant' or 'EMA')
     Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
         -> a constant value for diff (see above)
     """
@@ -124,8 +128,9 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
                 diff[i, :seq_len] = value
             else:  # default
                 diff[i, :seq_len] = np.average(diff_hat[i][:seq_len])
-        else:  # EMA TODO
-            diff[i, :seq_len] = 0
+        else:  # EMA
+            diff[i, :seq_len] = ewma(
+                diff_hat[i][:seq_len], alpha=value if value else 0.8)
         # Y = Y_hat + diff_hat - diff
         np.add(Y_hat[i], diff_hat[i], Y_hat[i])   # Y_hat = Y_hat + diff_hat
         np.subtract(Y_hat[i], diff[i], Y[i])      # Y     = Y_hat - diff
@@ -314,6 +319,7 @@ class TimingLSTM(nn.Module):
         # filter out all zero positions from Y
         mask = (Y != 0)
         nb_outputs = torch.sum(mask).item()
+        #print("Computing loss for", nb_outputs, "hits.")
 
         # pick the values for Y_hat and zero out the rest with the mask
         Y_hat = Y_hat[range(Y_hat.shape[0])] * mask

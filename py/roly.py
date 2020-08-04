@@ -275,7 +275,8 @@ async def init_main():
 
         X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
             X, X_lengths, Y_hat, diff_hat, batch_size)
-        Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y)
+        Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y,
+                                    style='EMA', value=0.8)
 
         total_loss = model.loss(Y_hat, Y)
         print('Take loss: {:4f}'.format(total_loss))
@@ -290,3 +291,10 @@ async def init_main():
 
 
 asyncio.run(init_main())
+
+
+"""
+TODO test: constant vs EMA
+simple, boots, s2s
+normal play, quicky, quantized
+"""
