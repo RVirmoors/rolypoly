@@ -278,7 +278,7 @@ async def init_main():
         Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y,
                                     style='EMA', value=0.96)
 
-        total_loss = model.loss(Y_hat, Y, diff_hat)
+        total_loss = model.loss(Y_hat, Y, torch.DoubleTensor(diff_hat))
         print('Take loss: {:4f}'.format(total_loss))
         print('Take MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 

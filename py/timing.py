@@ -96,8 +96,6 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     X_lengths = X_lengths[:batch_size]
     X = torch.tensor(X, dtype=torch.float64)
     X_lengths = torch.tensor(X_lengths, dtype=torch.int64)
-    Y_hat = torch.tensor(Y_hat, dtype=torch.float64)
-    diff_hat = torch.tensor(diff_hat, dtype=torch.float64)
     return X, X_lengths, Y_hat, diff_hat
 
 
@@ -333,14 +331,15 @@ class TimingLSTM(nn.Module):
         mask = diffMask * mask
 
         nb_outputs = torch.sum(mask).item()
-        #print("Computing loss for", nb_outputs, "hits.")
+        if DEBUG:
+            print("Computing loss for", nb_outputs, "hits.")
 
         # pick the values for Y_hat and zero out the rest with the mask
         Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
         Y = Y[range(Y.shape[0])] * mask
 
-        print("\nY_hat:", Y_hat)
-        print("Y:", Y)
+        #print("\nY_hat:", Y_hat)
+        #print("Y:", Y)
 
         criterion = nn.MSELoss(reduction='sum')
 
