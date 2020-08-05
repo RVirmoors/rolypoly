@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
     '--preload_model', default='models/last.pt', metavar='FOO.pt',
@@ -170,8 +170,7 @@ async def parseMIDItoFV(model):
     Y_hat = np.zeros((1000, 64))             # seqs * hits
     diff_hat = np.zeros((1000, 64))          # seqs * hits
     X_lengths = np.zeros(1000)
-    s_i = -1
-    h_i = 0
+    s_i = h_i = -1
     next_delay = 0
     start = time.monotonic()
     featVec = np.zeros(feat_vec_size)  # 9+4+1 zeros

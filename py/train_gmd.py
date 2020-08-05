@@ -105,8 +105,7 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
     Y_hat = np.zeros((1000, 64))             # seqs * hits
     diff_hat = np.zeros((1000, 64))          # seqs * hits
     X_lengths = np.zeros(1000)
-    s_i = -1
-    h_i = 0
+    s_i = h_i = -1
 
     for index, note in enumerate(drumtrack.notes):
         if index < (len(drumtrack.notes) - 1):

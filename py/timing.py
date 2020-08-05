@@ -52,10 +52,10 @@ def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
             # last hit plus one doesn't make sense
             Y_hat[s_i][h_i + 1] = 0
-            # if DEBUG:
-            #    print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
-            #    print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
-            #    print("==========")
+            if DEBUG:
+                print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
+                print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
+                print("==========")
         s_i += 1
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
@@ -148,11 +148,14 @@ def save_XY(X, X_lengths, diff_hat, Y, Y_hat=None, filename=None):
     """
     Xcsv = X.numpy()
     Ycsv = Y.numpy()
-    if Y_hat:
+    if Y_hat is not None:
         Y_hcsv = Y_hat.numpy()
-    fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g, %g'
-    header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y, y_hat"
-    columns = 1 + feat_vec_size + 1 + 1  # seq, fv, diff, y
+        fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g, %g'
+        header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y, y_hat"
+    else:
+        fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g'
+        header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y"
+    columns = 1 + feat_vec_size + 1 + 1 + 1*(Y_hat is not None)  # seq, fv, diff, y, y_hat
     rows = int(sum(X_lengths))
     to_csv = np.zeros((rows, columns))
     cur_row = 0
@@ -163,8 +166,8 @@ def save_XY(X, X_lengths, diff_hat, Y, Y_hat=None, filename=None):
             to_csv[cur_row][1:feat_vec_size + 1] = Xcsv[i][j]
             to_csv[cur_row][feat_vec_size + 1] = diff_hat[i][j]
             to_csv[cur_row][feat_vec_size + 2] = Ycsv[i][j]
-            if Y_hat:
-                to_csv[cur_row][feat_vec_size + 2] = Y_hcsv[i][j]
+            if Y_hat is not None:
+                to_csv[cur_row][feat_vec_size + 3] = Y_hcsv[i][j]
             cur_row += 1
     now = datetime.datetime.now()
     if filename == None:
