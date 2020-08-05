@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
     '--preload_model', default='models/last.pt', metavar='FOO.pt',
@@ -232,15 +232,16 @@ async def init_main():
                 trained_path, map_location=timing.device))
             print("Loaded pre-trained model weights from", trained_path)
 
-        train_data = [{'X': x, 'X_lengths': xl, 'Y': y, 'split': 'train'}]
+        train_data = [{'X': x, 'X_lengths': xl,
+                       'Y': y, 'diff_hat': dh, 'split': 'train'}]
         dl = {}
         dl['train'] = DataLoader(train_data, batch_size=1,
                                  shuffle=False)
 
         trained_model, loss = timing.train(model, dl,
-                                           minibatch_size=int(batch_size / 2),
-                                           minihop_size=int(batch_size / 4),
-                                           epochs=40)
+                                           minibatch_size=int(batch_size / 1),
+                                           minihop_size=int(batch_size / 1),
+                                           epochs=10)
 
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
@@ -277,7 +278,7 @@ async def init_main():
         Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y,
                                     style='EMA', value=0.96)
 
-        total_loss = model.loss(Y_hat, Y)
+        total_loss = model.loss(Y_hat, Y, diff_hat)
         print('Take loss: {:4f}'.format(total_loss))
         print('Take MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 

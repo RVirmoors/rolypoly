@@ -96,6 +96,8 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     X_lengths = X_lengths[:batch_size]
     X = torch.tensor(X, dtype=torch.float64)
     X_lengths = torch.tensor(X_lengths, dtype=torch.int64)
+    Y_hat = torch.tensor(Y_hat, dtype=torch.float64)
+    diff_hat = torch.tensor(diff_hat, dtype=torch.float64)
     return X, X_lengths, Y_hat, diff_hat
 
 
@@ -203,8 +205,8 @@ def load_XY(filename):
     # last seq
     X_lengths[s_i] = h_i
     batch_size = s_i + 1
-    # if DEBUG:
-    #    print("Done loading sequences of lengths: ", X_lengths[:batch_size])
+    if DEBUG:
+        print("Done loading sequences of lengths: ", X_lengths[:batch_size])
     return X, X_lengths, diff_hat, Y, batch_size
 
 
@@ -310,7 +312,7 @@ class TimingLSTM(nn.Module):
         y_hat = X_out  # [-1][(X_lengths[-1] - 1)][0]
         return y_hat
 
-    def loss(self, Y_hat, Y):
+    def loss(self, Y_hat, Y, diff_hat):
         """
         flatten all the targets and predictions,
         eliminate outputs on padded elements,
@@ -318,14 +320,27 @@ class TimingLSTM(nn.Module):
         """
         Y = Y.view(-1)              # flat target
         Y_hat = Y_hat.view(-1)      # flat inference
+        diff_hat = diff_hat.view(-1)
 
         # filter out all zero positions from Y
         mask = (Y != 0)
+
+        # filter out repeated diff_hat
+        diffMask = torch.BoolTensor([True]) # first is always new
+        b = [(diff_hat[i+1] - diff_hat[i] != 0) for i in range(diff_hat.shape[0]-1)]
+        diffMask = torch.cat((diffMask, torch.BoolTensor(b)), dim=0)
+
+        mask = diffMask * mask
+
         nb_outputs = torch.sum(mask).item()
         #print("Computing loss for", nb_outputs, "hits.")
 
         # pick the values for Y_hat and zero out the rest with the mask
         Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
+        Y = Y[range(Y.shape[0])] * mask
+
+        print("\nY_hat:", Y_hat)
+        print("Y:", Y)
 
         criterion = nn.MSELoss(reduction='sum')
 
@@ -378,13 +393,17 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
 
             # (tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
             for b_i, sample in enumerate(dataloaders[phase]):
+                if 'diff_hat' not in sample: # no drum-guit diff recorded, just use Y
+                    sample['diff_hat'] = sample['Y'].detach().clone()
                 if sample['X'].shape[0] == 1:
                     sample['X'] = sample['X'].squeeze()
                     sample['X_lengths'] = sample['X_lengths'].squeeze()
                     sample['Y'] = sample['Y'].squeeze()
+                    sample['diff_hat'] = sample['diff_hat'].squeeze()
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)
+                diff_hat = sample['diff_hat'].to(device)
                 model.hidden = model.init_hidden()  # reset the state at the start of a take
 
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
@@ -407,6 +426,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
                     mb_Xl = torch.index_select(
                         X_lengths, 0, indices).to(device)
                     mb_Y = torch.index_select(Y, 0, indices).to(device)
+                    mb_dh = torch.index_select(diff_hat, 0, indices).to(device)
 
                     optimizer.zero_grad()
 
@@ -415,7 +435,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
                     with torch.set_grad_enabled(phase == 'train'):
                         # print(mb_X.size(), mb_Xl.size(), mb_Y.size())
                         mb_Y_hat = model(mb_X, mb_Xl)
-                        loss = model.loss(mb_Y_hat, mb_Y)
+                        loss = model.loss(mb_Y_hat, mb_Y, mb_dh)
                         epoch_loss += loss.item()
                         batch_loss += loss.item()
                         div_loss += 1
@@ -483,9 +503,18 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
 
     if 'test' in dataloaders:
         for b_i, sample in enumerate(dataloaders['test']):
+            if 'diff_hat' not in sample: # no drum-guit diff recorded, just use Y
+                sample['diff_hat'] = sample['Y'].detach().clone()
+            if sample['X'].shape[0] == 1:
+                sample['X'] = sample['X'].squeeze()
+                sample['X_lengths'] = sample['X_lengths'].squeeze()
+                sample['Y'] = sample['Y'].squeeze()
+                sample['diff_hat'] = sample['diff_hat'].squeeze()
             X = sample['X'].to(device)
             X_lengths = sample['X_lengths'].to(device)
             Y = sample['Y'].to(device)
+            diff_hat = sample['diff_hat'].to(device)
+
             model.hidden = model.init_hidden()
 
             n_mb = int(np.ceil(X.shape[0] / minihop_size))
@@ -508,11 +537,12 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
                 mb_Xl = torch.index_select(
                     X_lengths, 0, indices).to(device)
                 mb_Y = torch.index_select(Y, 0, indices).to(device)
+                mb_dh = torch.index_select(diff_hat, 0, indices).to(device)
 
                 # forward, don't track history for eval
                 with torch.set_grad_enabled(False):
                     mb_Y_hat = model(mb_X, mb_Xl)
-                    loss = model.loss(mb_Y_hat, mb_Y)
+                    loss = model.loss(mb_Y_hat, mb_Y, mb_dh)
                     total_loss += loss.item()
                     batch_loss += loss.item()
                     div_loss += 1
