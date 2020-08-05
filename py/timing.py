@@ -141,15 +141,17 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     return Y_hat, Y
 
 
-def save_XY(X, X_lengths, diff_hat, Y, filename=None):
+def save_XY(X, X_lengths, diff_hat, Y, Y_hat=None, filename=None):
     """
     Save X, diff_hat, Y to a csv file.
     Returns total numbers of rows written.
     """
     Xcsv = X.numpy()
     Ycsv = Y.numpy()
-    fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g'
-    header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y"
+    if Y_hat:
+        Y_hcsv = Y_hat.numpy()
+    fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g, %g'
+    header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y, y_hat"
     columns = 1 + feat_vec_size + 1 + 1  # seq, fv, diff, y
     rows = int(sum(X_lengths))
     to_csv = np.zeros((rows, columns))
@@ -161,6 +163,8 @@ def save_XY(X, X_lengths, diff_hat, Y, filename=None):
             to_csv[cur_row][1:feat_vec_size + 1] = Xcsv[i][j]
             to_csv[cur_row][feat_vec_size + 1] = diff_hat[i][j]
             to_csv[cur_row][feat_vec_size + 2] = Ycsv[i][j]
+            if Y_hat:
+                to_csv[cur_row][feat_vec_size + 2] = Y_hcsv[i][j]
             cur_row += 1
     now = datetime.datetime.now()
     if filename == None:
@@ -371,6 +375,10 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
 
             # (tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
             for b_i, sample in enumerate(dataloaders[phase]):
+                if sample['X'].shape[0] == 1:
+                    sample['X'] = sample['X'].squeeze()
+                    sample['X_lengths'] = sample['X_lengths'].squeeze()
+                    sample['Y'] = sample['Y'].squeeze()
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)

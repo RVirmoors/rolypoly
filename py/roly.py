@@ -219,7 +219,7 @@ async def init_main():
         x, xl, yh, dh = timing.prepare_X(x, xl, dh, dh, bs)
         batch_size = bs
         longest_seq = int(max(xl))
-        y = torch.Tensor(y[:batch_size, :longest_seq])
+        y = torch.DoubleTensor(y[:batch_size, :longest_seq])
         # define model for offline: learn a batch
         model = timing.TimingLSTM(
             input_dim=feat_vec_size,
@@ -239,9 +239,9 @@ async def init_main():
                                  shuffle=False)
 
         trained_model, loss = timing.train(model, dl,
-                                           minibatch_size=batch_size / 2,
-                                           minihop_size=batch_size / 4,
-                                           epochs=10)
+                                           minibatch_size=int(batch_size / 2),
+                                           minihop_size=int(batch_size / 4),
+                                           epochs=40)
 
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
@@ -276,14 +276,14 @@ async def init_main():
         X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
             X, X_lengths, Y_hat, diff_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y,
-                                    style='EMA', value=0.8)
+                                    style='EMA', value=0.96)
 
         total_loss = model.loss(Y_hat, Y)
         print('Take loss: {:4f}'.format(total_loss))
         print('Take MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 
         if get_y_n("Save performance? "):
-            rows, filename = timing.save_XY(X, X_lengths, diff_hat, Y)
+            rows, filename = timing.save_XY(X, X_lengths, diff_hat, Y, Y_hat)
             print("Saved", filename, ": ", rows, "rows.")
             client.send_message("/save", filename[11:-3] + "wav")
 
