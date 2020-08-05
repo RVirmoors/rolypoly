@@ -206,7 +206,7 @@ def load_XY(filename):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=100, input_dim=14, batch_size=128, dropout=0.3, bootstrap=False, seq2seq=False):
+    def __init__(self, nb_layers=2, nb_lstm_units=128, input_dim=14, batch_size=128, dropout=0.3, bootstrap=False, seq2seq=False):
         """
         batch_size: # of sequences in training batch
         """
@@ -269,12 +269,8 @@ class TimingLSTM(nn.Module):
         X_pack = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
 
-        # print(X)
-
         # now run through LSTM
         X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
-        # p, _, _, _ = X
-        # print(p[0])
 
         # undo the packing operation
         X_lstm, _ = torch.nn.utils.rnn.pad_packed_sequence(
