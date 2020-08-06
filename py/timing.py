@@ -324,9 +324,9 @@ class TimingLSTM(nn.Module):
         mask = (Y != 0)
 
         # filter out repeated diff_hat
-        diffMask = torch.BoolTensor([True]) # first is always new
+        diffMask = torch.BoolTensor([True]).to(device) # first is always new
         b = [(diff_hat[i+1] - diff_hat[i] != 0) for i in range(diff_hat.shape[0]-1)]
-        diffMask = torch.cat((diffMask, torch.BoolTensor(b)), dim=0)
+        diffMask = torch.cat((diffMask, torch.BoolTensor(b).to(device)), dim=0)
 
         mask = diffMask * mask
 
