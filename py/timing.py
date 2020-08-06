@@ -218,9 +218,9 @@ def transform(X, Y):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=128, input_dim=15, batch_size=128, dropout=0.3, bootstrap=False, seq2seq=False):
+    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, bootstrap=False, seq2seq=False):
         """
-        batch_size: # of sequences in training batch
+        batch_size: # of sequences (bars) in training batch
         """
         super(TimingLSTM, self).__init__()
 
@@ -357,7 +357,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=64, epochs=20, lr=4e-5):
+def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
