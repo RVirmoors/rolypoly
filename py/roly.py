@@ -245,7 +245,7 @@ async def init_main():
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat, Y,
                                     style='EMA', value=0.8)
 
-        total_loss = model.loss(Y_hat, Y, X[:, :, 14])
+        total_loss = model.loss(Y_hat, Y, None)
         print('Take loss: {:4f}'.format(total_loss))
         print('Take MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 

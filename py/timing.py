@@ -311,17 +311,19 @@ class TimingLSTM(nn.Module):
         """
         Y = Y.view(-1)                  # flat target
         Y_hat = Y_hat.view(-1)          # flat inference
-        diff_hat = diff_hat.view(-1)    # flat drum-guitar (for mask)
+        if diff_hat is not None:
+            diff_hat = diff_hat.view(-1)    # flat drum-guitar (for mask)
 
         # filter out all zero positions from Y
         mask = (Y != 0)
 
         # filter out repeated diff_hat
-        diffMask = torch.BoolTensor([True]).to(device) # first is always new
-        b = [(diff_hat[i+1] - diff_hat[i] != 0) for i in range(diff_hat.shape[0]-1)]
-        diffMask = torch.cat((diffMask, torch.BoolTensor(b).to(device)), dim=0)
+        if diff_hat is not None:
+            diffMask = torch.BoolTensor([True]).to(device) # first is always new
+            b = [(diff_hat[i+1] - diff_hat[i] != 0) for i in range(diff_hat.shape[0]-1)]
+            diffMask = torch.cat((diffMask, torch.BoolTensor(b).to(device)), dim=0)
 
-        mask = diffMask * mask
+            mask = diffMask * mask
 
         nb_outputs = torch.sum(mask).item()
         if DEBUG:
@@ -340,7 +342,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=1e-4):
+def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=4e-5):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
@@ -520,7 +522,7 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                 # forward, don't track history for eval
                 with torch.set_grad_enabled(False):
                     mb_Y_hat = model(mb_X, mb_Xl)
-                    loss = model.loss(mb_Y_hat, mb_Y, mb_X[:,:,14])
+                    loss = model.loss(mb_Y_hat, mb_Y, None)
                     total_loss += loss.item()
                     batch_loss += loss.item()
                     div_loss += 1
