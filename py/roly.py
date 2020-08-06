@@ -70,10 +70,7 @@ tc = pm.get_tempo_changes()
 ts = pm.time_signature_changes
 
 delayms = 1
-guitarDescr = 0  # loudness delta?
-
-
-# LIVE METHODS
+guitarDescr = 0  # kurtosis
 
 
 def getOnsetDiffOSC(address, *args):
@@ -113,7 +110,8 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     await asyncio.sleep(featVec[9] * 0.1 / 1000)
     featVec[13] = guitarDescr
     # 3.
-    # print(featVec[9], featVec[10], featVec[11], featVec[12], featVec[13])
+    #print(int(featVec[0]), int(featVec[1]), int(
+    #    featVec[2]), int(featVec[3]), int(featVec[4]))
     if RUNSEQ:
         # if new bar, finish existing sequence and start a new one
         if featVec[12] <= X[s_i][h_i][12] and h_i:
@@ -148,7 +146,7 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
         else:
             y_hat = model(x, [1])[0][0]     # one fV
     # 4.
-    await asyncio.sleep(featVec[9] * 0.4 / 1000)
+    await asyncio.sleep(featVec[9] * 0.6 / 1000)
     # remains constant if no guit onset?
     onsetDelay = data.ms_to_bartime(delayms, featVec)
     print("drum-guitar: {:.4f} || next drum-delay: {:.4f}".
@@ -201,7 +199,7 @@ async def parseMIDItoFV(model):
             featVec = np.zeros(feat_vec_size)
 
             client.send_message("/next", next_delay)
-            await asyncio.sleep(sleeptime + (next_delay - prev_delay) / 1000.)
+            await asyncio.sleep(sleeptime * 0.4 + (next_delay - prev_delay) / 1000.)
     return X, Y, Y_hat, diff_hat, s_i + 1, X_lengths
 
 
@@ -296,5 +294,5 @@ asyncio.run(init_main())
 """
 TODO test: constant vs EMA
 simple, boots, s2s
-normal play, quicky, quantized
+normal play, lazy, triplets, quantized
 """

@@ -21,8 +21,6 @@ import copy
 from constants import ROLAND_DRUM_PITCH_CLASSES
 from helper import get_y_n, EarlyStopping, plot_grad_flow, ewma
 import matplotlib.pyplot as plt
-
-# Helper libraries
 import random
 from tqdm import tqdm, trange
 
@@ -272,7 +270,7 @@ class TimingLSTM(nn.Module):
         #print("X ....", X.size())
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
-        # doesn't make sense to sort seqs by length => we lose ONNX exportability..
+        # doesn't make sense to sort seqs by length => we lose ONNX exportability.
         X_pack = torch.nn.utils.rnn.pack_padded_sequence(
             X, X_lengths, batch_first=True, enforce_sorted=False)
 
@@ -316,9 +314,9 @@ class TimingLSTM(nn.Module):
         eliminate outputs on padded elements,
         compute MSE loss
         """
-        Y = Y.view(-1)              # flat target
-        Y_hat = Y_hat.view(-1)      # flat inference
-        diff_hat = diff_hat.view(-1)
+        Y = Y.view(-1)                  # flat target
+        Y_hat = Y_hat.view(-1)          # flat inference
+        diff_hat = diff_hat.view(-1)    # flat drum-guitar (for mask)
 
         # filter out all zero positions from Y
         mask = (Y != 0)
@@ -337,9 +335,6 @@ class TimingLSTM(nn.Module):
         # pick the values for Y_hat and zero out the rest with the mask
         Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
         Y = Y[range(Y.shape[0])] * mask
-
-        #print("\nY_hat:", Y_hat)
-        #print("Y:", Y)
 
         criterion = nn.MSELoss(reduction='sum')
 
@@ -378,7 +373,7 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
         phases = ['train']
 
     for t in range(epochs):
-        # train loop. TODO add several epochs, w/ noise?
+        # train loop. TODO add noise?
         #print("Epoch", t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
         if DEBUG:
@@ -496,11 +491,10 @@ def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=
         plt.show()
 
     ### Evaluation ###
-#    if get_y_n(str(len(dataloaders['test'])) + " test batches. Run test evaluation? "):
     model.eval()
     total_loss = div_loss = 0
 
-    if 'test' in dataloaders:
+    if 'test' in dataloaders:   # todo refactor this, too much copy-paste from above...
         for b_i, sample in enumerate(dataloaders['test']):
             if 'diff_hat' not in sample: # no drum-guit diff recorded, just use Y
                 sample['diff_hat'] = sample['Y'].detach().clone()
