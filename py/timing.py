@@ -174,7 +174,7 @@ def save_XY(X, X_lengths, Y, Y_hat=None, filename=None):
 
 def load_XY(filename):
     """
-    Get (unpadded) X, diff_hat, Y from a csv file.
+    Get (unpadded) X, Y from a csv file.
     """
     X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
     Y = np.zeros((1000, 64))                 # seqs * hits
@@ -382,17 +382,13 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
 
             # (tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
             for b_i, sample in enumerate(dataloaders[phase]):
-                if 'diff_hat' not in sample: # no drum-guit diff recorded, just use Y
-                    sample['diff_hat'] = sample['Y'].detach().clone()
                 if sample['X'].shape[0] == 1:
                     sample['X'] = sample['X'].squeeze()
                     sample['X_lengths'] = sample['X_lengths'].squeeze()
                     sample['Y'] = sample['Y'].squeeze()
-                    sample['diff_hat'] = sample['diff_hat'].squeeze()
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)
-                diff_hat = sample['diff_hat'].to(device)
                 model.hidden = model.init_hidden()  # reset the state at the start of a take
 
                 n_mb = int(np.ceil(X.shape[0] / minihop_size))
@@ -415,7 +411,6 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                     mb_Xl = torch.index_select(
                         X_lengths, 0, indices).to(device)
                     mb_Y = torch.index_select(Y, 0, indices).to(device)
-                    mb_dh = torch.index_select(diff_hat, 0, indices).to(device)
 
                     optimizer.zero_grad()
 
@@ -424,7 +419,7 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                     with torch.set_grad_enabled(phase == 'train'):
                         # print(mb_X.size(), mb_Xl.size(), mb_Y.size())
                         mb_Y_hat = model(mb_X, mb_Xl)
-                        loss = model.loss(mb_Y_hat, mb_Y, mb_dh)
+                        loss = model.loss(mb_Y_hat, mb_Y, mb_X[:,:,14])
                         epoch_loss += loss.item()
                         batch_loss += loss.item()
                         div_loss += 1
@@ -491,17 +486,13 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
 
     if 'test' in dataloaders:   # todo refactor this, too much copy-paste from above...
         for b_i, sample in enumerate(dataloaders['test']):
-            if 'diff_hat' not in sample: # no drum-guit diff recorded, just use Y
-                sample['diff_hat'] = sample['Y'].detach().clone()
             if sample['X'].shape[0] == 1:
                 sample['X'] = sample['X'].squeeze()
                 sample['X_lengths'] = sample['X_lengths'].squeeze()
                 sample['Y'] = sample['Y'].squeeze()
-                sample['diff_hat'] = sample['diff_hat'].squeeze()
             X = sample['X'].to(device)
             X_lengths = sample['X_lengths'].to(device)
             Y = sample['Y'].to(device)
-            diff_hat = sample['diff_hat'].to(device)
 
             model.hidden = model.init_hidden()
 
@@ -525,12 +516,11 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                 mb_Xl = torch.index_select(
                     X_lengths, 0, indices).to(device)
                 mb_Y = torch.index_select(Y, 0, indices).to(device)
-                mb_dh = torch.index_select(diff_hat, 0, indices).to(device)
 
                 # forward, don't track history for eval
                 with torch.set_grad_enabled(False):
                     mb_Y_hat = model(mb_X, mb_Xl)
-                    loss = model.loss(mb_Y_hat, mb_Y, mb_dh)
+                    loss = model.loss(mb_Y_hat, mb_Y, mb_X[:,:,14])
                     total_loss += loss.item()
                     batch_loss += loss.item()
                     div_loss += 1
