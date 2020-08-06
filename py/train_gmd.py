@@ -50,10 +50,10 @@ parser.add_argument(
     '--batch_size', type=int, default=512,
     help='Batch size: how many files/takes to process at a time.')
 parser.add_argument(
-    '--window_size', type=int, default=128,
+    '--window_size', type=int, default=64,
     help='Minibatch / window size: number of 2*bars to train on.')
 parser.add_argument(
-    '--hop_size', type=int, default=2,
+    '--hop_size', type=int, default=32,
     help='Training hop size.')
 parser.add_argument(
     '--epochs', type=int, default=0,
@@ -368,8 +368,8 @@ if __name__ == '__main__':
 """
 
 models:
-simple -    1e-4 bs2 epochs ??? -- to beat 0.0000067649 0.000056205
-boots -     1e-4 bs 256 epochs ??? -- to beat 0.0000071667 0.000059781
+simple -    1e-4 bs 64 epochs ??? -- to beat 0.0000067649 0.000056205
+boots -     1e-4 bs 64 epochs 43 -- to beat 0.0000071667 0.000059781
 s2s -       4e-4 bs 64 epochs63 --- 6.1688e-5
 
 """
