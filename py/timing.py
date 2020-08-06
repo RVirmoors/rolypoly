@@ -213,7 +213,6 @@ def transform(X, Y):
     """
 
 
-
 # TIMING NETWORK CLASS
 # ====================
 
@@ -358,16 +357,14 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=4e-5):
+def train(model, dataloaders, minibatch_size=64, epochs=20, lr=4e-5):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
-    minihop_size = int(minihop_size)
 
     model.to(device)
     print(model)
-    print("window size:", minibatch_size,
-          "bars | hop:", minihop_size, "bars | lr:", lr)
+    print("window size:", minibatch_size, "bars | lr:", lr)
     print("Running on", next(model.parameters()).device)
 
     optimizer = torch.optim.Adam(
@@ -409,7 +406,7 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                 Y = sample['Y'].to(device)
                 model.hidden = model.init_hidden()  # reset the state at the start of a take
 
-                n_mb = int(np.ceil(X.shape[0] / minihop_size))
+                n_mb = int(np.ceil(X.shape[0] / minibatch_size))
 
                 batch_loss = 0
                 batch_div = 0
@@ -418,13 +415,13 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                     # if DEBUG:
                     #    print("miniBatch", mb_i + 1, "/", n_mb)
                     # get minibatch indices
-                    if mb_i * minihop_size + minibatch_size < X.shape[0]:
-                        end = mb_i * minihop_size + minibatch_size
+                    if (mb_i + 1) * minibatch_size < X.shape[0]:
+                        end = (mb_i + 1) * minibatch_size
                     else:
                         # reached the end
                         end = X.shape[0]
                     indices = torch.tensor(
-                        range(mb_i * minihop_size, end), device=device, dtype=torch.int64)
+                        range(mb_i * minibatch_size, end), device=device, dtype=torch.int64)
                     mb_X = torch.index_select(X, 0, indices).to(device)
                     mb_Xl = torch.index_select(
                         X_lengths, 0, indices).to(device)
@@ -515,7 +512,7 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
 
             model.hidden = model.init_hidden()
 
-            n_mb = int(np.ceil(X.shape[0] / minihop_size))
+            n_mb = int(np.ceil(X.shape[0] / minibatch_size))
 
             batch_loss = 0
             batch_div = 0
@@ -524,13 +521,13 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                 # if DEBUG:
                 #    print("miniBatch", mb_i + 1, "/", n_mb)
                 # get minibatch indices
-                if mb_i * minihop_size + minibatch_size < X.shape[0]:
-                    end = mb_i * minihop_size + minibatch_size
+                if (mb_i + 1) * minibatch_size < X.shape[0]:
+                    end = (mb_i + 1) * minibatch_size
                 else:
                     # reached the end
                     end = X.shape[0]
                 indices = torch.tensor(
-                    range(mb_i * minihop_size, end), device=device, dtype=torch.int64)
+                    range(mb_i * minibatch_size, end), device=device, dtype=torch.int64)
                 mb_X = torch.index_select(X, 0, indices).to(device)
                 mb_Xl = torch.index_select(
                     X_lengths, 0, indices).to(device)

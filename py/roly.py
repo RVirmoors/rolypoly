@@ -207,7 +207,6 @@ async def init_main():
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=int(batch_size / 2),
-                                           minihop_size=int(batch_size / 4),
                                            epochs=20)
 
         if get_y_n("Save trained model? "):

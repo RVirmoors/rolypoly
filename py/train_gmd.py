@@ -53,9 +53,6 @@ parser.add_argument(
     '--window_size', type=int, default=64,
     help='Minibatch / window size: number of 2*bars to train on.')
 parser.add_argument(
-    '--hop_size', type=int, default=32,
-    help='Training hop size.')
-parser.add_argument(
     '--epochs', type=int, default=0,
     help='# of epochs to train. Zero means don\'t train.')
 parser.add_argument(
@@ -324,7 +321,6 @@ if __name__ == '__main__':
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=args.window_size,
-                                           minihop_size=args.hop_size,
                                            epochs=args.epochs)
 
     # Optimisation ###            see https://optuna.org/
@@ -341,7 +337,7 @@ if __name__ == '__main__':
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout,
                                       bootstrap=args.bootstrap, seq2seq=args.seq2seq)
             trained_model, loss = timing.train(
-                model, dl, lr=lr, minibatch_size=bs, minihop_size=bs / 2, epochs=ep)
+                model, dl, lr=lr, minibatch_size=bs, epochs=ep)
 
             return loss
 
