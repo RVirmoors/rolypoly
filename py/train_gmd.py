@@ -246,7 +246,7 @@ def pad_collate(batch):
     xx = [batch[i]['X'][j] for i in range(len(batch)) for j in range(len(batch[i]['X']))]
     xl = torch.tensor([batch[i]['X_lengths'][j]
                        for i in range(len(batch))
-                       for j in range(len(batch[i]['X_lengths']) - 1)])
+                       for j in range(len(batch[i]['X_lengths']))])
     yy = [batch[i]['Y'][j] for i in range(len(batch)) for j in range(len(batch[i]['Y']))]
 
     take_lens = [len(x) for x in xx]
