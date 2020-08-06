@@ -129,8 +129,8 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
             # use average offset of first & last note in group
             y = (O[new_index] + O[index]) / 2
 
-            X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = timing.addRow(
-                featVec, None, y, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
+            X, Y_hat, diff_hat, h_i, s_i, X_lengths = timing.addRow(
+                featVec, None, y, X, Y_hat, diff_hat, h_i, s_i, X_lengths)
 
             # move on to the next (group of) note(s)
             featVec = np.zeros(feat_vec_size)

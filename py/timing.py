@@ -42,7 +42,7 @@ feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
 # =========================
 
 
-def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
+def addRow(featVec, y_hat, d_g_diff, X, Y_hat, diff_hat, h_i, s_i, X_lengths):
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12] and h_i:
         if s_i >= 0:  # s_i is init'd as -1, so first note doesn't trigger:
@@ -65,7 +65,7 @@ def addRow(featVec, y_hat, d_g_diff, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
         Y_hat[s_i][h_i + 1] = y_hat     # delay for next hit
         diff_hat[s_i][h_i] = d_g_diff   # drum-guitar diff for this hit
         X_lengths[s_i] = h_i + 1
-    return X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths
+    return X, Y_hat, diff_hat, h_i, s_i, X_lengths
 
 
 def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
@@ -122,7 +122,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     for i in range(len(diff)):
         seq_len = int(X_lengths[i])
         if style == 'constant':
-            if value:
+            if value is not None:
                 diff[i, :seq_len] = value
             else:  # default
                 diff[i, :seq_len] = np.average(diff_hat[i][:seq_len])
