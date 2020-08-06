@@ -347,7 +347,7 @@ if __name__ == '__main__':
 
         print("Optimization done. Best params:", study.best_params)
         print("Best trial out of", len(study.trials), ":", study.best_trial)
-"""
+
         while get_y_n("Optimise for 10 more trials? "):
             study.optimize(objective, n_trials=10)
 
@@ -363,11 +363,11 @@ if __name__ == '__main__':
             PATH = "models/gmd_LSTM.pt"
         torch.save(trained_model.state_dict(), PATH)
         print("Saved trained model to", PATH)
-"""
+
 """
 
 models:
-simple -    4e-5 bs 64 epochs ??? -- to beat 0.0000067649 0.000056205
+simple -    1e-3 bs 64 epochs ???
 boots -     1e-4 bs 64 epochs 43 -- to beat 0.0000071667 0.000059781
 s2s -       4e-4 bs 64 epochs63 --- 6.1688e-5
 
