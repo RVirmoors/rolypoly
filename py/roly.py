@@ -90,7 +90,7 @@ dispatcher.map("/onset", getOnsetDiffOSC)  # receive
 dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 
 
-async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
+async def processFV(featVec, model, X, Y, Y_hat, h_i, s_i, X_lengths):
     """
     Live:
     1. send the drums to be played in Max
@@ -122,10 +122,10 @@ async def processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths):
     print("drum-guitar: {:.4f} || next drum-delay: {:.4f}".
           format(onsetDelay, y_hat.item()))
     # 5.
-    X, Y_hat, diff_hat, h_i, s_i, X_lengths = timing.addRow(
-        featVec, y_hat, onsetDelay, X, Y_hat, diff_hat, h_i, s_i, X_lengths)
+    X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
+        featVec, y_hat, onsetDelay, X, Y_hat, h_i, s_i, X_lengths)
     # 6.
-    return y_hat, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths
+    return y_hat, X, Y, Y_hat, h_i, s_i, X_lengths
 
 
 async def parseMIDItoFV(model):
@@ -136,12 +136,11 @@ async def parseMIDItoFV(model):
     X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
     Y = np.zeros((1000, 64))                 # seqs * hits
     Y_hat = np.zeros((1000, 64))             # seqs * hits
-    diff_hat = np.zeros((1000, 64))          # seqs * hits
     X_lengths = np.zeros(1000)
     s_i = h_i = -1
     next_delay = 0
     start = time.monotonic()
-    featVec = np.zeros(feat_vec_size)  # 9+4+1 zeros
+    featVec = np.zeros(feat_vec_size)  # 9+6 zeros
     for index, note in enumerate(drumtrack.notes):
         #        print(pitch_class_map[note.pitch])
         if index < (len(drumtrack.notes) - 1):
@@ -161,7 +160,7 @@ async def parseMIDItoFV(model):
 
             # loop = asyncio.get_event_loop()
             # next hit timing [ms]
-            y_hat, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths = await processFV(featVec, model, X, Y, Y_hat, diff_hat, h_i, s_i, X_lengths)
+            y_hat, X, Y, Y_hat, h_i, s_i, X_lengths = await processFV(featVec, model, X, Y, Y_hat, h_i, s_i, X_lengths)
             prev_delay = next_delay
             next_delay = data.bartime_to_ms(y_hat.item(), featVec)
 
@@ -170,7 +169,7 @@ async def parseMIDItoFV(model):
 
             client.send_message("/next", next_delay)
             await asyncio.sleep(sleeptime * 0.4 + (next_delay - prev_delay) / 1000.)
-    return X, Y, Y_hat, diff_hat, s_i + 1, X_lengths
+    return X, Y, Y_hat, s_i + 1, X_lengths
 
 
 pitch_class_map = data.classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
@@ -183,7 +182,7 @@ async def init_main():
     if args.offline:
         # OFFLINE : ...
         x, xl, dh, y, bs = timing.load_XY(args.take)
-        x, xl, yh, dh = timing.prepare_X(x, xl, dh, dh, bs)
+        x, xl, yh = timing.prepare_X(x, xl, yh, bs)
         batch_size = bs
         longest_seq = int(max(xl))
         y = torch.DoubleTensor(y[:batch_size, :longest_seq])
@@ -201,7 +200,7 @@ async def init_main():
             print("Loaded pre-trained model weights from", trained_path)
 
         train_data = [{'X': x, 'X_lengths': xl,
-                       'Y': y, 'diff_hat': dh, 'split': 'train'}]
+                       'Y': y, 'split': 'train'}]
         dl = {}
         dl['train'] = DataLoader(train_data, batch_size=1,
                                  shuffle=False)
@@ -238,20 +237,20 @@ async def init_main():
 
         client.send_message("/record", 1)
         # Enter main loop of program
-        X, Y, Y_hat, diff_hat, batch_size, X_lengths = await parseMIDItoFV(model)
+        X, Y, Y_hat, batch_size, X_lengths = await parseMIDItoFV(model)
         client.send_message("/record", 0)
 
-        X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
-            X, X_lengths, Y_hat, diff_hat, batch_size)
-        Y_hat, Y = timing.prepare_Y(X_lengths, diff_hat, Y_hat, Y,
-                                    style='constant', value=0.01)
+        X, X_lengths, Y_hat = timing.prepare_X(
+            X, X_lengths, Y_hat, batch_size)
+        Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat, Y,
+                                    style='EMA', value=0.8)
 
-        total_loss = model.loss(Y_hat, Y, torch.DoubleTensor(diff_hat))
+        total_loss = model.loss(Y_hat, Y, X[:, :, 14])
         print('Take loss: {:4f}'.format(total_loss))
         print('Take MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 
         if get_y_n("Save performance? "):
-            rows, filename = timing.save_XY(X, X_lengths, diff_hat, Y, Y_hat)
+            rows, filename = timing.save_XY(X, X_lengths, Y, Y_hat)
             print("Saved", filename, ": ", rows, "rows.")
             client.send_message("/save", filename[11:-3] + "wav")
 

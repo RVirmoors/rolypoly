@@ -103,7 +103,6 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
     X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
     Y = np.zeros((1000, 64))                 # seqs * hits
     Y_hat = np.zeros((1000, 64))             # seqs * hits
-    diff_hat = np.zeros((1000, 64))          # seqs * hits
     X_lengths = np.zeros(1000)
     s_i = h_i = -1
 
@@ -127,15 +126,15 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
             featVec[13] = V[index]  # TODO CHECK IF MAYBE BETTER ZERO??
 
             # use average offset of first & last note in group
-            y = (O[new_index] + O[index]) / 2
+            featVec[14] = (O[new_index] + O[index]) / 2
 
-            X, Y_hat, diff_hat, h_i, s_i, X_lengths = timing.addRow(
-                featVec, None, y, X, Y_hat, diff_hat, h_i, s_i, X_lengths)
+            X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
+                featVec, None, X, Y_hat, h_i, s_i, X_lengths)
 
             # move on to the next (group of) note(s)
             featVec = np.zeros(feat_vec_size)
             new_index = index + 1
-    return X, Y, Y_hat, diff_hat, s_i + 1, X_lengths
+    return X, Y, Y_hat, s_i + 1, X_lengths
 
 
 def pm_to_XY(file_name):
@@ -162,15 +161,15 @@ def pm_to_XY(file_name):
     positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 
     hits, offsets, vels = quantizeDrumTrack(drumtrack, positions_in_bar)
-    X, Y, Y_hat, diff_hat, take_size, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
-                                                               tempos, timesigs, positions_in_bar)
+    X, Y, Y_hat, take_size, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
+                                                     tempos, timesigs, positions_in_bar)
 
-    X, X_lengths, Y_hat, diff_hat = timing.prepare_X(
-        X, X_lengths, Y_hat, diff_hat, take_size)
+    X, X_lengths, Y_hat = timing.prepare_X(
+        X, X_lengths, Y_hat, take_size)
     Y_hat, Y = timing.prepare_Y(
-        X_lengths, diff_hat, Y_hat, Y, style='diff')
+        X_lengths, X[:, :, 14], Y_hat, Y, style='diff')
 
-    return X, X_lengths, diff_hat, Y
+    return X, X_lengths, Y
 
 
 class GMDdataset(Dataset):
@@ -195,23 +194,23 @@ class GMDdataset(Dataset):
                                      self.meta.iloc[idx]['midi_filename'])
             if self.source == 'midi':
                 # load MIDI file
-                x, xl, dh, y = pm_to_XY(file_name)
+                x, xl, y = pm_to_XY(file_name)
                 # if get_y_n("Save to csv? "):
                 csv_filename = file_name[:-3] + 'csv'
-                rows, _ = timing.save_XY(x, xl, dh, y, filename=csv_filename)
+                rows, _ = timing.save_XY(x, xl, y, filename=csv_filename)
                 print("Saved", csv_filename, ": ", rows, "rows.")
             else:
                 # load CSV file
                 csv_filename = file_name[:-3] + 'csv'
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    x, xl, dh, y, bs = timing.load_XY(csv_filename)
+                    x, xl, y, bs = timing.load_XY(csv_filename)
                 if sum(xl):
                     # don't process empty files
-                    x, xl, yh, dh = timing.prepare_X(
-                        x, xl, dh, dh, bs)
+                    x, xl, _ = timing.prepare_X(
+                        x, xl, None, bs)        # no y_hat (hasn't been run thru model)
                     _, y = timing.prepare_Y(
-                        xl, dh, yh, y, style='diff')
+                        xl, x[:, :, 14], _, y, style='diff')
                 # print("Loaded", csv_filename, ": ", bs, "bars.")
 
             if sum(xl):

@@ -36,13 +36,14 @@ torch.set_printoptions(sci_mode=False)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 4 + 1
+feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 6
+# FV: 9 drumhits + dur, tempo, timesig, pos_in_bar, guitar, d_g-diff
 
 # METHODS FOR BUILDING X, Y
 # =========================
 
 
-def addRow(featVec, y_hat, d_g_diff, X, Y_hat, diff_hat, h_i, s_i, X_lengths):
+def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12] and h_i:
         if s_i >= 0:  # s_i is init'd as -1, so first note doesn't trigger:
@@ -58,17 +59,15 @@ def addRow(featVec, y_hat, d_g_diff, X, Y_hat, diff_hat, h_i, s_i, X_lengths):
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
         Y_hat[s_i][1] = y_hat        # delay for next hit
-        diff_hat[s_i][0] = d_g_diff  # drum-guitar diff for this hit
     else:
         h_i += 1
         X[s_i][h_i] = featVec           # this hit
         Y_hat[s_i][h_i + 1] = y_hat     # delay for next hit
-        diff_hat[s_i][h_i] = d_g_diff   # drum-guitar diff for this hit
         X_lengths[s_i] = h_i + 1
-    return X, Y_hat, diff_hat, h_i, s_i, X_lengths
+    return X, Y_hat, h_i, s_i, X_lengths
 
 
-def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
+def prepare_X(X, X_lengths, Y_hat, batch_size):
     """
     Pad short sequences
     https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
@@ -77,24 +76,23 @@ def prepare_X(X, X_lengths, Y_hat, diff_hat, batch_size):
     # if DEBUG:
     #    print("longest: ", longest_seq, " | batch size: ", batch_size)
     padded_X = np.zeros((batch_size, longest_seq, feat_vec_size))
-    padded_Y_hat = np.zeros((batch_size, longest_seq))
-    padded_diff_hat = np.zeros_like(padded_Y_hat)
+    if Y_hat is not None:
+        padded_Y_hat = np.zeros((batch_size, longest_seq))
     for i, x_len in enumerate(X_lengths[:batch_size]):
         x_len = int(x_len)
         # print("i", i, "seq length", x_len)
         sequence = X[i]
         padded_X[i, 0:x_len] = sequence[:x_len]
-        sequence = Y_hat[i]
-        padded_Y_hat[i, 0:x_len] = sequence[:x_len]
-        sequence = diff_hat[i]
-        padded_diff_hat[i, 0:x_len] = sequence[:x_len]
+        if Y_hat is not None:
+            sequence = Y_hat[i]
+            padded_Y_hat[i, 0:x_len] = sequence[:x_len]
     X = padded_X
-    Y_hat = padded_Y_hat
-    diff_hat = padded_diff_hat
+    if Y_hat is not None:
+        Y_hat = padded_Y_hat
     X_lengths = X_lengths[:batch_size]
     X = torch.tensor(X, dtype=torch.float64)
     X_lengths = torch.tensor(X_lengths, dtype=torch.int64)
-    return X, X_lengths, Y_hat, diff_hat
+    return X, X_lengths, Y_hat
 
 
 def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
@@ -139,9 +137,9 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     return Y_hat, Y
 
 
-def save_XY(X, X_lengths, diff_hat, Y, Y_hat=None, filename=None):
+def save_XY(X, X_lengths, Y, Y_hat=None, filename=None):
     """
-    Save X, diff_hat, Y to a csv file.
+    Save X, Y to a csv file.
     Returns total numbers of rows written.
     """
     Xcsv = X.numpy()
@@ -153,7 +151,7 @@ def save_XY(X, X_lengths, diff_hat, Y, Y_hat=None, filename=None):
     else:
         fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g'
         header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y"
-    columns = 1 + feat_vec_size + 1 + 1 + 1*(Y_hat is not None)  # seq, fv, diff, y, y_hat
+    columns = 1 + feat_vec_size + 1 + 1*(Y_hat is not None)  # seq, fv, y, y_hat
     rows = int(sum(X_lengths))
     to_csv = np.zeros((rows, columns))
     cur_row = 0
@@ -162,10 +160,9 @@ def save_XY(X, X_lengths, diff_hat, Y, Y_hat=None, filename=None):
         for j in range(seq_len):
             to_csv[cur_row][0] = i
             to_csv[cur_row][1:feat_vec_size + 1] = Xcsv[i][j]
-            to_csv[cur_row][feat_vec_size + 1] = diff_hat[i][j]
-            to_csv[cur_row][feat_vec_size + 2] = Ycsv[i][j]
+            to_csv[cur_row][feat_vec_size + 1] = Ycsv[i][j]
             if Y_hat is not None:
-                to_csv[cur_row][feat_vec_size + 3] = Y_hcsv[i][j]
+                to_csv[cur_row][feat_vec_size + 2] = Y_hcsv[i][j]
             cur_row += 1
     now = datetime.datetime.now()
     if filename == None:
@@ -181,7 +178,6 @@ def load_XY(filename):
     """
     X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
     Y = np.zeros((1000, 64))                 # seqs * hits
-    diff_hat = np.zeros((1000, 64))          # seqs * hits
     X_lengths = np.zeros(1000)
     s_i = -1
     h_i = 0
@@ -195,15 +191,14 @@ def load_XY(filename):
             s_i = cur_seq
             h_i = 0
         X[s_i][h_i] = from_csv[cur_row][1:feat_vec_size + 1]
-        diff_hat[s_i][h_i] = from_csv[cur_row][feat_vec_size + 1]
-        Y[s_i][h_i] = from_csv[cur_row][feat_vec_size + 2]
+        Y[s_i][h_i] = from_csv[cur_row][feat_vec_size + 1]
         h_i += 1
     # last seq
     X_lengths[s_i] = h_i
     batch_size = s_i + 1
     if DEBUG:
         print("Done loading sequences of lengths: ", X_lengths[:batch_size])
-    return X, X_lengths, diff_hat, Y, batch_size
+    return X, X_lengths, Y, batch_size
 
 
 # TIMING NETWORK CLASS
@@ -345,7 +340,7 @@ class TimingLSTM(nn.Module):
 # TRAIN METHOD
 # ============
 
-def train(model, dataloaders, minibatch_size=128, minihop_size=2, epochs=10, lr=1e-4):
+def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=1e-4):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
