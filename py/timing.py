@@ -151,7 +151,8 @@ def save_XY(X, X_lengths, Y, Y_hat=None, filename=None):
     else:
         fmt = '%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %g, %g, %g, %g, %g, %g, %g'
         header = "seq no., kick, snar, hclos, hopen, ltom, mtom, htom, cras, ride, duration, tempo, timesig, pos_in_bar, guitar, d_g_diff, y"
-    columns = 1 + feat_vec_size + 1 + 1*(Y_hat is not None)  # seq, fv, y, y_hat
+    columns = 1 + feat_vec_size + 1 + 1 * \
+        (Y_hat is not None)  # seq, fv, y, y_hat
     rows = int(sum(X_lengths))
     to_csv = np.zeros((rows, columns))
     cur_row = 0
@@ -199,6 +200,18 @@ def load_XY(filename):
     if DEBUG:
         print("Done loading sequences of lengths: ", X_lengths[:batch_size])
     return X, X_lengths, Y, batch_size
+
+
+def transform(X, Y):
+    """
+    TODO Data preprocessing:
+    Drum hits (x[0:8]) and pos_in_bar (x[12]) rescaled from [0,1] to [-1,1]
+    Minmax scale factor applied to diff_hat (x[14]) and y, y_hat to [-1,1]
+    Duration (x[9]) rescaled from [20, 1000] to [-1,1]  (log, capped)
+    Tempo (x[10]) rescaled from [60,240] to [-1,1]      (log, capped)
+    Timesig (x[11]) rescaled from [0.25, 4] to [-1,1]   (log, capped)
+    """
+
 
 
 # TIMING NETWORK CLASS
@@ -319,9 +332,12 @@ class TimingLSTM(nn.Module):
 
         # filter out repeated diff_hat
         if diff_hat is not None:
-            diffMask = torch.BoolTensor([True]).to(device) # first is always new
-            b = [(diff_hat[i+1] - diff_hat[i] != 0) for i in range(diff_hat.shape[0]-1)]
-            diffMask = torch.cat((diffMask, torch.BoolTensor(b).to(device)), dim=0)
+            diffMask = torch.BoolTensor([True]).to(
+                device)  # first is always new
+            b = [(diff_hat[i + 1] - diff_hat[i] != 0)
+                 for i in range(diff_hat.shape[0] - 1)]
+            diffMask = torch.cat(
+                (diffMask, torch.BoolTensor(b).to(device)), dim=0)
 
             mask = diffMask * mask
 
@@ -421,7 +437,7 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
                     with torch.set_grad_enabled(phase == 'train'):
                         # print(mb_X.size(), mb_Xl.size(), mb_Y.size())
                         mb_Y_hat = model(mb_X, mb_Xl)
-                        loss = model.loss(mb_Y_hat, mb_Y, mb_X[:,:,14])
+                        loss = model.loss(mb_Y_hat, mb_Y, mb_X[:, :, 14])
                         epoch_loss += loss.item()
                         batch_loss += loss.item()
                         div_loss += 1
@@ -486,7 +502,8 @@ def train(model, dataloaders, minibatch_size=64, minihop_size=32, epochs=20, lr=
     model.eval()
     total_loss = div_loss = 0
 
-    if 'test' in dataloaders:   # todo refactor this, too much copy-paste from above...
+    # todo refactor this, too much copy-paste from above...
+    if 'test' in dataloaders:
         for b_i, sample in enumerate(dataloaders['test']):
             if sample['X'].shape[0] == 1:
                 sample['X'] = sample['X'].squeeze()

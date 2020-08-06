@@ -177,10 +177,11 @@ class GMDdataset(Dataset):
     GMD dataset class. See https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
     """
 
-    def __init__(self, csv_file, root_dir, source='csv'):
+    def __init__(self, csv_file, root_dir, source='csv', transform=None):
         self.meta = pd.read_csv(csv_file)
         self.root_dir = root_dir
         self.source = source
+        self.transform = transform
 
         self._remove_short_takes()  # filter out short samples
 
@@ -214,6 +215,8 @@ class GMDdataset(Dataset):
                 # print("Loaded", csv_filename, ": ", bs, "bars.")
 
             if sum(xl):
+                if self.transform:
+                    x, y = self.transform(x, y)
                 self.x[idx] = x
                 self.xl[idx] = xl
                 self.y[idx] = y
