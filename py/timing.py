@@ -157,16 +157,18 @@ def save_XY(X, X_lengths, Y, Y_hat=None, filename=None):
         (Y_hat is not None)  # seq, fv, y, y_hat
     rows = int(sum(X_lengths))
     to_csv = np.zeros((rows, columns))
-    cur_row = 0
+    cur_row = s_i = 0
     for i, x_len in enumerate(X_lengths):
         seq_len = int(X_lengths[i])
-        for j in range(seq_len):
-            to_csv[cur_row][0] = i
-            to_csv[cur_row][1:feat_vec_size + 1] = Xcsv[i][j]
-            to_csv[cur_row][feat_vec_size + 1] = Ycsv[i][j]
-            if Y_hat is not None:
-                to_csv[cur_row][feat_vec_size + 2] = Y_hcsv[i][j]
-            cur_row += 1
+        if seq_len:
+            for j in range(seq_len):
+                to_csv[cur_row][0] = s_i
+                to_csv[cur_row][1:feat_vec_size + 1] = Xcsv[i][j]
+                to_csv[cur_row][feat_vec_size + 1] = Ycsv[i][j]
+                if Y_hat is not None:
+                    to_csv[cur_row][feat_vec_size + 2] = Y_hcsv[i][j]
+                cur_row += 1
+            s_i += 1
     now = datetime.datetime.now()
     if filename == None:
         filename = "data/takes/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
@@ -184,23 +186,26 @@ def load_XY(filename):
     X_lengths = np.zeros(1000)
     s_i = 0
     h_i = 0
+    batch_size = 0
 
     from_csv = np.loadtxt(filename, delimiter=',')
-    for cur_row in range(len(from_csv)):
-        cur_seq = int(from_csv[cur_row][0])
-        if (s_i != cur_seq):
-            # new seq
+    if from_csv.ndim == 2:
+        for cur_row in range(len(from_csv)):
+            cur_seq = int(from_csv[cur_row][0])
+            if (s_i != cur_seq and h_i):
+                # new seq
+                X_lengths[s_i] = h_i
+                s_i = cur_seq
+                h_i = 0
+            X[s_i][h_i] = from_csv[cur_row][1:feat_vec_size + 1]
+            Y[s_i][h_i] = from_csv[cur_row][feat_vec_size + 1]
+            h_i += 1
+        # last seq
+        if h_i:
             X_lengths[s_i] = h_i
-            s_i = cur_seq
-            h_i = 0
-        X[s_i][h_i] = from_csv[cur_row][1:feat_vec_size + 1]
-        Y[s_i][h_i] = from_csv[cur_row][feat_vec_size + 1]
-        h_i += 1
-    # last seq
-    X_lengths[s_i] = h_i
-    batch_size = s_i + 1
-    if DEBUG:
-        print("Done loading sequences of lengths: ", X_lengths[:batch_size])
+            batch_size = s_i + 1
+        if DEBUG:
+            print("Done loading sequences of lengths: ", X_lengths[:batch_size])
     return X, X_lengths, Y, batch_size
 
 
@@ -280,8 +285,11 @@ class TimingLSTM(nn.Module):
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability.
-        X_pack = torch.nn.utils.rnn.pack_padded_sequence(
-            X, X_lengths, batch_first=True, enforce_sorted=False)
+        try:
+            X_pack = torch.nn.utils.rnn.pack_padded_sequence(
+                X, X_lengths, batch_first=True, enforce_sorted=False)
+        except:
+            print(X_lengths)
 
         # now run through LSTM
         X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
