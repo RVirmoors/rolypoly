@@ -245,15 +245,11 @@ class GMDdataset(Dataset):
 
 def pad_collate(batch):
     # used in dataLoader below
-    xx = [torch.cat((batch[i]['X'][j], batch[i]['X'][j + 1]), dim=0)  # 2 bars at a time
-          for i in range(len(batch))
-          for j in range(len(batch[i]['X']) - 1)]
-    xl = torch.tensor([batch[i]['X_lengths'][j]  # + batch[i]['X_lengths'][j + 1]
+    xx = [batch[i]['X'][j] for i in range(len(batch)) for j in range(len(batch[i]['X']))]
+    xl = torch.tensor([batch[i]['X_lengths'][j]
                        for i in range(len(batch))
-                       for j in range(len(batch[i]['X_lengths']) - 1)])
-    yy = [torch.cat((batch[i]['Y'][j], batch[i]['Y'][j + 1]), dim=0)
-          for i in range(len(batch))
-          for j in range(len(batch[i]['Y']) - 1)]
+                       for j in range(len(batch[i]['X_lengths']))])
+    yy = [batch[i]['Y'][j] for i in range(len(batch)) for j in range(len(batch[i]['Y']))]
 
     take_lens = [len(x) for x in xx]
 
@@ -329,9 +325,9 @@ if __name__ == '__main__':
     if args.optuna:
         def objective(trial):
             layers = 2  # trial.suggest_int('layers', 2, 3)
-            lstm_units = 128  # trial.suggest_int('lstm_units', 50, 550)
+            lstm_units = 256  # trial.suggest_int('lstm_units', 50, 550)
             dropout = 0.3  # trial.suggest_uniform('dropout', 0.2, 0.6)
-            bs = 256  # pow(2, trial.suggest_int('bs', 1, 7))
+            bs = 64  # pow(2, trial.suggest_int('bs', 1, 7))
             lr = trial.suggest_loguniform('lr', 1e-5, 1e-4)
             ep = 150  # trial.suggest_int('ep', 3, 20)
 
