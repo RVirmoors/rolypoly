@@ -182,11 +182,11 @@ def load_XY(filename):
     X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
     Y = np.zeros((1000, 64))                 # seqs * hits
     X_lengths = np.zeros(1000)
-    s_i = -1
+    s_i = 0
     h_i = 0
 
     from_csv = np.loadtxt(filename, delimiter=',')
-    for cur_row in range(len(from_csv)):        
+    for cur_row in range(len(from_csv)):
         cur_seq = int(from_csv[cur_row][0])
         if (s_i != cur_seq):
             # new seq
