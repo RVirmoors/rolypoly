@@ -186,7 +186,7 @@ def load_XY(filename):
     h_i = 0
 
     from_csv = np.loadtxt(filename, delimiter=',')
-    for cur_row in range(len(from_csv)):
+    for cur_row in range(len(from_csv)):        
         cur_seq = int(from_csv[cur_row][0])
         if (s_i != cur_seq):
             # new seq

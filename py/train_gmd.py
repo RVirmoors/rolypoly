@@ -210,7 +210,7 @@ class GMDdataset(Dataset):
                     x, xl, _ = timing.prepare_X(
                         x, xl, None, bs)        # no y_hat (hasn't been run thru model)
                     _, y = timing.prepare_Y(
-                        xl, x[:, :, 14], _, y, style='diff')
+                        xl, x[:, :, 14], y, style='diff')
                 # print("Loaded", csv_filename, ": ", bs, "bars.")
 
             if sum(xl):
