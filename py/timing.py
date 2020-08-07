@@ -47,23 +47,18 @@ def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12] and h_i >= 0:
         #print("new bar", s_i, h_i)
-        if s_i > 0:  # s_i is init'd as 0, so first note doesn't trigger:
-            # move delay to first hit in new seq
-            Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
-            # last hit plus one doesn't make sense
-            Y_hat[s_i][h_i + 1] = 0
-            if DEBUG:
-                print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
-                print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
-                print("==========")
+        if DEBUG:
+            print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
+            print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
+            print("==========")
         s_i += 1
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
-        Y_hat[s_i][1] = y_hat        # delay for next hit
+        Y_hat[s_i][0] = y_hat        # delay for next hit
     else:
         h_i += 1
         X[s_i][h_i] = featVec           # this hit
-        Y_hat[s_i][h_i + 1] = y_hat     # delay for next hit
+        Y_hat[s_i][h_i] = y_hat     # delay for next hit
         X_lengths[s_i] = h_i + 1
     # print(s_i, h_i, X[s_i][h_i][:9], X[s_i][h_i][12], X[s_i][h_i][14])
     return X, Y_hat, h_i, s_i, X_lengths
@@ -116,6 +111,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None):
     """
     if style == 'diff':
         Y = torch.roll(diff_hat, -1)   # try to predict the next d_g delay
+        Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
         return Y_hat, Y
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
@@ -205,7 +201,8 @@ def load_XY(filename):
             X_lengths[s_i] = h_i
             batch_size = s_i + 1
         if DEBUG:
-            print("Done loading sequences of lengths: ", X_lengths[:batch_size])
+            print("Done loading sequences of lengths: ",
+                  X_lengths[:batch_size])
     return X, X_lengths, Y, batch_size
 
 
