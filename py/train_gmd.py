@@ -96,12 +96,12 @@ def quantizeDrumTrack(drumtrack, positions_in_bar, steps=16):
 def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
                  tempos, timesigs, positions_in_bar):
     featVec = np.zeros(feat_vec_size)  # 9+4+1 zeros
-    new_index = 0
+    new_index = prev_i = 0
     X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
-    Y = np.zeros((1000, 64))                 # seqs * hits
     Y_hat = np.zeros((1000, 64))             # seqs * hits
     X_lengths = np.zeros(1000)
-    s_i = h_i = -1
+    s_i = 0
+    h_i = -1
 
     for index, note in enumerate(drumtrack.notes):
         if index < (len(drumtrack.notes) - 1):
@@ -117,21 +117,23 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
         if sleeptime:
             # FV complete, process it
             featVec[9] = sleeptime * 1000.  # hit duration [ms]
-            featVec[10] = tempos[new_index]  # use first hit in group of hits
+            featVec[10] = tempos[new_index] # use first hit in group of hits
             featVec[11] = timesigs[new_index][0] / timesigs[new_index][1]
-            featVec[12] = positions_in_bar[new_index]
-            featVec[13] = V[index]  # TODO CHECK IF MAYBE BETTER ZERO??
+            featVec[12] = H[index] % 1.     # quantized pos_in_bar --- 1. becomes 0.
+            featVec[13] = V[new_index]  # TODO CHECK IF MAYBE BETTER ZERO??
 
-            # use average offset of first & last note in group
-            featVec[14] = (O[new_index] + O[index]) / 2
+            if new_index > 0:
+                # use average offset of first & last note in PREVIOUS group
+                featVec[14] = (O[new_index - 1] + O[prev_i]) / 2
 
             X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
                 featVec, None, X, Y_hat, h_i, s_i, X_lengths)
 
             # move on to the next (group of) note(s)
             featVec = np.zeros(feat_vec_size)
+            prev_i = new_index
             new_index = index + 1
-    return X, Y, Y_hat, s_i + 1, X_lengths
+    return X, Y_hat, s_i + 1, X_lengths
 
 
 def pm_to_XY(file_name):
@@ -158,13 +160,13 @@ def pm_to_XY(file_name):
     positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 
     hits, offsets, vels = quantizeDrumTrack(drumtrack, positions_in_bar)
-    X, Y, Y_hat, take_size, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
-                                                     tempos, timesigs, positions_in_bar)
+    X, Y_hat, take_size, X_lengths = parseHOVtoFV(hits, offsets, vels, drumtrack, pitch_class_map,
+                                                  tempos, timesigs, positions_in_bar)
 
     X, X_lengths, Y_hat = timing.prepare_X(
         X, X_lengths, Y_hat, take_size)
     Y_hat, Y = timing.prepare_Y(
-        X_lengths, X[:, :, 14], Y_hat, Y, style='diff')
+        X_lengths, X[:, :, 14], Y_hat, style='diff')
 
     return X, X_lengths, Y
 

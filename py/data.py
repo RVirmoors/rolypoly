@@ -58,21 +58,22 @@ def score_pos_in_bar(drumtrack, timesig_changes, tempos, timesigs):
     """
     positions_in_bar = np.zeros(len(drumtrack.notes))
     first_timesig = timesig_changes[0]
-    barStart = 0
+    barStart = atTime = 0
     barEnd = 240 / tempos[0] * \
         first_timesig.numerator / first_timesig.denominator
     for index, note in enumerate(drumtrack.notes):
-        atTime = note.start
+        if note.start >= atTime:
+            atTime = note.start
         if np.isclose(atTime, barEnd) or atTime > barEnd:
             # reached the end of the bar, compute the next one
-            barStart = atTime
-            barEnd = atTime + 240 / tempos[index] * \
+            barStart = barEnd
+            barEnd = barEnd + 240 / tempos[index] * \
                 timesigs[index][0] / timesigs[index][1]
-            cur_pos = 0
-        else:
-            # pos in bar is always in [0, 1)
-            cur_pos = (atTime - barStart) / (barEnd - barStart)
+            # print("EOB", barStart, barEnd)
+        # pos in bar is always in [0, 1)
+        cur_pos = (atTime - barStart) / (barEnd - barStart)
         positions_in_bar[index] = cur_pos
+        #print(atTime, cur_pos)
     return positions_in_bar
 
 

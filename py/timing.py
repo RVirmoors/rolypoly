@@ -45,8 +45,9 @@ feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 6
 
 def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
     # if new bar, finish existing sequence and start a new one
-    if featVec[12] <= X[s_i][h_i][12] and h_i:
-        if s_i >= 0:  # s_i is init'd as -1, so first note doesn't trigger:
+    if featVec[12] <= X[s_i][h_i][12] and h_i >= 0:
+        #print("new bar", s_i, h_i)
+        if s_i > 0:  # s_i is init'd as 0, so first note doesn't trigger:
             # move delay to first hit in new seq
             Y_hat[s_i + 1][0] = Y_hat[s_i][h_i + 1]
             # last hit plus one doesn't make sense
@@ -64,6 +65,7 @@ def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
         X[s_i][h_i] = featVec           # this hit
         Y_hat[s_i][h_i + 1] = y_hat     # delay for next hit
         X_lengths[s_i] = h_i + 1
+    # print(s_i, h_i, X[s_i][h_i][:9], X[s_i][h_i][12], X[s_i][h_i][14])
     return X, Y_hat, h_i, s_i, X_lengths
 
 
@@ -95,7 +97,7 @@ def prepare_X(X, X_lengths, Y_hat, batch_size):
     return X, X_lengths, Y_hat
 
 
-def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
+def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None):
     """
     Computes Y, the target values to be used in the MSE loss function.
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
@@ -103,7 +105,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
     Parameters for determining diff:
         - style = 'constant'                -> we want to bring next d-g delay close to avg
                 or 'EMA'                    -> we want to bring next d-g delay close to EMA
-                or 'diff' (copies diff_hat) -> we want to minimize next drum-guitar delay
+                or 'diff' (rolls diff_hat)  -> we want to minimize next drum-guitar delay
         - value = if None, will be computed as avg(diff_hat) over the present seq
                   if style='constant', value -> diff
                   if style='EMA',      value -> EMA alpha in (0,1)
@@ -113,7 +115,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, Y, style='constant', value=None):
         -> a constant value for diff (see above)
     """
     if style == 'diff':
-        Y = torch.DoubleTensor(diff_hat)
+        Y = torch.roll(diff_hat, -1)   # try to predict the next d_g delay
         return Y_hat, Y
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
