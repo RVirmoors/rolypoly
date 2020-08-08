@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='miniinfo.csv',
+    '--meta', default='info.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -357,7 +357,7 @@ if __name__ == '__main__':
 
     if get_y_n("Save trained model? "):
         if args.bootstrap:
-            PATH = "models/gmd_s2s_boot.pt"
+            PATH = "models/gmd_s2sy_boot.pt"
         elif args.seq2seq:
             PATH = "models/gmd_seq2seq.pt"
         else:
