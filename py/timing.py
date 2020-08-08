@@ -113,7 +113,8 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
 
     if style == 'diff':
         if online:
-            Y = diff_hat    # try to predict the next d_g delay (here a single value)
+            # try to predict the next d_g delay (here a single value)
+            Y = diff_hat
             Y = torch.Tensor([Y]).double()
         else:
             # try to predict the next d_g delay
@@ -124,9 +125,10 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
         return Y_hat, Y
 
     if torch.is_tensor(diff_hat):
-        diff_hat = torch.roll(diff_hat, -1).numpy()
+        diff_hat = roll_w_padding(diff_hat, X_lengths).numpy()
     else:
-        diff_hat = torch.roll(torch.tensor(diff_hat).double(), -1).numpy()
+        diff_hat = roll_w_padding(torch.tensor(
+            diff_hat).double(), X_lengths).numpy()
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
 
@@ -139,9 +141,10 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
                 diff[i, :seq_len] = np.average(diff_hat[i][:seq_len])
     elif style == 'EMA':
         for i in range(len(diff_hat)):
-            for j in range(len(diff_hat[i])):
-                diff[i, j] = ewma(
-                    diff_hat.flatten(), alpha=value if value else 0.8)[i * len(diff_hat[i]) + j]
+            seq_len = int(X_lengths[i])
+            diff[i, :seq_len] = ewma(
+                diff_hat[i, :seq_len],
+                alpha=value if value else 0.8)
 
     # Y[t] = Y_hat[t] + diff_hat[t+1] - diff[t+1]
     np.add(Y_hat, diff_hat, Y_hat)   # Y_hat = Y_hat + diff_hat
