@@ -98,7 +98,7 @@ dispatcher.map("/onset", getOnsetDiffOSC)  # receive
 dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 
 
-async def processFV(writer, next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
+async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     """
     Live:
     UPSWING
@@ -112,6 +112,8 @@ async def processFV(writer, next_delay, featVec, model, X, Y_hat, h_i, s_i, X_le
        wait dur/2 (adjusted by training time)
     """
     since = time.time()
+    writer = trainer['writer']
+    next_delay = trainer['next_delay']
     # 1.
     featVec[13] = guitarDescr
     # remains constant if no guit onset:
@@ -135,8 +137,11 @@ async def processFV(writer, next_delay, featVec, model, X, Y_hat, h_i, s_i, X_le
     inference_time = time.time() - since
     wait_time = featVec[9] * 0.5 / 1000 - \
         inference_time + (next_delay - prev_delay) / 1000.
-    print("inference time: {:.4f} || wait time: {:.4f}".
+    trainer['next_delay'] = next_delay
+    print("    inference time: {:.3f}  || wait time:      {:.3f}   [sec]".
           format(inference_time, wait_time))
+    if (wait_time < 0):
+        print("WARNING: inference is causing extra delays")
     await asyncio.sleep(wait_time)
 
     # 4.
@@ -147,30 +152,45 @@ async def processFV(writer, next_delay, featVec, model, X, Y_hat, h_i, s_i, X_le
     client.send_message("/play", play)
 
     # 5.
-    print("drum-guitar: {:.4f} || next microtime: {:.4f}".
+    print("    drum-guitar:    {:.4f} || next microtime: {:.4f}  [/bar]".
           format(featVec[14], y_hat.item()))
 
     if args.train_online:
         _, y = timing.prepare_Y(
-            None, featVec[14], data.ms_to_bartime(prev_delay, featVec), style='diff', online=True)
-        model, loss = timing.trainOnline(
-            model, y, y_hat, epochs=1, lr=1e-3)
-        w_i = sum(X_lengths)
-        writer.add_scalar(
-            "Loss/train", loss, w_i)
+            #    None, featVec[14], data.ms_to_bartime(prev_delay, featVec), style='diff', online=True)
+            X_lengths, X[:, :, 14], Y_hat, style='EMA', value=0.8)
+        if (featVec[9] * 0.5 / 1000 < trainer['train_time']):
+            # not enough time to train: accum indices and wait
+            trainer['indices'] -= 1
+            trained = False
+        else:
+            model, loss = timing.trainOnline(
+                model, y, y_hat, indices=trainer['indices'], epochs=1, lr=1e-3)
+            w_i = sum(X_lengths)
+            writer.add_scalar(
+                "Loss/train", loss, w_i)
+            trainer['indices'] = -1
+            trained = True
 
     X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
         featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths)
+
     train_time = time.time() - since
+    if trained:
+        trainer['train_time'] = train_time
 
     # 6.
-    print("train time: {:.4f} || loss: {:.4f}".
-          format(train_time, loss))
-    await asyncio.sleep(featVec[9] * 0.5 / 1000 - train_time)
-    return next_delay, y_hat, X, Y_hat, h_i, s_i, X_lengths
+    wait_time = featVec[9] * 0.5 / 1000 - train_time
+    if trained:
+        print("    train time [s]: {:.4f} || loss:        {:.4f}".
+              format(trainer['train_time'], loss))
+        if (wait_time < 0):
+            print("WARNING: training is causing extra delays")
+    await asyncio.sleep(wait_time)
+    return trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths
 
 
-async def parseMIDItoFV(model, writer):
+async def parseMIDItoFV(model, trainer):
     """
     Play the drum MIDI file in real time, emitting
     feature vectors to be processed by processFV().
@@ -180,7 +200,6 @@ async def parseMIDItoFV(model, writer):
     X_lengths = np.zeros(1000)
     s_i = 0
     h_i = -1
-    next_delay = 0
 
     start = time.monotonic()
     featVec = np.zeros(feat_vec_size)  # 9+6 zeros
@@ -201,7 +220,7 @@ async def parseMIDItoFV(model, writer):
             featVec[11] = timesigs[index][0] / timesigs[index][1]
             featVec[12] = positions_in_bar[index]
 
-            next_delay, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(writer, next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths)
+            trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths)
             # reset FV and wait
             featVec = np.zeros(feat_vec_size)
 
@@ -271,9 +290,13 @@ async def init_main():
             print("Loaded pre-trained model weights from", trained_path)
 
         client.send_message("/record", 1)
-        writer = SummaryWriter() if args.train_online else None
+        trainer = {}
+        trainer['next_delay'] = 0
+        trainer['train_time'] = 0.15    # seconds
+        trainer['indices'] = -1
+        trainer['writer'] = SummaryWriter()
         # Enter main loop of program
-        X, Y_hat, batch_size, X_lengths = await parseMIDItoFV(model, writer)
+        X, Y_hat, batch_size, X_lengths = await parseMIDItoFV(model, trainer)
         client.send_message("/record", 0)
 
         X, X_lengths, Y_hat = timing.prepare_X(

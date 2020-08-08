@@ -112,13 +112,14 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
     """
 
     if style == 'diff':
-        if online == True:
+        if online:
             Y = diff_hat    # try to predict the next d_g delay
             Y = torch.Tensor([Y]).double()
         else:
             Y = torch.roll(diff_hat, -1)   # try to predict the next d_g delay
             Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
         return Y_hat, Y
+
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
     for i in range(len(diff)):
@@ -612,7 +613,7 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
     return model, total_loss
 
 
-def trainOnline(model, y, y_hat, epochs=1, lr=1e-3):
+def trainOnline(model, y, y_hat, indices=-1, epochs=1, lr=1e-3):
     model.to(device)
 
     optimizer = torch.optim.Adam(
@@ -622,8 +623,8 @@ def trainOnline(model, y, y_hat, epochs=1, lr=1e-3):
     for t in range(epochs):
         model.train()  # Set model to training mode
 
-        y = y.to(device)
-        y_hat = y_hat.to(device)  # already computed from model(x)
+        y = y[indices:].to(device)
+        y_hat = y_hat[indices:].to(device)  # already computed from model(x)
 
         optimizer.zero_grad()
 
