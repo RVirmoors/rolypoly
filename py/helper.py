@@ -161,3 +161,19 @@ class EarlyStopping(object):
             if mode == 'max':
                 self.is_better = lambda a, best: a > best + (
                     best * min_delta / 100)
+
+
+def roll_w_padding(X, X_lengths):
+    # input: 2D tensor X, padded w/ zero values to the right
+    #        X_lengths: number of nonzero values in each row
+    # output: X shifted forwards by 1, maintaining padding
+    Xrolled = torch.zeros_like(X)
+    for i, x_len in enumerate(X_lengths):
+        seq_len = int(X_lengths[i])
+        if seq_len:  # should always be nonzero, but still..
+            Xrolled[i, :seq_len - 1] = X[i, 1:seq_len]
+            if i + 1 < X.shape[0]:  # if not on the last row
+                Xrolled[i, seq_len - 1] = X[i + 1, 0]
+            else:
+                Xrolled[i, seq_len - 1] = X[i, seq_len - 1]
+    return Xrolled

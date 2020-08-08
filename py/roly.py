@@ -37,7 +37,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
     '--preload_model', default='models/last.pt', metavar='FOO.pt',
@@ -158,7 +158,7 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     if args.train_online:
         _, y = timing.prepare_Y(
             #    None, featVec[14], data.ms_to_bartime(prev_delay, featVec), style='diff', online=True)
-            X_lengths, X[:, :, 14], Y_hat, style='EMA', value=0.8)
+            X_lengths, X[:s_i+1, :h_i+1, 14], Y_hat[:s_i+1, :h_i+1], style='EMA', value=0.8)
         if (featVec[9] * 0.5 / 1000 < trainer['train_time']):
             # not enough time to train: accum indices and wait
             trainer['indices'] -= 1
@@ -302,7 +302,7 @@ async def init_main():
         X, X_lengths, Y_hat = timing.prepare_X(
             X, X_lengths, Y_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
-                                    style='constant', value = 0) # JUST FOR TESTING
+                                    style='diff', value = 0) # JUST FOR TESTING
                                     # style='EMA', value=0.8)
 
         total_loss = model.loss(Y_hat, Y, None)

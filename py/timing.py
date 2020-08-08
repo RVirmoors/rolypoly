@@ -19,7 +19,7 @@ import os
 import copy
 
 from constants import ROLAND_DRUM_PITCH_CLASSES
-from helper import get_y_n, EarlyStopping, plot_grad_flow, ewma
+from helper import get_y_n, EarlyStopping, plot_grad_flow, ewma, roll_w_padding
 import matplotlib.pyplot as plt
 import random
 from tqdm import tqdm, trange
@@ -113,34 +113,44 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
 
     if style == 'diff':
         if online:
-            Y = diff_hat    # try to predict the next d_g delay
+            Y = diff_hat    # try to predict the next d_g delay (here a single value)
             Y = torch.Tensor([Y]).double()
         else:
-            Y = torch.roll(diff_hat, -1)   # try to predict the next d_g delay
+            # try to predict the next d_g delay
+            s = diff_hat.size()
+            # Y = torch.roll(diff_hat, -1) ## doesn't work due to padding!!! workaround:
+            Y = roll_w_padding(diff_hat, X_lengths)
             Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
         return Y_hat, Y
 
+    if torch.is_tensor(diff_hat):
+        diff_hat = torch.roll(diff_hat, -1).numpy()
+    else:
+        diff_hat = torch.roll(torch.tensor(diff_hat).double(), -1).numpy()
     diff = np.zeros_like(diff_hat)
-    diff_hat = torch.roll(torch.tensor(diff_hat).double(), -1).numpy()
     Y = np.zeros_like(Y_hat)
-    for i in range(len(diff)):
-        seq_len = int(X_lengths[i])
-        if style == 'constant':
+
+    if style == 'constant':
+        for i in range(len(diff)):
+            seq_len = int(X_lengths[i])
             if value is not None:
                 diff[i, :seq_len] = value
             else:  # default
                 diff[i, :seq_len] = np.average(diff_hat[i][:seq_len])
-        else:  # EMA
-            diff[i, :seq_len] = ewma(
-                diff_hat.view(-1), alpha=value if value else 0.8)
-        # Y[t] = Y_hat[t] + diff_hat[t+1] - diff[t+1]
-        np.add(Y_hat[i], diff_hat[i], Y_hat[i])   # Y_hat = Y_hat + diff_hat
-        np.subtract(Y_hat[i], diff[i], Y[i])      # Y     = Y_hat - diff
+    elif style == 'EMA':
+        for i in range(len(diff_hat)):
+            for j in range(len(diff_hat[i])):
+                diff[i, j] = ewma(
+                    diff_hat.flatten(), alpha=value if value else 0.8)[i * len(diff_hat[i]) + j]
+
+    # Y[t] = Y_hat[t] + diff_hat[t+1] - diff[t+1]
+    np.add(Y_hat, diff_hat, Y_hat)   # Y_hat = Y_hat + diff_hat
+    np.subtract(Y_hat, diff, Y)      # Y     = Y_hat - diff
 
     Y = torch.Tensor(Y).double()  # dtype=torch.float64)
     Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
 
-    return Y_hat, Y # TODO
+    return Y_hat, Y
 
 
 def save_XY(X, X_lengths, Y, Y_hat=None, filename=None):
