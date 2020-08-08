@@ -38,7 +38,7 @@ parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for dataset.')
 parser.add_argument(
-    '--meta', default='info.csv',
+    '--meta', default='miniinfo.csv',
     help='Metadata file: filename of csv list of samples for dataset.')
 parser.add_argument(
     '--source', default='csv',
@@ -117,9 +117,10 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
         if sleeptime:
             # FV complete, process it
             featVec[9] = sleeptime * 1000.  # hit duration [ms]
-            featVec[10] = tempos[new_index] # use first hit in group of hits
+            featVec[10] = tempos[new_index]  # use first hit in group of hits
             featVec[11] = timesigs[new_index][0] / timesigs[new_index][1]
-            featVec[12] = H[index] % 1.     # quantized pos_in_bar --- 1. becomes 0.
+            # quantized pos_in_bar --- 1. becomes 0.
+            featVec[12] = H[index] % 1.
             featVec[13] = V[new_index]  # TODO CHECK IF MAYBE BETTER ZERO??
 
             if new_index > 0:
@@ -245,11 +246,13 @@ class GMDdataset(Dataset):
 
 def pad_collate(batch):
     # used in dataLoader below
-    xx = [batch[i]['X'][j] for i in range(len(batch)) for j in range(len(batch[i]['X']))]
+    xx = [batch[i]['X'][j]
+          for i in range(len(batch)) for j in range(len(batch[i]['X']))]
     xl = torch.tensor([batch[i]['X_lengths'][j]
                        for i in range(len(batch))
                        for j in range(len(batch[i]['X_lengths']))])
-    yy = [batch[i]['Y'][j] for i in range(len(batch)) for j in range(len(batch[i]['Y']))]
+    yy = [batch[i]['Y'][j]
+          for i in range(len(batch)) for j in range(len(batch[i]['Y']))]
 
     take_lens = [len(x) for x in xx]
 
@@ -353,10 +356,10 @@ if __name__ == '__main__':
             print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
-        if args.seq2seq:
+        if args.bootstrap:
+            PATH = "models/gmd_s2s_boot.pt"
+        elif args.seq2seq:
             PATH = "models/gmd_seq2seq.pt"
-        elif args.bootstrap:
-            PATH = "models/gmd_LSTM_boot.pt"
         else:
             PATH = "models/gmd_LSTM.pt"
         torch.save(trained_model.state_dict(), PATH)

@@ -46,7 +46,7 @@ feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 6
 def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12] and h_i >= 0:
-        #print("new bar", s_i, h_i)
+        # print("new bar", s_i, h_i)
         if DEBUG:
             print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
             print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
@@ -92,7 +92,7 @@ def prepare_X(X, X_lengths, Y_hat, batch_size):
     return X, X_lengths, Y_hat
 
 
-def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None):
+def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=False):
     """
     Computes Y, the target values to be used in the MSE loss function.
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
@@ -109,6 +109,10 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None):
     Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
         -> a constant value for diff (see above)
     """
+    if online == True:
+        y = diff_hat
+        y = torch.Tensor([y]).double()
+        return y, Y_hat
     if style == 'diff':
         Y = torch.roll(diff_hat, -1)   # try to predict the next d_g delay
         Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
@@ -307,7 +311,7 @@ class TimingLSTM(nn.Module):
         # self.hidden = self.init_hidden()
 
         batch_size, seq_len, _ = X.size()
-        #print("X ....", X.size())
+        # print("X ....", X.size())
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability.
@@ -324,8 +328,12 @@ class TimingLSTM(nn.Module):
             _, self.enc_hidden = self.encoder(X_pack, self.enc_hidden)
             if self.bootstrap:
                 # pos_in_bar, guitarDescr, d_g_diff
-                boot = X[:, :2, 12:15]  # first two
-                boot = boot.reshape(self.nb_layers, batch_size, 3)
+                if(batch_size > 1 and seq_len > 1):
+                    boot = X[:, :2, 12:15]  # first two
+                    boot = boot.reshape(self.nb_layers, batch_size, 3)
+                else:
+                    boot = torch.zeros(self.nb_layers, batch_size, 3).double()
+                    boot[0, 0] = X[0,0,12:15]
                 zeros = torch.zeros(self.nb_layers, batch_size, 3).double()
                 self.dec_hidden = (torch.cat((self.enc_hidden[0].detach_(), boot), dim=2),
                                    torch.cat((self.enc_hidden[1].detach_(), zeros), dim=2))
@@ -384,6 +392,8 @@ class TimingLSTM(nn.Module):
             mask = diffMask * mask
 
         nb_outputs = torch.sum(mask).item()
+        if nb_outputs == 0:
+            nb_outputs = 1
         if DEBUG:
             print("Computing loss for", nb_outputs, "hits.")
 
@@ -427,7 +437,7 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
 
     for t in range(epochs):
         # train loop. TODO add noise?
-        #print("Epoch", t + 1, "/", epochs)
+        # print("Epoch", t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
         if DEBUG:
             plt.ion()
@@ -598,3 +608,39 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
     writer.flush()
 
     return model, total_loss
+
+
+def trainOnline(model, y, y_hat, epochs=1, lr=1e-3):
+    model.to(device)
+
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+
+    for t in range(epochs):
+        model.train()  # Set model to training mode
+
+        y = y.to(device)
+        y_hat = y_hat.to(device)  # already computed from model(x)
+
+        optimizer.zero_grad()
+
+        # forward
+        # track history if only in train
+        with torch.set_grad_enabled(True):
+            loss = model.loss(y_hat, y, None)
+            epoch_loss = loss.item()
+
+            # backward + optimize
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), 1)  # clip gradients
+            optimizer.step()
+
+            # detach/repackage the hidden state in between batches
+            model.hidden_detach()
+
+            scheduler.step()
+
+    return model, epoch_loss

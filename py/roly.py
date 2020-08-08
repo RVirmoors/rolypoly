@@ -3,6 +3,8 @@
 
 Requires pythonosc, numpy, librosa.
 """
+TRAIN_ONLINE = True
+
 import argparse
 import queue
 import sys
@@ -35,7 +37,7 @@ parser.add_argument(
     '--drummidi', default='data/baron.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
-    '--preload_model', default=last.pt, metavar='FOO.pt',
+    '--preload_model', default='models/last.pt', metavar='FOO.pt',
     help='start from a pre-trained model')
 parser.add_argument(
     '--offline', action='store_true',
@@ -99,9 +101,9 @@ async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     3. wait dur/2 + microtiming (adjusted by prev + inference time)
     DOWNSWING
     4. send the drums to be played in Max
-    5. save FV & y_hat for future offline training
+    5. save + use FV & y_hat for online training
     6. return the full FV + y_hat
-       wait dur/2
+       wait dur/2 (adjusted by training time)
     """
     since = time.time()
     # 1.
@@ -115,7 +117,7 @@ async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     x = torch.Tensor(featVec).double()  # dtype=torch.float64)
     x = x[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
-    with torch.no_grad():
+    with torch.set_grad_enabled(TRAIN_ONLINE):
         y_hat = model(x, [1])[0][0]     # one fV
 
     # 3.
@@ -127,11 +129,13 @@ async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     inference_time = time.time() - since
     wait_time = featVec[9] * 0.5 / 1000 - \
         inference_time + (next_delay - prev_delay) / 1000.
-    #print("inference time:", inference_time, "| wait time:", wait_time)
+    print("inference time: {:.4f} || wait time: {:.4f}".
+          format(inference_time, wait_time))
     await asyncio.sleep(wait_time)
 
     # 4.
     # DOWNSWING
+    since = time.time()
     play = ["%.3f" % feat for feat in featVec]
     play = ' '.join(play)
     client.send_message("/play", play)
@@ -140,11 +144,19 @@ async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     print("drum-guitar: {:.4f} || next microtime: {:.4f}".
           format(featVec[14], y_hat.item()))
 
+    if TRAIN_ONLINE:
+        y, _ = timing.prepare_Y(None, X[s_i][h_i][14], y_hat, online=True)
+        model, loss = timing.trainOnline(
+            model, y, y_hat, epochs=1, lr=1e-3)
+
     X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
         featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths)
+    train_time = time.time() - since
 
     # 6.
-    await asyncio.sleep(featVec[9] * 0.5 / 1000)
+    print("train time: {:.4f} || loss: {:.4f}".
+          format(train_time, loss))
+    await asyncio.sleep(featVec[9] * 0.5 / 1000 - train_time)
     return next_delay, y_hat, X, Y_hat, h_i, s_i, X_lengths
 
 
@@ -258,7 +270,6 @@ async def init_main():
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
                                     # style='diff', value = 0) # JUST FOR TESTING
                                     style='EMA', value=0.8)
-        print(Y_hat)
 
         total_loss = model.loss(Y_hat, Y, None)
         print('Take loss: {:4f}'.format(total_loss))
@@ -268,6 +279,11 @@ async def init_main():
             rows, filename = timing.save_XY(X, X_lengths, Y, Y_hat)
             print("Saved", filename, ": ", rows, "rows.")
             client.send_message("/save", filename[11:-3] + "wav")
+
+        if TRAIN_ONLINE and get_y_n("Save trained model? "):
+            PATH = "models/last.pt"
+            torch.save(model.state_dict(), PATH)
+            print("Saved trained model to", PATH)
 
         transport.close()  # Clean up serve endpoint
 
