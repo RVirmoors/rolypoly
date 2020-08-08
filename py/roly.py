@@ -21,6 +21,9 @@ import asyncio
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+# see https://pytorch.org/tutorials/recipes/recipes/tensorboard_with_pytorch.html
+from torch.utils.tensorboard import SummaryWriter
+
 import timing           # ML timing module
 import data             # data helper methods
 from constants import ROLAND_DRUM_PITCH_CLASSES
@@ -46,11 +49,14 @@ parser.add_argument(
     '--take', default='data/takes/last.csv', metavar='FOO.csv',
     help='take csv file name for offline training')
 parser.add_argument(
-    '--bootstrap', action='store_true',
-    help='Bootstrap LSTM with position & guitar.')
-parser.add_argument(
     '--seq2seq', action='store_true',
     help='Add LSTM decoder for a Seq2Seq model.')
+parser.add_argument(
+    '--bootstrap', action='store_true',
+    help='Bootstrap Seq2Seq with position & guitar.')
+parser.add_argument(
+    '--train_online', action='store_true',
+    help='Online training of model during performance.')
 args = parser.parse_args()
 
 # load MIDI file
@@ -92,7 +98,7 @@ dispatcher.map("/onset", getOnsetDiffOSC)  # receive
 dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 
 
-async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
+async def processFV(writer, next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     """
     Live:
     UPSWING
@@ -117,7 +123,7 @@ async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     x = torch.Tensor(featVec).double()  # dtype=torch.float64)
     x = x[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
-    with torch.set_grad_enabled(TRAIN_ONLINE):
+    with torch.set_grad_enabled(args.train_online):
         y_hat = model(x, [1])[0][0]     # one fV
 
     # 3.
@@ -144,10 +150,14 @@ async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     print("drum-guitar: {:.4f} || next microtime: {:.4f}".
           format(featVec[14], y_hat.item()))
 
-    if TRAIN_ONLINE:
-        y, _ = timing.prepare_Y(None, X[s_i][h_i][14], y_hat, online=True)
+    if args.train_online:
+        _, y = timing.prepare_Y(
+            None, featVec[14], data.ms_to_bartime(prev_delay, featVec), style='diff', online=True)
         model, loss = timing.trainOnline(
             model, y, y_hat, epochs=1, lr=1e-3)
+        w_i = sum(X_lengths)
+        writer.add_scalar(
+            "Loss/train", loss, w_i)
 
     X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
         featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths)
@@ -160,7 +170,7 @@ async def processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     return next_delay, y_hat, X, Y_hat, h_i, s_i, X_lengths
 
 
-async def parseMIDItoFV(model):
+async def parseMIDItoFV(model, writer):
     """
     Play the drum MIDI file in real time, emitting
     feature vectors to be processed by processFV().
@@ -191,7 +201,7 @@ async def parseMIDItoFV(model):
             featVec[11] = timesigs[index][0] / timesigs[index][1]
             featVec[12] = positions_in_bar[index]
 
-            next_delay, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths)
+            next_delay, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(writer, next_delay, featVec, model, X, Y_hat, h_i, s_i, X_lengths)
             # reset FV and wait
             featVec = np.zeros(feat_vec_size)
 
@@ -261,8 +271,9 @@ async def init_main():
             print("Loaded pre-trained model weights from", trained_path)
 
         client.send_message("/record", 1)
+        writer = SummaryWriter() if args.train_online else None
         # Enter main loop of program
-        X, Y_hat, batch_size, X_lengths = await parseMIDItoFV(model)
+        X, Y_hat, batch_size, X_lengths = await parseMIDItoFV(model, writer)
         client.send_message("/record", 0)
 
         X, X_lengths, Y_hat = timing.prepare_X(
@@ -280,10 +291,14 @@ async def init_main():
             print("Saved", filename, ": ", rows, "rows.")
             client.send_message("/save", filename[11:-3] + "wav")
 
-        if TRAIN_ONLINE and get_y_n("Save trained model? "):
+        if args.train_online and get_y_n("Save trained model? "):
             PATH = "models/last.pt"
             torch.save(model.state_dict(), PATH)
             print("Saved trained model to", PATH)
+            writer.add_hparams({'layers': model.nb_layers, 'lstm_units': model.nb_lstm_units, 'lr': lr, 'epochs': epochs},
+                               {'hparam/best_val_loss': best_loss, 'hparam/test_loss': total_loss})
+
+            writer.flush()
 
         transport.close()  # Clean up serve endpoint
 
@@ -292,7 +307,7 @@ asyncio.run(init_main())
 
 
 """
-TODO test: constant vs EMA
+TODO test: constant vs EMA vs no-guit
 simple, boots, s2s
 normal play, lazy, triplets, quantized
 """

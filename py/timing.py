@@ -55,6 +55,7 @@ def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
         Y_hat[s_i][0] = y_hat        # delay for next hit
+        X_lengths[s_i] = 1
     else:
         h_i += 1
         X[s_i][h_i] = featVec           # this hit
@@ -109,13 +110,14 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
     Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
         -> a constant value for diff (see above)
     """
-    if online == True:
-        y = diff_hat
-        y = torch.Tensor([y]).double()
-        return y, Y_hat
+
     if style == 'diff':
-        Y = torch.roll(diff_hat, -1)   # try to predict the next d_g delay
-        Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
+        if online == True:
+            Y = diff_hat    # try to predict the next d_g delay
+            Y = torch.Tensor([Y]).double()
+        else:
+            Y = torch.roll(diff_hat, -1)   # try to predict the next d_g delay
+            Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
         return Y_hat, Y
     diff = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
@@ -333,7 +335,7 @@ class TimingLSTM(nn.Module):
                     boot = boot.reshape(self.nb_layers, batch_size, 3)
                 else:
                     boot = torch.zeros(self.nb_layers, batch_size, 3).double()
-                    boot[0, 0] = X[0,0,12:15]
+                    boot[0, 0] = X[0, 0, 12:15]
                 zeros = torch.zeros(self.nb_layers, batch_size, 3).double()
                 self.dec_hidden = (torch.cat((self.enc_hidden[0].detach_(), boot), dim=2),
                                    torch.cat((self.enc_hidden[1].detach_(), zeros), dim=2))
@@ -632,7 +634,6 @@ def trainOnline(model, y, y_hat, epochs=1, lr=1e-3):
             epoch_loss = loss.item()
 
             # backward + optimize
-
             loss.backward()
             torch.nn.utils.clip_grad_norm_(
                 model.parameters(), 1)  # clip gradients
