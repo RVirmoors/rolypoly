@@ -236,21 +236,9 @@ class TimingLSTM(nn.Module):
         self.bootstrap = bootstrap
         self.seq2seq = seq2seq
 
-        # LSTM layer
-        self.lstm = nn.LSTM(
-            input_size=self.input_dim,
-            hidden_size=self.nb_lstm_units,
-            num_layers=self.nb_layers,
-            batch_first=True,
-            dropout=self.dropout
-        ).double().to(device)
-
-        self.hidden = self.init_hidden()
-        lstm_outs = self.nb_lstm_units
-
-        if self.seq2seq:
-            # decoder is an LSTM net
-            self.decoder = nn.LSTM(
+        if not self.seq2seq:
+            # LSTM layer
+            self.lstm = nn.LSTM(
                 input_size=self.input_dim,
                 hidden_size=self.nb_lstm_units,
                 num_layers=self.nb_layers,
@@ -258,11 +246,36 @@ class TimingLSTM(nn.Module):
                 dropout=self.dropout
             ).double().to(device)
 
-        elif self.bootstrap:
-            lstm_outs = self.nb_lstm_units + 2
+        if self.bootstrap:
+            self.decoder_size = self.nb_lstm_units + 3
+        else:
+            self.decoder_size = self.nb_lstm_units
+
+        self.init_hidden()
+
+        if self.seq2seq:
+            # encoder is bidirectional LSTM
+            self.encoder = nn.LSTM(
+                input_size=self.input_dim,
+                hidden_size=self.nb_lstm_units,
+                num_layers=1,
+                batch_first=True,
+                bidirectional=True
+            ).double().to(device)
+            # decoder is 2-layer LSTM
+            self.decoder = nn.LSTM(
+                input_size=self.input_dim,
+                hidden_size=self.decoder_size,
+                num_layers=2,
+                batch_first=True,
+                dropout=self.dropout
+            ).double().to(device)
+
+        # tanh activation
+        self.tanh = nn.Tanh()
 
         # output layer which projects back to Y space
-        self.hidden_to_y = nn.Linear(lstm_outs, 1).double().to(device)
+        self.hidden_to_y = nn.Linear(self.decoder_size, 1).double().to(device)
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
@@ -270,7 +283,23 @@ class TimingLSTM(nn.Module):
                              self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
         cell = torch.zeros(self.nb_layers,
                            self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
-        return (hidden, cell)
+        if not self.seq2seq:
+            self.hidden = (hidden, cell)
+        else:
+            self.enc_hidden = (hidden, cell)
+            self.dec_hidden = (hidden.detach().clone(), cell.detach().clone())
+
+    def hidden_detach(self):
+        # detach/repackage the hidden state in between batches
+        if not self.seq2seq:
+            self.hidden[0].detach_()
+            self.hidden[1].detach_()
+        else:
+            self.dec_hidden[0].detach_()
+            self.dec_hidden[1].detach_()
+            # if self.bootstrap: # TODO test detach here
+            #    self.enc_hidden[0].detach_()
+            #    self.enc_hidden[1].detach_()
 
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We DO want the LSTM to treat
@@ -289,26 +318,33 @@ class TimingLSTM(nn.Module):
             print(X_lengths)
 
         # now run through LSTM
-        X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
+        if not self.seq2seq:
+            X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
+        else:
+            _, self.enc_hidden = self.encoder(X_pack, self.enc_hidden)
+            if self.bootstrap:
+                # pos_in_bar, guitarDescr, d_g_diff
+                boot = X[:, :2, 12:15]  # first two
+                boot = boot.reshape(self.nb_layers, batch_size, 3)
+                zeros = torch.zeros(self.nb_layers, batch_size, 3).double()
+                self.dec_hidden = (torch.cat((self.enc_hidden[0].detach_(), boot), dim=2),
+                                   torch.cat((self.enc_hidden[1].detach_(), zeros), dim=2))
+            X_lstm, self.dec_hidden = self.decoder(X_pack, self.dec_hidden)
 
         # undo the packing operation
         X_lstm, _ = torch.nn.utils.rnn.pad_packed_sequence(
             X_lstm, batch_first=True)
 
+        X_lstm = self.tanh(X_lstm)
+
         # hack for padded max length sequences:
         # https://github.com/pytorch/pytorch/issues/1591#issuecomment-365834629
         if X_lstm.size(1) < seq_len:
             dummy_tensor = torch.zeros(
-                batch_size, seq_len - X_lstm.size(1), self.nb_lstm_units, device=device, dtype=torch.float64)
+                batch_size, seq_len - X_lstm.size(1), self.decoder_size, device=device, dtype=torch.float64)
             X_lstm = torch.cat([X_lstm, dummy_tensor], 1)
 
-        # Project to output space (LSTM or Linear decoder)
-        if self.seq2seq:
-            X_lstm, _ = self.decoder(X, self.hidden)
-        # Bootstrap (without seq2seq)
-        elif self.bootstrap:
-            boot = X[:, :, 12:14]           # pos_in_bar and guitarDescr
-            X_lstm = torch.cat((X_lstm, boot), dim=2)
+        # Project to output space (Linear decoder)
 
         # Dim transformation: (batch_size, seq_len, nb_lstm_units) -> (batch_size * seq_len, nb_lstm_units)
         # First we need to reshape the data so it goes into the linear layer
@@ -411,7 +447,7 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
                 X = sample['X'].to(device)
                 X_lengths = sample['X_lengths'].to(device)
                 Y = sample['Y'].to(device)
-                model.hidden = model.init_hidden()  # reset the state at the start of a take
+                model.init_hidden()  # reset the state at the start of a take
 
                 n_mb = int(np.ceil(X.shape[0] / minibatch_size))
 
@@ -454,8 +490,7 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
                             optimizer.step()
 
                     # detach/repackage the hidden state in between batches
-                    model.hidden[0].detach_()
-                    model.hidden[1].detach_()
+                    model.hidden_detach()
 
                 if DEBUG:
                     print(phase + 'Epoch: {} [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
@@ -517,7 +552,7 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
             X_lengths = sample['X_lengths'].to(device)
             Y = sample['Y'].to(device)
 
-            model.hidden = model.init_hidden()
+            model.init_hidden()
 
             n_mb = int(np.ceil(X.shape[0] / minibatch_size))
 
@@ -548,10 +583,6 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
                     batch_loss += loss.item()
                     div_loss += 1
                     batch_div += 1
-
-                # detach/repackage the hidden state in between batches
-                model.hidden[0].detach_()
-                model.hidden[1].detach_()
 
             if DEBUG:
                 print('Test: [Batch {}/{}]\t{:3d} seqs\tBatch loss: {:.6f}'.
