@@ -47,21 +47,23 @@ def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths, pre=False):
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12] and h_i >= 0:
         # print("new bar", s_i, h_i)
-        if DEBUG:
+        if DEBUG and not pre:
             print("added bar #", s_i, "w/", int(X_lengths[s_i]), "hits.")
             print("Y_hat for seq:", Y_hat[s_i][:int(X_lengths[s_i])])
             print("==========")
         s_i += 1
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
-        X_lengths[s_i] = 1
-        if not pre:
+        if pre:
+            X_lengths[s_i] = 1
+        else:
             Y_hat[s_i][0] = y_hat        # delay for next hit
     else:
         h_i += 1
         X[s_i][h_i] = featVec           # this hit
-        X_lengths[s_i] = h_i + 1
-        if not pre:
+        if pre:
+            X_lengths[s_i] = h_i + 1
+        else:
             Y_hat[s_i][h_i] = y_hat     # delay for next hit
     # print(s_i, h_i, X[s_i][h_i][:9], X[s_i][h_i][12], X[s_i][h_i][14])
     return X, Y_hat, h_i, s_i, X_lengths
@@ -307,34 +309,30 @@ class TimingLSTM(nn.Module):
         self.hidden[0].detach_()
         self.hidden[1].detach_()
 
+
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We DO want the LSTM to treat
         # a new batch as a continuation of a sequence!
         # self.hidden = self.init_hidden()
 
         batch_size, seq_len, _ = X.size()
-        # print("X ....", X.size())
+        #print("X ....", X.size())
+        #print(X_lengths)
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability.
-        try:
-            X_pack = torch.nn.utils.rnn.pack_padded_sequence(
-                X, X_lengths, batch_first=True, enforce_sorted=False)
-            if self.seq2seq:
-                X_source = torch.nn.utils.rnn.pack_padded_sequence(
+        X_pack = torch.nn.utils.rnn.pack_padded_sequence(
+            X, X_lengths, batch_first=True, enforce_sorted=False)
+        if self.seq2seq:
+            X_source = torch.nn.utils.rnn.pack_padded_sequence(
                 X[:,:,:13], X_lengths, batch_first=True, enforce_sorted=False)
-        except:
-            print(X_lengths)
 
         # now run through LSTM
         if not self.seq2seq:
             X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
         else:
-            print("source:", X_source)
-            print("X:", X_pack)
             _, self.hidden = self.encoder(X_source, self.hidden)
             X_lstm, self.hidden = self.decoder(X_pack, self.hidden)
-            print("OUT:", X_lstm)
 
         # undo the packing operation
         X_lstm, _ = torch.nn.utils.rnn.pad_packed_sequence(

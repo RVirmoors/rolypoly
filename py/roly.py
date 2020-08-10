@@ -93,7 +93,7 @@ dispatcher.map("/onset", getOnsetDiffOSC)  # receive
 dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 
 
-async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
+async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batch_size):
     """
     Live:
        [ UPSWING   @ t - dur/2 ]
@@ -113,6 +113,7 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     featVec[13] = guitarDescr
     # remains constant if no guit onset:
     featVec[14] = data.ms_to_bartime(delayms, featVec)
+    print("FV", featVec)
 
     # 2.
     # print(int(featVec[0]), int(featVec[1]), int(
@@ -124,7 +125,18 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
             x = x[None, None, :]            # one batch, one seq
             y_hat = model(x, [1])[0][0]     # one fV
         else:
-            y_hat = model(X, X_lengths)[-1][-1]  # last FV
+            longest_seq = int(max(X_lengths))
+            x = torch.Tensor(X[:batch_size, :longest_seq]).double()
+            xl = X_lengths[:batch_size]
+            y_s = s_i
+            y_h = h_i
+            if featVec[12] <= X[s_i][h_i][12] and h_i >= 0:
+                y_s += 1
+                y_h = 0
+            else:
+                y_h += 1
+            print("======", y_s, y_h)
+            y_hat = model(x, xl)[y_s][y_h]  # last FV
             # 3.
             # next hit timing [ms]
     prev_delay = next_delay
@@ -201,7 +213,7 @@ async def parseMIDItoFV(model, trainer, X, X_lengths, batch_size):
     for i, x_len in enumerate(X_lengths[:batch_size]):
         x_len = int(x_len)
         for _, featVec in enumerate(X[i][:x_len]):
-            trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths)
+            trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batch_size)
             # reset FV and wait
             featVec = np.zeros(feat_vec_size)
 
@@ -237,6 +249,8 @@ def parseMIDItoX():
 
             X, _, h_i, s_i, X_lengths = timing.addRow(
                 featVec, None, X, None, h_i, s_i, X_lengths, pre=True)
+
+    print("Done preloading", s_i + 1, "bars.")
 
     return X, X_lengths, s_i + 1
 
@@ -289,10 +303,12 @@ async def init_main():
         # Create datagram endpoint and start serving
         transport, protocol = await server.create_serve_endpoint()
 
+        X, X_lengths, batch_size = parseMIDItoX()
+
         # define model for LIVE.
         model = timing.TimingLSTM(
             input_dim=feat_vec_size,
-            batch_size=1,
+            batch_size=batch_size if args.seq2seq else 1,
             seq2seq=args.seq2seq)
 
         if args.preload_model:
@@ -308,7 +324,6 @@ async def init_main():
         trainer['indices'] = -1
         trainer['writer'] = SummaryWriter()
         # Enter main loop of program
-        X, X_lengths, batch_size = parseMIDItoX()
         X, Y_hat, X_lengths = await parseMIDItoFV(model, trainer, X, X_lengths, batch_size)
         client.send_message("/record", 0)
 
