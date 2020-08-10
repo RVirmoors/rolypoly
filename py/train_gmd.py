@@ -124,7 +124,7 @@ def parseHOVtoFV(H, O, V, drumtrack, pitch_class_map,
             featVec[13] = V[new_index]  # TODO CHECK IF MAYBE BETTER ZERO??
 
             if new_index > 0:
-                # use average offset of first & last note in PREVIOUS group
+                # use average offset of first & last note in PREVIOUS hit-group
                 featVec[14] = (O[new_index - 1] + O[prev_i]) / 2
 
             X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
