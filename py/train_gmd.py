@@ -56,9 +56,6 @@ parser.add_argument(
     '--epochs', type=int, default=0,
     help='# of epochs to train. Zero means don\'t train.')
 parser.add_argument(
-    '--bootstrap', action='store_true',
-    help='Bootstrap LSTM with position & guitar.')
-parser.add_argument(
     '--seq2seq', action='store_true',
     help='Add LSTM decoder for a Seq2Seq model.')
 parser.add_argument(
@@ -306,7 +303,6 @@ if __name__ == '__main__':
     model = timing.TimingLSTM(
         input_dim=feat_vec_size,
         batch_size=args.window_size,
-        bootstrap=args.bootstrap,
         seq2seq=args.seq2seq)
 
     ### Pre-load ###
@@ -336,7 +332,7 @@ if __name__ == '__main__':
 
             model = timing.TimingLSTM(nb_layers=layers, nb_lstm_units=lstm_units,
                                       input_dim=feat_vec_size, batch_size=bs, dropout=dropout,
-                                      bootstrap=args.bootstrap, seq2seq=args.seq2seq)
+                                      seq2seq=args.seq2seq)
             trained_model, loss = timing.train(
                 model, dl, lr=lr, minibatch_size=bs, epochs=ep)
 
@@ -356,9 +352,7 @@ if __name__ == '__main__':
             print("Best trial out of", len(study.trials), ":", study.best_trial)
 
     if get_y_n("Save trained model? "):
-        if args.bootstrap:
-            PATH = "models/gmd_s2s_boot.pt"
-        elif args.seq2seq:
+        if args.seq2seq:
             PATH = "models/gmd_seq2seq.pt"
         else:
             PATH = "models/gmd_LSTM.pt"

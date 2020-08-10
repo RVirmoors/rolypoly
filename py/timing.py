@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = False
+DEBUG = True
 
 import torch
 import torch.nn as nn
@@ -43,7 +43,7 @@ feat_vec_size = len(ROLAND_DRUM_PITCH_CLASSES) + 6
 # =========================
 
 
-def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
+def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths, pre=False):
     # if new bar, finish existing sequence and start a new one
     if featVec[12] <= X[s_i][h_i][12] and h_i >= 0:
         # print("new bar", s_i, h_i)
@@ -54,13 +54,15 @@ def addRow(featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths):
         s_i += 1
         h_i = 0
         X[s_i][0] = featVec          # first hit in new seq
-        Y_hat[s_i][0] = y_hat        # delay for next hit
         X_lengths[s_i] = 1
+        if not pre:
+            Y_hat[s_i][0] = y_hat        # delay for next hit
     else:
         h_i += 1
         X[s_i][h_i] = featVec           # this hit
-        Y_hat[s_i][h_i] = y_hat     # delay for next hit
         X_lengths[s_i] = h_i + 1
+        if not pre:
+            Y_hat[s_i][h_i] = y_hat     # delay for next hit
     # print(s_i, h_i, X[s_i][h_i][:9], X[s_i][h_i][12], X[s_i][h_i][14])
     return X, Y_hat, h_i, s_i, X_lengths
 
@@ -242,7 +244,7 @@ def transform(X, Y):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, bootstrap=False, seq2seq=False):
+    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, seq2seq=False):
         """
         batch_size: # of sequences (bars) in training batch
         """
@@ -253,8 +255,9 @@ class TimingLSTM(nn.Module):
         self.input_dim = input_dim
         self.batch_size = batch_size
         self.dropout = dropout
-        self.bootstrap = bootstrap
         self.seq2seq = seq2seq
+
+        self.init_hidden()
 
         if not self.seq2seq:
             # LSTM layer
@@ -266,26 +269,20 @@ class TimingLSTM(nn.Module):
                 dropout=self.dropout
             ).double().to(device)
 
-        if self.bootstrap:
-            self.decoder_size = self.nb_lstm_units + 3
         else:
-            self.decoder_size = self.nb_lstm_units
-
-        self.init_hidden()
-
-        if self.seq2seq:
             # encoder is bidirectional LSTM
             self.encoder = nn.LSTM(
-                input_size=self.input_dim,
+                input_size=self.input_dim - 2,  # no guitar: we don't know descr & g_d
                 hidden_size=self.nb_lstm_units,
                 num_layers=1,
                 batch_first=True,
                 bidirectional=True
             ).double().to(device)
+
             # decoder is 2-layer LSTM
             self.decoder = nn.LSTM(
                 input_size=self.input_dim,
-                hidden_size=self.decoder_size,
+                hidden_size=self.nb_lstm_units,
                 num_layers=2,
                 batch_first=True,
                 dropout=self.dropout
@@ -295,7 +292,7 @@ class TimingLSTM(nn.Module):
         self.tanh = nn.Tanh()
 
         # output layer which projects back to Y space
-        self.hidden_to_y = nn.Linear(self.decoder_size, 1).double().to(device)
+        self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1).double().to(device)
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
@@ -303,23 +300,12 @@ class TimingLSTM(nn.Module):
                              self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
         cell = torch.zeros(self.nb_layers,
                            self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
-        if not self.seq2seq:
-            self.hidden = (hidden, cell)
-        else:
-            self.enc_hidden = (hidden, cell)
-            self.dec_hidden = (hidden.detach().clone(), cell.detach().clone())
+        self.hidden = (hidden, cell)
 
     def hidden_detach(self):
-        # detach/repackage the hidden state in between batches
-        if not self.seq2seq:
-            self.hidden[0].detach_()
-            self.hidden[1].detach_()
-        else:
-            self.dec_hidden[0].detach_()
-            self.dec_hidden[1].detach_()
-            # if self.bootstrap: # TODO test detach here
-            #    self.enc_hidden[0].detach_()
-            #    self.enc_hidden[1].detach_()
+    # detach/repackage the hidden state in between batches
+        self.hidden[0].detach_()
+        self.hidden[1].detach_()
 
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We DO want the LSTM to treat
@@ -334,6 +320,9 @@ class TimingLSTM(nn.Module):
         try:
             X_pack = torch.nn.utils.rnn.pack_padded_sequence(
                 X, X_lengths, batch_first=True, enforce_sorted=False)
+            if self.seq2seq:
+                X_source = torch.nn.utils.rnn.pack_padded_sequence(
+                X[:,:,:13], X_lengths, batch_first=True, enforce_sorted=False)
         except:
             print(X_lengths)
 
@@ -341,19 +330,11 @@ class TimingLSTM(nn.Module):
         if not self.seq2seq:
             X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
         else:
-            _, self.enc_hidden = self.encoder(X_pack, self.enc_hidden)
-            if self.bootstrap:
-                # pos_in_bar, guitarDescr, d_g_diff
-                if(batch_size > 1 and seq_len > 1):
-                    boot = X[:, :2, 12:15]  # first two
-                    boot = boot.reshape(self.nb_layers, batch_size, 3)
-                else:
-                    boot = torch.zeros(self.nb_layers, batch_size, 3, device=device, dtype=torch.float64)
-                    boot[0, 0] = X[0, 0, 12:15]
-                zeros = torch.zeros(self.nb_layers, batch_size, 3, device=device, dtype=torch.float64)
-                self.dec_hidden = (torch.cat((self.enc_hidden[0].detach_(), boot), dim=2),
-                                   torch.cat((self.enc_hidden[1].detach_(), zeros), dim=2))
-            X_lstm, self.dec_hidden = self.decoder(X_pack, self.dec_hidden)
+            print("source:", X_source)
+            print("X:", X_pack)
+            _, self.hidden = self.encoder(X_source, self.hidden)
+            X_lstm, self.hidden = self.decoder(X_pack, self.hidden)
+            print("OUT:", X_lstm)
 
         # undo the packing operation
         X_lstm, _ = torch.nn.utils.rnn.pad_packed_sequence(
@@ -365,7 +346,7 @@ class TimingLSTM(nn.Module):
         # https://github.com/pytorch/pytorch/issues/1591#issuecomment-365834629
         if X_lstm.size(1) < seq_len:
             dummy_tensor = torch.zeros(
-                batch_size, seq_len - X_lstm.size(1), self.decoder_size, device=device, dtype=torch.float64)
+                batch_size, seq_len - X_lstm.size(1), self.nb_lstm_units, device=device, dtype=torch.float64)
             X_lstm = torch.cat([X_lstm, dummy_tensor], 1)
 
         # Project to output space (Linear decoder)
@@ -635,6 +616,9 @@ def trainOnline(model, y, y_hat, indices=-1, epochs=1, lr=1e-3):
 
     for t in range(epochs):
         model.train()  # Set model to training mode
+
+        print(y[indices:])
+        print(y_hat[indices:])
 
         y = y[indices:].to(device)
         y_hat = y_hat[indices:].to(device)  # already computed from model(x)

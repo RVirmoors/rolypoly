@@ -50,9 +50,6 @@ parser.add_argument(
     '--seq2seq', action='store_true',
     help='Add LSTM decoder for a Seq2Seq model.')
 parser.add_argument(
-    '--bootstrap', action='store_true',
-    help='Bootstrap Seq2Seq with position & guitar.')
-parser.add_argument(
     '--train_online', action='store_true',
     help='Online training of model during performance.')
 args = parser.parse_args()
@@ -120,14 +117,16 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     # 2.
     # print(int(featVec[0]), int(featVec[1]), int(
     #    featVec[2]), int(featVec[3]), int(featVec[9]))
-    x = torch.Tensor(featVec).double()  # dtype=torch.float64)
-    x = x[None, None, :]    # one batch, one seq
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
     with torch.set_grad_enabled(args.train_online):
-        y_hat = model(x, [1])[0][0]     # one fV
-
-    # 3.
-    # next hit timing [ms]
+        if not args.seq2seq:
+            x = torch.Tensor(featVec).double()  # dtype=torch.float64)
+            x = x[None, None, :]            # one batch, one seq
+            y_hat = model(x, [1])[0][0]     # one fV
+        else:
+            y_hat = model(X, X_lengths)[-1][-1]  # last FV
+            # 3.
+            # next hit timing [ms]
     prev_delay = next_delay
     next_delay = data.bartime_to_ms(y_hat.item(), featVec)
 
@@ -153,15 +152,19 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     print("    drum-guitar:    {:.4f} || next microtime: {:.4f}  [/bar]".
           format(featVec[14], y_hat.item()))
 
+    X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
+        featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths)
+
+    trained = False
     if args.train_online:
+        # TODO: fix it!
         cols = int(max(X_lengths))
-        _, y = timing.prepare_Y(
+        y_hat, y = timing.prepare_Y(
             #    None, featVec[14], data.ms_to_bartime(prev_delay, featVec), style='diff', online=True)
-            X_lengths[:s_i+1], X[:s_i+1, :cols, 14], Y_hat[:s_i+1, :cols], style='EMA', value=0.8)
+            X_lengths[:s_i + 1], X[:s_i + 1, :cols, 14], Y_hat[:s_i + 1, :cols], style='EMA', value=0.8)
         if (featVec[9] * 0.5 / 1000 < trainer['train_time']):
             # not enough time to train: accum indices and wait
             trainer['indices'] -= 1
-            trained = False
         else:
             model, loss = timing.trainOnline(
                 model, y, y_hat, indices=trainer['indices'], epochs=1, lr=1e-3)
@@ -170,9 +173,6 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
                 "Loss/train", loss, w_i)
             trainer['indices'] = -1
             trained = True
-
-    X, Y_hat, h_i, s_i, X_lengths = timing.addRow(
-        featVec, y_hat, X, Y_hat, h_i, s_i, X_lengths)
 
     train_time = time.time() - since
     if trained:
@@ -189,21 +189,37 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths):
     return trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths
 
 
-async def parseMIDItoFV(model, trainer):
+async def parseMIDItoFV(model, trainer, X, X_lengths, batch_size):
     """
     Play the drum MIDI file in real time, emitting
     feature vectors to be processed by processFV().
     """
-    X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
     Y_hat = np.zeros((1000, 64))             # seqs * hits
+    s_i = 0
+    h_i = -1
+
+    for i, x_len in enumerate(X_lengths[:batch_size]):
+        x_len = int(x_len)
+        for _, featVec in enumerate(X[i][:x_len]):
+            trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths)
+            # reset FV and wait
+            featVec = np.zeros(feat_vec_size)
+
+    return X, Y_hat, X_lengths
+
+
+def parseMIDItoX():
+    """
+    Load the drum MIDI file into memory (X) asynchronously,
+    to be then used by the seq2seq encoder to make predictions.
+    """
+    X = np.zeros((1000, 64, feat_vec_size))  # seqs * hits * features
     X_lengths = np.zeros(1000)
     s_i = 0
     h_i = -1
 
-    start = time.monotonic()
     featVec = np.zeros(feat_vec_size)  # 9+6 zeros
     for index, note in enumerate(drumtrack.notes):
-        #        print(pitch_class_map[note.pitch])
         if index < (len(drumtrack.notes) - 1):
             # if we're not at the last note, maybe wait
             currstart = note.start
@@ -219,11 +235,10 @@ async def parseMIDItoFV(model, trainer):
             featVec[11] = timesigs[index][0] / timesigs[index][1]
             featVec[12] = positions_in_bar[index]
 
-            trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths)
-            # reset FV and wait
-            featVec = np.zeros(feat_vec_size)
+            X, _, h_i, s_i, X_lengths = timing.addRow(
+                featVec, None, X, None, h_i, s_i, X_lengths, pre=True)
 
-    return X, Y_hat, s_i + 1, X_lengths
+    return X, X_lengths, s_i + 1
 
 
 pitch_class_map = data.classes_to_map(ROLAND_DRUM_PITCH_CLASSES)
@@ -235,7 +250,7 @@ positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
 async def init_main():
     if args.offline:
         # OFFLINE : ...
-        x, xl, dh, y, bs = timing.load_XY(args.take)
+        x, xl, y, bs = timing.load_XY(args.take)
         x, xl, yh = timing.prepare_X(x, xl, yh, bs)
         batch_size = bs
         longest_seq = int(max(xl))
@@ -244,7 +259,6 @@ async def init_main():
         model = timing.TimingLSTM(
             input_dim=feat_vec_size,
             batch_size=batch_size,
-            bootstrap=args.bootstrap,
             seq2seq=args.seq2seq)
 
         if args.preload_model:
@@ -279,7 +293,6 @@ async def init_main():
         model = timing.TimingLSTM(
             input_dim=feat_vec_size,
             batch_size=1,
-            bootstrap=args.bootstrap,
             seq2seq=args.seq2seq)
 
         if args.preload_model:
@@ -295,13 +308,14 @@ async def init_main():
         trainer['indices'] = -1
         trainer['writer'] = SummaryWriter()
         # Enter main loop of program
-        X, Y_hat, batch_size, X_lengths = await parseMIDItoFV(model, trainer)
+        X, X_lengths, batch_size = parseMIDItoX()
+        X, Y_hat, X_lengths = await parseMIDItoFV(model, trainer, X, X_lengths, batch_size)
         client.send_message("/record", 0)
 
         X, X_lengths, Y_hat = timing.prepare_X(
             X, X_lengths, Y_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
-                                    #style='diff', value = 0) # JUST FOR TESTING
+                                    # style='diff', value = 0) # JUST FOR TESTING
                                     style='EMA', value=0.8)
 
         total_loss = model.loss(Y_hat, Y, None)
