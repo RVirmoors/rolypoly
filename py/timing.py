@@ -118,7 +118,6 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
             Y = torch.Tensor([Y]).double()
         else:
             # try to predict the next d_g delay
-            s = diff_hat.size()
             # Y = torch.roll(diff_hat, -1) ## doesn't work due to padding!!! workaround:
             Y = roll_w_padding(diff_hat, X_lengths)
             Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
