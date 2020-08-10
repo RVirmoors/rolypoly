@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = True
+DEBUG = False
 
 import torch
 import torch.nn as nn
@@ -330,11 +330,8 @@ class TimingLSTM(nn.Module):
         if not self.seq2seq:
             X_lstm, self.hidden = self.lstm(X_pack, self.hidden)
         else:
-            print("source:", X_source)
-            print("X:", X_pack)
             _, self.hidden = self.encoder(X_source, self.hidden)
             X_lstm, self.hidden = self.decoder(X_pack, self.hidden)
-            print("OUT:", X_lstm)
 
         # undo the packing operation
         X_lstm, _ = torch.nn.utils.rnn.pad_packed_sequence(
