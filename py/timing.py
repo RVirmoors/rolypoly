@@ -349,9 +349,9 @@ class TimingLSTM(nn.Module):
                     boot = X[:, :2, 12:15]  # first two
                     boot = boot.reshape(self.nb_layers, batch_size, 3)
                 else:
-                    boot = torch.zeros(self.nb_layers, batch_size, 3).double()
+                    boot = torch.zeros(self.nb_layers, batch_size, 3, device=device, dtype=torch.float64)
                     boot[0, 0] = X[0, 0, 12:15]
-                zeros = torch.zeros(self.nb_layers, batch_size, 3).double()
+                zeros = torch.zeros(self.nb_layers, batch_size, 3, device=device, dtype=torch.float64)
                 self.dec_hidden = (torch.cat((self.enc_hidden[0].detach_(), boot), dim=2),
                                    torch.cat((self.enc_hidden[1].detach_(), zeros), dim=2))
             X_lstm, self.dec_hidden = self.decoder(X_pack, self.dec_hidden)

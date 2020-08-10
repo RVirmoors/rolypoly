@@ -357,7 +357,7 @@ if __name__ == '__main__':
 
     if get_y_n("Save trained model? "):
         if args.bootstrap:
-            PATH = "models/gmd_s2sy_boot.pt"
+            PATH = "models/gmd_s2s_boot.pt"
         elif args.seq2seq:
             PATH = "models/gmd_seq2seq.pt"
         else:
