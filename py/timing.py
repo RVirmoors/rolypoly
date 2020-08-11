@@ -102,16 +102,16 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
     Computes Y, the target values to be used in the MSE loss function.
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
 
-    Parameters for determining diff:
+    Parameters for determining delta:
         - style = 'constant'                -> we want to bring next d-g delay close to avg
                 or 'EMA'                    -> we want to bring next d-g delay close to EMA
                 or 'diff' (rolls diff_hat)  -> we want to minimize next drum-guitar delay
         - value = if None, will be computed as avg(diff_hat) over the present seq
-                  if style='constant', value -> diff
+                  if style='constant', value -> delta
                   if style='EMA',      value -> EMA alpha in (0,1)
 
     (for style == 'constant' or 'EMA')
-    Computes Y = (Y_hat + diff_hat[t+1] - diff), in order to achieve ->
+    Computes Y = (Y_hat + diff_hat[t+1] - delta), in order to achieve ->
         -> a constant value for diff_hat (see above)
     """
 
@@ -132,26 +132,26 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
     else:
         diff_hat = roll_w_padding(torch.tensor(
             diff_hat).double(), X_lengths).numpy()
-    diff = np.zeros_like(diff_hat)
+    delta = np.zeros_like(diff_hat)
     Y = np.zeros_like(Y_hat)
 
     if style == 'constant':
-        for i in range(len(diff)):
+        for i in range(len(delta)):
             seq_len = int(X_lengths[i])
             if value is not None:
-                diff[i, :seq_len] = value
+                delta[i, :seq_len] = value
             else:  # default
-                diff[i, :seq_len] = np.average(diff_hat[i][:seq_len])
+                delta[i, :seq_len] = np.average(diff_hat[i][:seq_len])
     elif style == 'EMA':
         for i in range(len(diff_hat)):
             seq_len = int(X_lengths[i])
-            diff[i, :seq_len] = ewma(
+            delta[i, :seq_len] = ewma(
                 diff_hat[i, :seq_len],
                 alpha=value if value else 0.8)
 
     # Y[t] = Y_hat[t] + diff_hat[t+1] - diff[t+1]
     np.add(Y_hat, diff_hat, Y_hat)   # Y_hat = Y_hat + diff_hat
-    np.subtract(Y_hat, diff, Y)      # Y     = Y_hat - diff
+    np.subtract(Y_hat, delta, Y)      # Y     = Y_hat - delta
 
     Y = torch.Tensor(Y).double()  # dtype=torch.float64)
     Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
@@ -305,10 +305,9 @@ class TimingLSTM(nn.Module):
         self.hidden = (hidden, cell)
 
     def hidden_detach(self):
-    # detach/repackage the hidden state in between batches
+        # detach/repackage the hidden state in between batches
         self.hidden[0].detach_()
         self.hidden[1].detach_()
-
 
     def forward(self, X, X_lengths):
         # DON'T reset the LSTM hidden state. We DO want the LSTM to treat
@@ -317,7 +316,7 @@ class TimingLSTM(nn.Module):
 
         batch_size, seq_len, _ = X.size()
         #print("X ....", X.size())
-        #print(X_lengths)
+        # print(X_lengths)
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
         # doesn't make sense to sort seqs by length => we lose ONNX exportability.
@@ -325,7 +324,7 @@ class TimingLSTM(nn.Module):
             X, X_lengths, batch_first=True, enforce_sorted=False)
         if self.seq2seq:
             X_source = torch.nn.utils.rnn.pack_padded_sequence(
-                X[:,:,:13], X_lengths, batch_first=True, enforce_sorted=False)
+                X[:, :, :13], X_lengths, batch_first=True, enforce_sorted=False)
 
         # now run through LSTM
         if not self.seq2seq:
@@ -582,7 +581,8 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
 
                 # forward, don't track history for eval
                 with torch.set_grad_enabled(False):
-                    mb_Y_hat = model(mb_X, mb_Xl) # torch.zeros_like(mb_Y).to(device) # BASELINE ZERO
+                    # torch.zeros_like(mb_Y).to(device) # BASELINE ZERO
+                    mb_Y_hat = model(mb_X, mb_Xl)
                     loss = model.loss(mb_Y_hat, mb_Y, None)
                     total_loss += loss.item()
                     batch_loss += loss.item()
