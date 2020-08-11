@@ -103,15 +103,15 @@ dispatcher.map("/descr", getGuitarDescrOSC)  # receive
 async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batch_size):
     """
     Live:
-       [ UPSWING   @ t - dur/2 ]
-    1. get the previous guitar info & g_d onset delay, add to FV[t]
-    2. send FV[t] to the model for inference, get y_hat[t] offset
-    3. wait dur[t]/2 + y_hat[t] (adjusted by y_hat[t-1] + inference time)
+       [ UPSWING   @ t - dur[t-1]/2 ]
+    1. get the previous audio descriptor & diff_hat, add to featVec[t]
+    2. send featVec[t] to the model for inference, get y_hat[t] offset
+    3. wait dur[t-1]/2 + y_hat[t] (adjusted by y_hat[t-1] + inference time)
        [ DOWNSWING @ t ]
     4. play the current timestep hits, from FV[t]
-    5. use FV[t] & y_hat[t] for online training (if time allows)
+    5. store / train on featVec[t] & y_hat[t]
     6. wait dur[t]/2 (adjusted by training time)
-       [ REPEAT ]
+       [ REPEAT for all timesteps t ]
     """
     since = time.time()
     writer = trainer['writer']
