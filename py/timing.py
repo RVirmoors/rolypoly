@@ -582,7 +582,7 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
 
                 # forward, don't track history for eval
                 with torch.set_grad_enabled(False):
-                    mb_Y_hat = model(mb_X, mb_Xl)
+                    mb_Y_hat = model(mb_X, mb_Xl) # torch.zeros_like(mb_Y).to(device) # BASELINE ZERO
                     loss = model.loss(mb_Y_hat, mb_Y, None)
                     total_loss += loss.item()
                     batch_loss += loss.item()
