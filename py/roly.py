@@ -94,7 +94,7 @@ def getGuitarDescrOSC(address, *args):
 
 
 # OSC communication
-client = SimpleUDPClient("127.0.0.1", 5005)  # send
+client = SimpleUDPClient("127.0.0.1", 8017)  # send
 dispatcher = Dispatcher()
 dispatcher.map("/onset", getOnsetDiffOSC)  # receive
 dispatcher.map("/descr", getGuitarDescrOSC)  # receive
@@ -123,7 +123,7 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
 
     # 2.
     # print(int(featVec[0]), int(featVec[1]), int(
-    #    featVec[2]), int(featVec[3]), int(featVec[9]))
+    #    featVec[2]), int(featVec[3]), (featVec[12]))
     # Here we don't need to train, so the code is wrapped in torch.no_grad()
     with torch.set_grad_enabled(args.train_online):
         if not args.seq2seq:
@@ -149,11 +149,15 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
 
     client.send_message("/next", next_delay)
     inference_time = time.time() - since
-    wait_time = featVec[9] * 0.5 / 1000 - \
-        inference_time + (next_delay - prev_delay) / 1000.
+    if s_i + h_i >= 0:
+        wait_time = X[s_i, h_i, 9] * 0.5 / 1000 -\
+            inference_time + (next_delay - prev_delay) / 1000.
+    else:
+        wait_time = 0  # first note
     trainer['next_delay'] = next_delay
-    print("    inference time: {:.3f}  || wait time:      {:.3f}   [sec]".
-          format(inference_time, wait_time))
+    # print("    inference time: {:.3f}  || wait time:      {:.3f}   [sec]".
+    #      format(inference_time, wait_time))
+    # print("WAIT - ", wait_time)
     if (wait_time < 0):
         print("WARNING: inference is causing extra delays")
     await asyncio.sleep(wait_time)
@@ -197,6 +201,7 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
 
     # 6.
     wait_time = featVec[9] * 0.5 / 1000 - train_time
+    # print("WAIT + ", wait_time)
     if trained:
         print("    train time [s]: {:.4f} || loss:        {:.4f}".
               format(trainer['train_time'], loss))
@@ -219,8 +224,6 @@ async def parseMIDItoFV(model, trainer, X, X_lengths, batch_size):
         x_len = int(x_len)
         for _, featVec in enumerate(X[i][:x_len]):
             trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batch_size)
-            # reset FV and wait
-            featVec = np.zeros(feat_vec_size)
 
     return X, Y_hat, X_lengths
 
@@ -254,6 +257,9 @@ def parseMIDItoX():
 
             X, _, h_i, s_i, X_lengths = timing.addRow(
                 featVec, None, X, None, h_i, s_i, X_lengths, pre=True)
+
+            # reset FV and go to next timestep
+            featVec = np.zeros(feat_vec_size)
 
     print("Done preloading", s_i + 1, "bars.")
 
@@ -308,7 +314,7 @@ async def init_main():
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=int(batch_size),
-                                           epochs=100)
+                                           epochs=30)
 
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
@@ -350,7 +356,8 @@ async def init_main():
             X, X_lengths, Y_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
                                     # style='diff', value = 0) # JUST FOR TESTING
-                                    style='EMA', value=0.8)
+                                    # style='EMA', value=0.8)
+                                    style='constant')
 
         total_loss = model.loss(Y_hat, Y, None)
         print('Take loss: {:4f}'.format(total_loss))
