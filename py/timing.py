@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = True
+DEBUG = False
 
 import torch
 import torch.nn as nn
@@ -111,8 +111,8 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
                   if style='EMA',      value -> EMA alpha in (0,1)
 
     (for style == 'constant' or 'EMA')
-    Computes Y = (Y_hat + diff_hat - diff), in order to achieve ->
-        -> a constant value for diff (see above)
+    Computes Y = (Y_hat + diff_hat[t+1] - diff), in order to achieve ->
+        -> a constant value for diff_hat (see above)
     """
 
     if style == 'diff':

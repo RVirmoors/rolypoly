@@ -24,6 +24,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import timing           # ML timing module
 import data             # data helper methods
+from train_gmd import GMDdataset, pad_collate
 from constants import ROLAND_DRUM_PITCH_CLASSES
 from helper import get_y_n
 
@@ -37,6 +38,12 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--drummidi', default='data/baron.mid', metavar='FOO.mid',
     help='drum MIDI file name')
+parser.add_argument(
+    '--root_dir', default='data/groove/',
+    help='Root directory for validation dataset.')
+parser.add_argument(
+    '--meta', default=None, metavar='info.csv',
+    help='Metadata file: filename of csv list of samples for validation dataset.')
 parser.add_argument(
     '--preload_model', default='models/last.pt', metavar='FOO.pt',
     help='start from a pre-trained model')
@@ -113,7 +120,6 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
     featVec[13] = guitarDescr
     # remains constant if no guit onset:
     featVec[14] = data.ms_to_bartime(delayms, featVec)
-    print("FV", featVec)
 
     # 2.
     # print(int(featVec[0]), int(featVec[1]), int(
@@ -135,7 +141,6 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
                 y_h = 0
             else:
                 y_h += 1
-            print("======", y_s, y_h)
             y_hat = model(x, xl)[y_s][y_h]  # last FV
             # 3.
             # next hit timing [ms]
@@ -265,7 +270,7 @@ async def init_main():
     if args.offline:
         # OFFLINE : ...
         x, xl, y, bs = timing.load_XY(args.take)
-        x, xl, yh = timing.prepare_X(x, xl, yh, bs)
+        x, xl, yh = timing.prepare_X(x, xl, None, bs)
         batch_size = bs
         longest_seq = int(max(xl))
         y = torch.DoubleTensor(y[:batch_size, :longest_seq])
@@ -281,15 +286,29 @@ async def init_main():
                 trained_path, map_location=timing.device))
             print("Loaded pre-trained model weights from", trained_path)
 
+        since = time.time()
+        if args.meta:
+            gmd = GMDdataset(csv_file=args.root_dir + args.meta,
+                             root_dir=args.root_dir)
+            val_data = [gmd[i]
+                        for i in range(len(gmd)) if gmd[i]['split'] != 'dropped']
+
         train_data = [{'X': x, 'X_lengths': xl,
                        'Y': y, 'split': 'train'}]
         dl = {}
         dl['train'] = DataLoader(train_data, batch_size=1,
                                  shuffle=False)
+        if args.meta:
+            dl['val'] = DataLoader(val_data, batch_size=64,
+                                   shuffle=True, num_workers=1, collate_fn=pad_collate)
+
+        time_elapsed = time.time() - since
+        print('Data loaded in {:.0f}m {:.0f}s\n==========='.format(
+            time_elapsed // 60, time_elapsed % 60))
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=int(batch_size / 2),
-                                           epochs=20)
+                                           epochs=100)
 
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
@@ -353,8 +372,8 @@ async def init_main():
 
         transport.close()  # Clean up serve endpoint
 
-
-asyncio.run(init_main())
+if __name__ == '__main__':
+    asyncio.run(init_main())
 
 
 """

@@ -30,41 +30,42 @@ np.set_printoptions(suppress=True)
 DEBUG = False
 
 # parse command line args
-parser = argparse.ArgumentParser(
-    description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter
-)  # show docstring from top
-parser.add_argument(
-    '--root_dir', default='data/groove/',
-    help='Root directory for dataset.')
-parser.add_argument(
-    '--meta', default='info.csv',
-    help='Metadata file: filename of csv list of samples for dataset.')
-parser.add_argument(
-    '--source', default='csv',
-    help='Source data files: csv or midi.')
-parser.add_argument(
-    '--load_model', metavar='FOO.pt',
-    help='Load a pre-trained model.')
-parser.add_argument(
-    '--batch_size', type=int, default=512,
-    help='Batch size: how many files/takes to process at a time.')
-parser.add_argument(
-    '--window_size', type=int, default=64,
-    help='Minibatch / window size: number of 2*bars to train on.')
-parser.add_argument(
-    '--epochs', type=int, default=0,
-    help='# of epochs to train. Zero means don\'t train.')
-parser.add_argument(
-    '--seq2seq', action='store_true',
-    help='Add LSTM decoder for a Seq2Seq model.')
-parser.add_argument(
-    '--optuna', action='store_true',
-    help='Optimise (tune hyperparams) using Optuna.')
-parser.add_argument(
-    '--final', action='store_true',
-    help='Final training, using the entire dataset.')
-args = parser.parse_args()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )  # show docstring from top
+    parser.add_argument(
+        '--root_dir', default='data/groove/',
+        help='Root directory for dataset.')
+    parser.add_argument(
+        '--meta', default='info.csv',
+        help='Metadata file: filename of csv list of samples for dataset.')
+    parser.add_argument(
+        '--source', default='csv',
+        help='Source data files: csv or midi.')
+    parser.add_argument(
+        '--load_model', metavar='FOO.pt',
+        help='Load a pre-trained model.')
+    parser.add_argument(
+        '--batch_size', type=int, default=512,
+        help='Batch size: how many files/takes to process at a time.')
+    parser.add_argument(
+        '--window_size', type=int, default=64,
+        help='Minibatch / window size: number of 2*bars to train on.')
+    parser.add_argument(
+        '--epochs', type=int, default=0,
+        help='# of epochs to train. Zero means don\'t train.')
+    parser.add_argument(
+        '--seq2seq', action='store_true',
+        help='Add LSTM decoder for a Seq2Seq model.')
+    parser.add_argument(
+        '--optuna', action='store_true',
+        help='Optimise (tune hyperparams) using Optuna.')
+    parser.add_argument(
+        '--final', action='store_true',
+        help='Final training, using the entire dataset.')
+    args = parser.parse_args()
 
 
 feat_vec_size = timing.feat_vec_size
