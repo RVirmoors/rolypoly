@@ -119,7 +119,11 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
     # 1.
     featVec[13] = guitarDescr
     # remains constant if no guit onset:
-    featVec[14] = data.ms_to_bartime(delayms, featVec)
+    print(delayms, "clamp to", featVec[9] / -6. +
+          next_delay, " : ", featVec[9] / 6. + next_delay)
+    delayms_clamped = np.clip(delayms, featVec[9] / -6. +
+                              next_delay, featVec[9] / 6. + next_delay)
+    featVec[14] = data.ms_to_bartime(delayms_clamped, featVec)
 
     # 2.
     # print(int(featVec[0]), int(featVec[1]), int(

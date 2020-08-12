@@ -28,6 +28,9 @@ function bang() {
 			if (Math.abs(min) < dur) {				
 				outlet(0, min);
 				}
+			else if (Math.abs(min) < dur * 2) {				
+				post("OFF-BEAT:" + min + "\n");
+				}
 			d_g = g_d = 9999.; // reset & wait for new diffs
 		}
 	}
