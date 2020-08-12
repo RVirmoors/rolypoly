@@ -148,15 +148,22 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
                 diff_hat[i, :seq_len],
                 alpha=value if value else 0.8)
 
-    # Y[t] = Y_hat[t] + diff_hat[t+1] - diff[t+1]
-    if style == 'constant' or 'EMA':
-        np.add(Y_hat, diff_hat, Y_hat)   # Y_hat = Y_hat + diff_hat
-        np.subtract(Y_hat, delta, Y)      # Y     = Y_hat - delta
+    # Y[t] = Y_hat[t] + diff_hat[t+1] - delta[t+1]
+    res = np.zeros_like(diff_hat)
+    np.add(Y_hat, diff_hat, res)   # res = Y_hat + diff_hat
+    np.subtract(res, delta, Y)      # Y     = res - delta
+
+    m = np.mean(np.ma.masked_equal(Y, 0))
+    np.subtract(Y, m, Y)  # center Y on zero
 
     Y = torch.Tensor(Y).double()  # dtype=torch.float64)
     Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
 
-    print("delta:", delta[:, 0])
+    if DEBUG:
+        print("  Y_hat:   ", Y_hat[:, 0])
+        print("+ diff_hat:", diff_hat[:, 0])
+        print("- delta:   ", delta[:, 0])
+        print("= Y:       ", Y[:, 0])
 
     return Y_hat, Y
 

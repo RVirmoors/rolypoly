@@ -201,20 +201,9 @@ def KL_Gauss_np(X):
     return kl_div(Xpdf_norm, unit_gauss).sum()
 
 
-def KL_unitGauss(X):
-    # PyTorch implementation of the above
-    X = X.flatten()
-    Xpdf = torch.histc(X, bins=1000)
-    Xpdf_norm = (Xpdf - Xpdf.min()) / (Xpdf - Xpdf.min()).sum()
-
-    unit_gauss = tdist.Normal(torch.tensor([X.mean()]), torch.tensor([1]))
-
-    kl = F.kl_div(X, X)
-    return kl
-
-
-
+"""
 # TEST
 print(KL_unitGauss(torch.DoubleTensor([[-1], [-1], [1], [1], [2], [2]])))
 
 #print(KL_unitGauss([[-1], [0], [1], [1], [1], [1],  [2], [3]]))
+"""
