@@ -3,6 +3,9 @@ import torch
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
+from sklearn.neighbors import KernelDensity
+import scipy.stats as stats
+from scipy.special import kl_div
 
 
 def get_y_n(prompt):
@@ -177,3 +180,26 @@ def roll_w_padding(X, X_lengths):
             else:
                 Xrolled[i, seq_len - 1] = X[i, seq_len - 1]
     return Xrolled
+
+
+def KL_unitGauss(X):
+    # KL divergence of a sequence from the unit gaussian
+    # First the seq is transformed to a probability density function via KDE:
+    # https://stackoverflow.com/questions/38711541/how-to-compute-the-probability-of-a-value-given-a-list-of-samples-from-a-distrib
+    # Then KL is applied.
+    Xpdf = KernelDensity(kernel='gaussian', bandwidth=0.75).fit(X)
+    xaxis = np.linspace(min(X)[0], max(X)[0], 1000)[:, np.newaxis]
+    kde_vals = np.exp(Xpdf.score_samples(xaxis))
+    Xpdf_norm = (kde_vals - kde_vals.min()) / (kde_vals - kde_vals.min()).sum()
+
+    unit_gauss = stats.norm.pdf(xaxis, np.mean(X))[:, 0]
+
+    return kl_div(Xpdf_norm, unit_gauss).sum()
+
+
+"""
+# TEST
+print(KL_unitGauss([[-1], [-1], [1], [1], [2], [2]]))
+
+print(KL_unitGauss([[-1], [0], [1], [1], [1], [1],  [2], [3]]))
+"""

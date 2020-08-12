@@ -150,11 +150,17 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
                 alpha=value if value else 0.8)
 
     # Y[t] = Y_hat[t] + diff_hat[t+1] - diff[t+1]
-    np.add(Y_hat, diff_hat, Y_hat)   # Y_hat = Y_hat + diff_hat
-    np.subtract(Y_hat, delta, Y)      # Y     = Y_hat - delta
+    if style == 'constant' or 'EMA':
+        np.add(Y_hat, diff_hat, Y_hat)   # Y_hat = Y_hat + diff_hat
+        np.subtract(Y_hat, delta, Y)      # Y     = Y_hat - delta
+
+    if style == 'KL':
+
 
     Y = torch.Tensor(Y).double()  # dtype=torch.float64)
     Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
+
+    print("delta:", delta[:, 0])
 
     return Y_hat, Y
 
