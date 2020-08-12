@@ -3,9 +3,13 @@ import torch
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
+
 from sklearn.neighbors import KernelDensity
 import scipy.stats as stats
 from scipy.special import kl_div
+
+import torch.distributions as tdist
+import torch.nn.functional as F
 
 
 def get_y_n(prompt):
@@ -182,8 +186,8 @@ def roll_w_padding(X, X_lengths):
     return Xrolled
 
 
-def KL_unitGauss(X):
-    # KL divergence of a sequence from the unit gaussian
+def KL_Gauss_np(X):
+    # KL divergence of a sequence from the gaussian
     # First the seq is transformed to a probability density function via KDE:
     # https://stackoverflow.com/questions/38711541/how-to-compute-the-probability-of-a-value-given-a-list-of-samples-from-a-distrib
     # Then KL is applied.
@@ -197,9 +201,20 @@ def KL_unitGauss(X):
     return kl_div(Xpdf_norm, unit_gauss).sum()
 
 
-"""
-# TEST
-print(KL_unitGauss([[-1], [-1], [1], [1], [2], [2]]))
+def KL_unitGauss(X):
+    # PyTorch implementation of the above
+    X = X.flatten()
+    Xpdf = torch.histc(X, bins=1000)
+    Xpdf_norm = (Xpdf - Xpdf.min()) / (Xpdf - Xpdf.min()).sum()
 
-print(KL_unitGauss([[-1], [0], [1], [1], [1], [1],  [2], [3]]))
-"""
+    unit_gauss = tdist.Normal(torch.tensor([X.mean()]), torch.tensor([1]))
+
+    kl = F.kl_div(X, X)
+    return kl
+
+
+
+# TEST
+print(KL_unitGauss(torch.DoubleTensor([[-1], [-1], [1], [1], [2], [2]])))
+
+#print(KL_unitGauss([[-1], [0], [1], [1], [1], [1],  [2], [3]]))

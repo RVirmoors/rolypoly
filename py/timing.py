@@ -3,7 +3,6 @@ Rolypoly timing model
 2020 rvirmoors
 """
 DEBUG = False
-KL = True
 
 import torch
 import torch.nn as nn
@@ -20,8 +19,7 @@ import os
 import copy
 
 from constants import ROLAND_DRUM_PITCH_CLASSES
-from helper import get_y_n, EarlyStopping, plot_grad_flow, ewma, roll_w_padding, KL_unitGauss
-import matplotlib.pyplot as plt
+from helper import get_y_n, EarlyStopping, plot_grad_flow, ewma, roll_w_padding
 import random
 from tqdm import tqdm, trange
 
@@ -154,9 +152,6 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
     if style == 'constant' or 'EMA':
         np.add(Y_hat, diff_hat, Y_hat)   # Y_hat = Y_hat + diff_hat
         np.subtract(Y_hat, delta, Y)      # Y     = Y_hat - delta
-
-    if style == 'KL':
-        Y = Y_hat
 
     Y = torch.Tensor(Y).double()  # dtype=torch.float64)
     Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
@@ -398,18 +393,13 @@ class TimingLSTM(nn.Module):
         if DEBUG:
             print("Computing loss for", nb_outputs, "hits.")
 
-        if not KL:
-            # pick the values for Y_hat and zero out the rest with the mask
-            Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
-            Y = Y[range(Y.shape[0])] * mask
+        # pick the values for Y_hat and zero out the rest with the mask
+        Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
+        Y = Y[range(Y.shape[0])] * mask
 
-            criterion = nn.MSELoss(reduction='sum')
-            # compute MSE loss
-            loss = criterion(Y_hat, Y) / nb_outputs
-
-        else:
-            # compute KL div
-            loss = KL_unitGauss(diff_hat[mask] + Y_hat[mask] - Y[mask])
+        criterion = nn.MSELoss(reduction='sum')
+        # compute MSE loss
+        loss = criterion(Y_hat, Y) / nb_outputs
 
         return loss
 
