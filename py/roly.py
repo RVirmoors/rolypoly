@@ -319,7 +319,8 @@ async def init_main():
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=int(batch_size),
-                                           epochs=30)
+                                           epochs=30,
+                                           lr=1e-3)
 
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
@@ -363,7 +364,7 @@ async def init_main():
                                     # style='EMA', value=0.8)
                                     style='constant')
 
-        total_loss = model.loss(Y_hat, Y, None)
+        total_loss = model.loss(Y_hat, Y, X[:, :, 14])
         print('Take loss: {:4f}'.format(total_loss))
         print('Take MSE (16th note) loss: {:4f}'.format(total_loss * 16 * 16))
 
