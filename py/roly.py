@@ -119,8 +119,8 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
     # 1.
     featVec[13] = guitarDescr
     # remains constant if no guit onset:
-    print(delayms, "clamp to", featVec[9] / -6. +
-          next_delay, " : ", featVec[9] / 6. + next_delay)
+    # print(delayms, "clamp to", featVec[9] / -6. +
+    #      next_delay, " : ", featVec[9] / 6. + next_delay)
     delayms_clamped = np.clip(delayms, featVec[9] / -6. +
                               next_delay, featVec[9] / 6. + next_delay)
     featVec[14] = data.ms_to_bartime(delayms_clamped, featVec)
@@ -224,6 +224,7 @@ async def parseMIDItoFV(model, trainer, X, X_lengths, batch_size):
     s_i = 0
     h_i = -1
 
+    client.send_message("/record", 1)
     for i, x_len in enumerate(X_lengths[:batch_size]):
         x_len = int(x_len)
         for _, featVec in enumerate(X[i][:x_len]):
@@ -318,7 +319,7 @@ async def init_main():
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=int(batch_size),
-                                           epochs=15)
+                                           epochs=5)
 
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
@@ -346,7 +347,6 @@ async def init_main():
                 trained_path, map_location=timing.device))
             print("Loaded pre-trained model weights from", trained_path)
 
-        client.send_message("/record", 1)
         trainer = {}
         trainer['next_delay'] = 0
         trainer['train_time'] = 0.15    # seconds
@@ -361,7 +361,7 @@ async def init_main():
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
                                     # style='diff', value = 0) # JUST FOR TESTING
                                     # style='EMA', value=0.8)
-                                    style='constant', value=0)
+                                    style='constant')
 
         total_loss = model.loss(Y_hat, Y, None)
         print('Take loss: {:4f}'.format(total_loss))
