@@ -319,7 +319,7 @@ async def init_main():
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=int(batch_size),
-                                           epochs=5)
+                                           epochs=30)
 
         if get_y_n("Save trained model? "):
             PATH = "models/last.pt"
