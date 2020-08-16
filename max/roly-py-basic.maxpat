@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 173.0, -984.0, 1276.0, 278.0 ],
+		"rect" : [ 173.0, -984.0, 1276.0, 246.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 1,
 		"default_fontsize" : 12.0,
@@ -46,7 +46,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 871.745604999999955, 209.5, 136.0, 297.0 ],
+					"patching_rect" : [ 1336.745605000000069, 358.0, 136.0, 297.0 ],
 					"presentation" : 1,
 					"presentation_rect" : [ 679.745605000000069, 69.0, 213.0, 152.0 ],
 					"text" : "diff",
@@ -74,7 +74,7 @@
 					"numoutlets" : 0,
 					"patching_rect" : [ 1056.0, 358.0, 150.0, 20.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 990.0, 92.0, 51.0, 20.0 ],
+					"presentation_rect" : [ 989.0, 92.0, 51.0, 20.0 ],
 					"text" : "monitor"
 				}
 
@@ -657,7 +657,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 856.745604999999955, 194.5, 136.0, 152.0 ],
+					"patching_rect" : [ 1341.0, 649.0, 136.0, 152.0 ],
 					"presentation" : 1,
 					"presentation_rect" : [ 412.745605000000069, 73.0, 190.0, 152.0 ],
 					"text" : "Ŷ",
@@ -680,7 +680,7 @@
 					"setminmax" : [ -100.0, 100.0 ],
 					"setstyle" : 1,
 					"signed" : 1,
-					"size" : 63,
+					"size" : 117,
 					"slidercolor" : [ 0.823529411764706, 0.635294117647059, 0.384313725490196, 1.0 ]
 				}
 
@@ -1250,21 +1250,21 @@
 								"selection" : [ 0.0, 0.424242424242424 ],
 								"loop" : 0,
 								"content_state" : 								{
+									"originallengthms" : [ 0.0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
 									"quality" : [ "basic" ],
 									"play" : [ 0 ],
 									"pitchshift" : [ 0.5 ],
 									"pitchcorrection" : [ 0 ],
-									"speed" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ],
 									"formant" : [ 1.0 ],
 									"timestretch" : [ 1 ],
+									"speed" : [ 1.0 ],
 									"formantcorrection" : [ 0 ],
 									"slurtime" : [ 0.0 ],
-									"originallength" : [ 0.0, "ticks" ],
 									"mode" : [ "basic" ],
-									"originallengthms" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
-									"basictuning" : [ 440 ]
+									"originallength" : [ 0.0, "ticks" ]
 								}
 
 							}
@@ -1291,21 +1291,21 @@
 								"selection" : [ 0.0, 1.0 ],
 								"loop" : 0,
 								"content_state" : 								{
+									"originallengthms" : [ 0.0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
 									"quality" : [ "basic" ],
 									"play" : [ 0 ],
 									"pitchshift" : [ 1.0 ],
 									"pitchcorrection" : [ 0 ],
-									"speed" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ],
 									"formant" : [ 1.0 ],
 									"timestretch" : [ 0 ],
+									"speed" : [ 1.0 ],
 									"formantcorrection" : [ 0 ],
 									"slurtime" : [ 0.0 ],
-									"originallength" : [ 0.0, "ticks" ],
 									"mode" : [ "basic" ],
-									"originallengthms" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
-									"basictuning" : [ 440 ]
+									"originallength" : [ 0.0, "ticks" ]
 								}
 
 							}
@@ -1332,21 +1332,21 @@
 								"selection" : [ 0.0, 0.240740740740741 ],
 								"loop" : 0,
 								"content_state" : 								{
+									"originallengthms" : [ 0.0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
 									"quality" : [ "basic" ],
 									"play" : [ 0 ],
 									"pitchshift" : [ 1.5 ],
 									"pitchcorrection" : [ 1 ],
-									"speed" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ],
 									"formant" : [ 1.0 ],
 									"timestretch" : [ 0 ],
+									"speed" : [ 1.0 ],
 									"formantcorrection" : [ 0 ],
 									"slurtime" : [ 0.0 ],
-									"originallength" : [ 0.0, "ticks" ],
 									"mode" : [ "basic" ],
-									"originallengthms" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
-									"basictuning" : [ 440 ]
+									"originallength" : [ 0.0, "ticks" ]
 								}
 
 							}
@@ -1391,7 +1391,7 @@
 					"setminmax" : [ -15.0, 15.0 ],
 					"setstyle" : 1,
 					"signed" : 1,
-					"size" : 175,
+					"size" : 213,
 					"slidercolor" : [ 0.388235294117647, 0.725490196078431, 0.827450980392157, 1.0 ]
 				}
 
@@ -1694,7 +1694,7 @@
 						}
 ,
 						"classnamespace" : "box",
-						"rect" : [ 0.0, 0.0, 640.0, 480.0 ],
+						"rect" : [ 59.0, 107.0, 640.0, 480.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -1728,8 +1728,8 @@
 									"numinlets" : 2,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 50.0, 100.0, 45.0, 22.0 ],
-									"text" : "$1 100"
+									"patching_rect" : [ 50.0, 132.0, 39.0, 22.0 ],
+									"text" : "$1 50"
 								}
 
 							}
@@ -1740,7 +1740,7 @@
 									"numinlets" : 3,
 									"numoutlets" : 2,
 									"outlettype" : [ "", "bang" ],
-									"patching_rect" : [ 50.0, 125.5, 41.0, 22.0 ],
+									"patching_rect" : [ 50.0, 157.5, 41.0, 22.0 ],
 									"text" : "line 0."
 								}
 
@@ -1795,7 +1795,7 @@
  ]
 					}
 ,
-					"patching_rect" : [ 689.0, 151.5, 58.0, 22.0 ],
+					"patching_rect" : [ 699.0, 152.5, 58.0, 22.0 ],
 					"saved_object_attributes" : 					{
 						"description" : "",
 						"digest" : "",
@@ -2259,7 +2259,7 @@
 						}
 ,
 						"classnamespace" : "box",
-						"rect" : [ 42.0, 82.0, 847.0, 920.0 ],
+						"rect" : [ 570.0, -868.0, 847.0, 920.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -2295,18 +2295,6 @@
 									"outlettype" : [ "bang" ],
 									"parameter_enable" : 0,
 									"patching_rect" : [ 279.37371826171875, 394.0, 24.0, 24.0 ]
-								}
-
-							}
-, 							{
-								"box" : 								{
-									"id" : "obj-7",
-									"maxclass" : "message",
-									"numinlets" : 2,
-									"numoutlets" : 1,
-									"outlettype" : [ "" ],
-									"patching_rect" : [ 321.0, 350.0, 50.0, 22.0 ],
-									"text" : "bang"
 								}
 
 							}
@@ -2764,15 +2752,6 @@
 , 							{
 								"patchline" : 								{
 									"destination" : [ "obj-13", 0 ],
-									"order" : 1,
-									"source" : [ "obj-36", 0 ]
-								}
-
-							}
-, 							{
-								"patchline" : 								{
-									"destination" : [ "obj-7", 1 ],
-									"order" : 0,
 									"source" : [ "obj-36", 0 ]
 								}
 
@@ -2944,12 +2923,12 @@
 					"patching_rect" : [ 154.5, 550.0, 136.0, 41.0 ],
 					"saved_attribute_attributes" : 					{
 						"valueof" : 						{
-							"parameter_mmax" : 6.0,
 							"parameter_shortname" : "live.gain~",
 							"parameter_type" : 0,
 							"parameter_unitstyle" : 4,
 							"parameter_mmin" : -70.0,
-							"parameter_longname" : "live.gain~"
+							"parameter_longname" : "live.gain~",
+							"parameter_mmax" : 6.0
 						}
 
 					}
@@ -3259,21 +3238,21 @@
 								"selection" : [ 0.0, 1.0 ],
 								"loop" : 0,
 								"content_state" : 								{
+									"originallengthms" : [ 0.0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
 									"quality" : [ "basic" ],
 									"play" : [ 0 ],
 									"pitchshift" : [ 1.0 ],
 									"pitchcorrection" : [ 0 ],
-									"speed" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ],
 									"formant" : [ 1.0 ],
 									"timestretch" : [ 0 ],
+									"speed" : [ 1.0 ],
 									"formantcorrection" : [ 0 ],
 									"slurtime" : [ 0.0 ],
-									"originallength" : [ 0.0, "ticks" ],
 									"mode" : [ "basic" ],
-									"originallengthms" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
-									"basictuning" : [ 440 ]
+									"originallength" : [ 0.0, "ticks" ]
 								}
 
 							}
@@ -3300,21 +3279,21 @@
 								"selection" : [ 0.0, 0.766666666666667 ],
 								"loop" : 0,
 								"content_state" : 								{
+									"originallengthms" : [ 0.0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
 									"quality" : [ "basic" ],
 									"play" : [ 0 ],
 									"pitchshift" : [ 1.0 ],
 									"pitchcorrection" : [ 0 ],
-									"speed" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ],
 									"formant" : [ 1.0 ],
 									"timestretch" : [ 0 ],
+									"speed" : [ 1.0 ],
 									"formantcorrection" : [ 0 ],
 									"slurtime" : [ 0.0 ],
-									"originallength" : [ 0.0, "ticks" ],
 									"mode" : [ "basic" ],
-									"originallengthms" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
-									"basictuning" : [ 440 ]
+									"originallength" : [ 0.0, "ticks" ]
 								}
 
 							}
@@ -3489,7 +3468,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 127.0, 203.0, 238.0, 36.0 ],
-					"text" : "0. 1. 0. 0. 0. 0. 0. 0. 0. 214.285 140. 1. 0.875 1. 0.009"
+					"text" : "0. 1. 0. 0. 0. 0. 0. 0. 0. 214.285 140. 1. 0.875 0.02 0.01"
 				}
 
 			}
@@ -4083,7 +4062,7 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-78", 0 ],
-					"midpoints" : [ 149.75, 147.0, 698.5, 147.0 ],
+					"midpoints" : [ 149.75, 147.0, 708.5, 147.0 ],
 					"order" : 1,
 					"source" : [ "obj-7", 1 ]
 				}

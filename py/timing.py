@@ -117,7 +117,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
     if style == 'diff':
         if online:
             # try to predict the next d_g delay (here a single value)
-            Y = diff_hat
+            Y = diff_hat  # rolled
             Y = torch.Tensor([Y]).double()
         else:
             # try to predict the next d_g delay

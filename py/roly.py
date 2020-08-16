@@ -360,9 +360,9 @@ async def init_main():
         X, X_lengths, Y_hat = timing.prepare_X(
             X, X_lengths, Y_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
-                                    # style='diff', value = 0) # JUST FOR TESTING
+                                     style='diff', value = 0) # JUST FOR TESTING
                                     # style='EMA', value=0.8)
-                                    style='constant')
+                                    #style='constant')
 
         total_loss = model.loss(Y_hat, Y, X[:, :, 14])
         print('Take loss: {:4f}'.format(total_loss))
