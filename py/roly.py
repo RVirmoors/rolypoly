@@ -80,6 +80,8 @@ ts = pm.time_signature_changes
 delayms = 1
 guitarDescr = 0  # kurtosis
 
+since = time.time()
+
 
 def getOnsetDiffOSC(address, *args):
     # print(f"{address}: {args[0]}")
@@ -113,7 +115,7 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
     6. wait dur[t]/2 (adjusted by training time)
        [ REPEAT for all timesteps t ]
     """
-    since = time.time()
+    global since
     writer = trainer['writer']
     next_delay = trainer['next_delay']
     # 1.
@@ -152,13 +154,13 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
     next_delay = data.bartime_to_ms(y_hat.item(), featVec)
 
     client.send_message("/next", next_delay)
+    trainer['next_delay'] = next_delay
     inference_time = time.time() - since
     if s_i + h_i >= 0:
         wait_time = X[s_i, h_i, 9] * 0.5 / 1000 -\
             inference_time + (next_delay - prev_delay) / 1000.
     else:
         wait_time = 0  # first note
-    trainer['next_delay'] = next_delay
     # print("    inference time: {:.3f}  || wait time:      {:.3f}   [sec]".
     #      format(inference_time, wait_time))
     # print("WAIT - ", wait_time)
@@ -200,18 +202,17 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
             trained = True
 
     train_time = time.time() - since
-    if trained:
-        trainer['train_time'] = train_time
-
     # 6.
     wait_time = featVec[9] * 0.5 / 1000 - train_time
     # print("WAIT + ", wait_time)
+    await asyncio.sleep(wait_time)
+    since = time.time()
     if trained:
+        trainer['train_time'] = train_time
         print("    train time [s]: {:.4f} || loss:        {:.4f}".
               format(trainer['train_time'], loss))
         if (wait_time < 0):
             print("WARNING: training is causing extra delays")
-    await asyncio.sleep(wait_time)
     return trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths
 
 
@@ -360,9 +361,9 @@ async def init_main():
         X, X_lengths, Y_hat = timing.prepare_X(
             X, X_lengths, Y_hat, batch_size)
         Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
-                                     style='diff', value = 0) # JUST FOR TESTING
+                                    # style='diff') # JUST FOR TESTING
                                     # style='EMA', value=0.8)
-                                    #style='constant')
+                                    style='constant')
 
         total_loss = model.loss(Y_hat, Y, X[:, :, 14])
         print('Take loss: {:4f}'.format(total_loss))

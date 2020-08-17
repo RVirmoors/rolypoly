@@ -2,13 +2,12 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = False
+DEBUG = True
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 # see https://pytorch.org/tutorials/recipes/recipes/tensorboard_with_pytorch.html
 from torch.utils.tensorboard import SummaryWriter
 
@@ -96,22 +95,16 @@ def prepare_X(X, X_lengths, Y_hat, batch_size):
     return X, X_lengths, Y_hat
 
 
-def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=False):
+def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, style='constant', online=False):
     """
     Computes Y, the target values to be used in the MSE loss function.
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
 
-    Parameters for determining delta:
-        - style = 'constant'                -> we want to bring next d-g delay close to avg
-                or 'EMA'                    -> we want to bring next d-g delay close to EMA
-                or 'diff' (rolls diff_hat)  -> we want to minimize next drum-guitar delay
-        - value = if None, will be computed as avg(diff_hat) over the present seq
-                  if style='constant', value -> delta
-                  if style='EMA',      value -> EMA alpha in (0,1)
+        - style = 'constant'                -> we want to minimize d-g delay variance
+                or 'diff' (rolls diff_hat)  -> we want to predict next drum-guitar delay
 
     (for style == 'constant' or 'EMA')
-    Computes Y = (Y_hat + diff_hat[t+1] - delta), in order to achieve ->
-        -> a constant value for diff_hat (see above)
+    Computes Y = A * (Y_hat + diff_hat[t+1])
     """
 
     if style == 'diff':
@@ -126,32 +119,22 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
             Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
         return Y_hat, Y
 
+    # roll diff_hat, so we get the next d_g delay in line with the current y_hat
     if torch.is_tensor(diff_hat):
         diff_hat = roll_w_padding(diff_hat, X_lengths).numpy()
     else:
         diff_hat = roll_w_padding(torch.tensor(
             diff_hat).double(), X_lengths).numpy()
-    delta = np.zeros_like(diff_hat)
+
     Y = np.zeros_like(Y_hat)
 
-    if style == 'constant':
-        for i in range(len(delta)):
-            seq_len = int(X_lengths[i])
-            if value is not None:
-                delta[i, :seq_len] = value
-            else:  # default
-                delta[i, :seq_len] = np.average(diff_hat[i][:seq_len])
-    elif style == 'EMA':
-        for i in range(len(diff_hat)):
-            seq_len = int(X_lengths[i])
-            delta[i, :seq_len] = ewma(
-                diff_hat[i, :seq_len],
-                alpha=value if value else 0.8)
+    factor = np.std(np.ma.masked_equal(diff_hat, 0)) / \
+        np.std(np.ma.masked_equal(Y_hat, 0))
+    diff_hat = diff_hat / factor
 
-    # Y[t] = Y_hat[t] + diff_hat[t+1] - delta[t+1]
-    res = np.zeros_like(diff_hat)
-    np.add(Y_hat, diff_hat, res)   # res = Y_hat + diff_hat
-    np.subtract(res, delta, Y)      # Y     = res - delta
+    np.add(Y_hat, diff_hat, Y)   # Y = Y_hat + diff_hat
+
+    Y = A * Y       # scale
 
     m = np.mean(np.ma.masked_equal(Y, 0))
     np.subtract(Y, m, Y)  # center Y on zero
@@ -162,7 +145,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, style='constant', value=None, online=F
     if DEBUG:
         print("  Y_hat:   ", Y_hat[:, 0])
         print("+ diff_hat:", diff_hat[:, 0])
-        print("- delta:   ", delta[:, 0])
+#        print("- delta:   ", delta[:, 0])
         print("= Y:       ", Y[:, 0])
 
     return Y_hat, Y
@@ -241,7 +224,7 @@ def load_XY(filename):
 
 def transform(X, Y):
     """
-    TODO Data preprocessing:
+    TODO Data preprocessing?
     Drum hits (x[0:8]) and pos_in_bar (x[12]) rescaled from [0,1] to [-1,1]
     Minmax scale factor applied to diff_hat (x[14]) and y, y_hat to [-1,1]
     Duration (x[9]) rescaled from [20, 1000] to [-1,1]  (log, capped)
@@ -255,7 +238,7 @@ def transform(X, Y):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, seq2seq=False):
+    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, seq2seq=False, A=1):
         """
         batch_size: # of sequences (bars) in training batch
         """
@@ -267,6 +250,7 @@ class TimingLSTM(nn.Module):
         self.batch_size = batch_size
         self.dropout = dropout
         self.seq2seq = seq2seq
+        self.A = A
 
         self.init_hidden()
 
@@ -299,11 +283,12 @@ class TimingLSTM(nn.Module):
                 dropout=self.dropout
             ).double().to(device)
 
-        # tanh activation
+        # self.layerNorm = nn.LayerNorm(nb_lstm_units) # TODO try this before tanh
         self.tanh = nn.Tanh()
 
         # output layer which projects back to Y space
-        self.hidden_to_y = nn.Linear(self.nb_lstm_units, 1).double().to(device)
+        self.hidden_to_y = nn.Linear(
+            self.nb_lstm_units, 1).double().to(device)
 
     def init_hidden(self):
         # the weights are of the form (nb_layers, batch_size, nb_lstm_units)
@@ -397,8 +382,8 @@ class TimingLSTM(nn.Module):
         nb_outputs = torch.sum(mask).item()
         if nb_outputs == 0:
             nb_outputs = 1
-        if DEBUG:
-            print("Computing loss for", nb_outputs, "hits.")
+        # if DEBUG:
+        #    print("Computing loss for", nb_outputs, "hits.")
 
         # pick the values for Y_hat and zero out the rest with the mask
         Y_hat = Y_hat[range(Y_hat.shape[0])] * mask
@@ -443,8 +428,8 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
         # train loop. TODO add noise?
         # print("Epoch", t + 1, "/", epochs)
         epoch_loss = div_loss = 0.
-        if DEBUG:
-            plt.ion()
+        # if DEBUG:
+        #    plt.ion()
         # Each epoch has a training and validation phase
         for phase in phases:
             if phase == 'train':
@@ -519,9 +504,9 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
 
             if phase == 'train':
                 scheduler.step()
-                if DEBUG:
-                    plot_grad_flow(model.named_parameters())
-                    plt.pause(0.01)
+                # if DEBUG:
+                #    plot_grad_flow(model.named_parameters())
+                #    plt.pause(0.01)
             elif es.step(torch.tensor(epoch_loss)):
                 print("Stopping early @ epoch", t + 1, "!")
                 early_stop = True
@@ -548,8 +533,8 @@ def train(model, dataloaders, minibatch_size=64, epochs=20, lr=1e-3):
         # load best model weights
         model.load_state_dict(best_model_wts)
 
-    if DEBUG:
-        plt.show()
+    # if DEBUG:
+    #    plt.show()
 
     ### Evaluation ###
     model.eval()
