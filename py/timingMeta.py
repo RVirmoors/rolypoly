@@ -348,7 +348,7 @@ if __name__ == '__main__':
     model = TimingMeta(batch_size=batch_size)
 
     trained_model, loss = train(model, dl,
-                                epochs=1)
+                                epochs=100)
 
     getNextAB = dataset[-1]['X']
     getNextAB[0] = 0.   # predict for (desired) zero diff variance

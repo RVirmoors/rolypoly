@@ -45,10 +45,10 @@ parser.add_argument(
     '--meta', default="data/meta/last.csv", metavar='info.csv',
     help='Meta learning dataset.')
 parser.add_argument(
-    '--A', default=1.,
+    '--A', default=1., type = float,
     help='A scaling value.')
 parser.add_argument(
-    '--B', default=1.,
+    '--B', default=1., type = float,
     help='B scaling value.')
 parser.add_argument(
     '--root_dir', default='data/groove/',
@@ -255,12 +255,12 @@ async def parseMIDItoFV(model, trainer, X, X_lengths, batch_size):
         B = torch.DoubleTensor([[args.B]])
 
         hid = model.hidden[0][-1]
-        print("varDiff", varDiff.size())
-        print("hidden", hid.size())
+        #print("varDiff", varDiff.size())
+        #print("hidden", hid.size())
         metaX, metaY = timingMeta.add_XY(
             metaX, metaY, varDiff, hid, A, B)
 
-    if args.meta == False:
+    if args.meta is None:
         metaX = metaX[1:]  # remove first (zeros) row
         metaY = metaY[1:]
 
@@ -406,16 +406,15 @@ async def init_main():
 
         if get_y_n("Save performance? "):
             rows, filename = timing.save_XY(X, X_lengths, Y, Y_hat)
-            print("Saved", filename, ": ", rows, "rows.")
             client.send_message("/save", filename[11:-3] + "wav")
             Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*1.1, B=args.B*1.1)
-            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_AB')
+            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_AABB.csv')
             Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*1.1, B=args.B*0.909)
-            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_Ab')
+            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_AAb.csv')
             Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*0.909, B=args.B*1.1)
-            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_aB')
+            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_aBB.csv')
             Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*0.909, B=args.B*0.909)
-            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_ab')
+            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_ab.csv')
 
 
         if args.train_online and get_y_n("Save trained model? "):

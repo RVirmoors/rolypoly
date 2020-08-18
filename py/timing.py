@@ -2,7 +2,7 @@
 Rolypoly timing model
 2020 rvirmoors
 """
-DEBUG = True
+DEBUG = False
 
 import torch
 import torch.nn as nn
@@ -196,6 +196,8 @@ def save_XY(X, X_lengths, Y, Y_hat=None, filename=None):
         filename = "data/takes/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
     np.savetxt(filename, to_csv, fmt=fmt, header=header)
     np.savetxt("data/takes/last.csv", to_csv, fmt=fmt, header=header)
+
+    print("Saved", filename, ": ", cur_row, "rows.")
     return cur_row, filename
 
 
@@ -248,7 +250,7 @@ def transform(X, Y):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, seq2seq=False, A=1, B=1):
+    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, seq2seq=False):
         """
         batch_size: # of sequences (bars) in training batch
         """
@@ -260,8 +262,6 @@ class TimingLSTM(nn.Module):
         self.batch_size = batch_size
         self.dropout = dropout
         self.seq2seq = seq2seq
-        self.A = A
-        self.B = B
 
         self.init_hidden()
 
