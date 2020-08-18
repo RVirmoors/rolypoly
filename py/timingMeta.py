@@ -217,7 +217,7 @@ def train(model, dataloaders, minibatch_size=1, epochs=20, lr=1e-3):
         model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 
-    es = EarlyStopping(patience=10)
+    es = EarlyStopping(patience=20)
     early_stop = False
 
     phases = ['train', 'val']
@@ -260,7 +260,7 @@ def train(model, dataloaders, minibatch_size=1, epochs=20, lr=1e-3):
                 model.hidden_detach()
 
             epoch_loss = epoch_loss / div_loss
-            if t % 1 == 0:
+            if t % 5 == 1:
                 print("Epoch", t + 1, phase, "loss:", epoch_loss)
 
             if phase == 'train':
@@ -352,7 +352,7 @@ if __name__ == '__main__':
 
     getNextAB = dataset[-1]['X']
     getNextAB[0] = 0.   # predict for (desired) zero diff variance
-    nextAB = model(getNextAB.unsqueeze(dim=0).unsqueeze(dim=0))
+    nextAB = model(getNextAB.unsqueeze(dim=0).unsqueeze(dim=0).to(device))
     print("A and B should go towards:", nextAB)
 
     if get_y_n("Save trained model? "):
