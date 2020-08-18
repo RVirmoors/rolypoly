@@ -3,6 +3,8 @@
 
 Requires pythonosc, numpy, librosa.
 """
+HIDDEN_DIM = 256
+
 import argparse
 import queue
 import sys
@@ -23,6 +25,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 import timing           # ML timing module
+import timingMeta
 import data             # data helper methods
 from train_gmd import GMDdataset, pad_collate
 from constants import ROLAND_DRUM_PITCH_CLASSES
@@ -36,13 +39,22 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
     help='drum MIDI file name')
+parser.add_argument(
+    '--meta', default="data/meta/last.csv", metavar='info.csv',
+    help='Meta learning dataset.')
+parser.add_argument(
+    '--A', default=1.,
+    help='A scaling value.')
+parser.add_argument(
+    '--B', default=1.,
+    help='B scaling value.')
 parser.add_argument(
     '--root_dir', default='data/groove/',
     help='Root directory for validation dataset.')
 parser.add_argument(
-    '--meta', default=None, metavar='info.csv',
+    '--valid', default=None, metavar='info.csv',
     help='Metadata file: filename of csv list of samples for validation dataset.')
 parser.add_argument(
     '--preload_model', default='models/last.pt', metavar='FOO.pt',
@@ -224,12 +236,35 @@ async def parseMIDItoFV(model, trainer, X, X_lengths, batch_size):
     Y_hat = np.zeros((1000, 64))             # seqs * hits
     s_i = 0
     h_i = -1
+    if args.meta:
+        metaX, metaY, _ = timingMeta.load_XY(filename=args.meta)
+    else:
+        metaX = torch.zeros(1 + HIDDEN_DIM).double().unsqueeze(dim=0)
+        metaY = torch.zeros(2).double().unsqueeze(dim=0)
 
     client.send_message("/record", 1)
     for i, x_len in enumerate(X_lengths[:batch_size]):
         x_len = int(x_len)
         for _, featVec in enumerate(X[i][:x_len]):
-            trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batch_size)
+            trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = \
+                await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batch_size)
+        diff_hat = torch.DoubleTensor(X[i, :, 14])
+        varDiff = torch.var(diff_hat[Y_hat[i] != 0]).unsqueeze(
+            dim=0).unsqueeze(dim=0)
+        A = torch.DoubleTensor([[args.A]])
+        B = torch.DoubleTensor([[args.B]])
+
+        hid = model.hidden[0][-1]
+        print("varDiff", varDiff.size())
+        print("hidden", hid.size())
+        metaX, metaY = timingMeta.add_XY(
+            metaX, metaY, varDiff, hid, A, B)
+
+    if args.meta == False:
+        metaX = metaX[1:]  # remove first (zeros) row
+        metaY = metaY[1:]
+
+    timingMeta.save_XY(metaX, metaY)
 
     return X, Y_hat, X_lengths
 
@@ -299,8 +334,8 @@ async def init_main():
             print("Loaded pre-trained model weights from", trained_path)
 
         since = time.time()
-        if args.meta:
-            gmd = GMDdataset(csv_file=args.root_dir + args.meta,
+        if args.valid:
+            gmd = GMDdataset(csv_file=args.root_dir + args.valid,
                              root_dir=args.root_dir)
             val_data = [gmd[i]
                         for i in range(len(gmd)) if gmd[i]['split'] != 'dropped']
@@ -310,7 +345,7 @@ async def init_main():
         dl = {}
         dl['train'] = DataLoader(train_data, batch_size=1,
                                  shuffle=False)
-        if args.meta:
+        if args.valid:
             dl['val'] = DataLoader(val_data, batch_size=64,
                                    shuffle=True, num_workers=1, collate_fn=pad_collate)
 
@@ -360,7 +395,7 @@ async def init_main():
 
         X, X_lengths, Y_hat = timing.prepare_X(
             X, X_lengths, Y_hat, batch_size)
-        Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat,
+        Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat, A=args.A, B=args.B,
                                     # style='diff') # JUST FOR TESTING
                                     # style='EMA', value=0.8)
                                     style='constant')

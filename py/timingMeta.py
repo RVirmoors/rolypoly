@@ -46,8 +46,8 @@ def add_XY(X, Y, varDiff, hidden, A, B):
     X = torch.cat((X, Xadd), 0)
     Y = torch.cat((Y, Yadd), 0)
     if DEBUG:
-        print("add X:", X)
-        print("add Y:", Y)
+        print("add X:", X[-5:, :5])
+        print("add Y:", Y[-5:])
     return X, Y
 
 
@@ -79,8 +79,8 @@ def load_XY(filename="data/meta/last.csv"):
     X = torch.DoubleTensor(data[:, :HIDDEN_DIM + 1])
     Y = torch.DoubleTensor(data[:, -2:])
     if DEBUG:
-        print("load X", X[:5])
-        print("load Y", Y[:5])
+        print("load X", X[-5:, :5])
+        print("load Y", Y[-5:])
     return X, Y, X.size()[0]    # inputs, targets, batch_size
 
 # META DATASET CLASS
@@ -94,20 +94,16 @@ class MetaDataset(Dataset):
     https://stackoverflow.com/questions/50544730/how-do-i-split-a-custom-dataset-into-training-and-test-datasets/50544887#50544887
     """
 
-    def __init__(self, csv_file, transform=None):
+    def __init__(self, csv_file="data/meta/last.csv", transform=None):
         self.csv_file = csv_file
         self.transform = transform
 
-        self.x = [None] * len(self.csv_file)
-        self.y = [None] * len(self.csv_file)
-        self.split = [None] * len(self.csv_file)
-
-        self.x, self.y = load_XY(csv_file)
+        self.x, self.y, self.len = load_XY(csv_file)
         if self.transform:
             self.x, self.y = self.transform(self.x, self.y)
 
     def __len__(self):
-        return len(self.csv_file)
+        return self.len
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
@@ -154,6 +150,7 @@ class TimingMeta(nn.Module):
                              self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
         cell = torch.zeros(self.nb_layers,
                            self.batch_size, self.nb_lstm_units, device=device, dtype=torch.float64)
+        # print(hidden.size())
         self.hidden = (hidden, cell)
 
     def hidden_detach(self):
@@ -161,13 +158,13 @@ class TimingMeta(nn.Module):
         self.hidden[0].detach_()
         self.hidden[1].detach_()
 
-    def forward(self, X, X_lengths):
+    def forward(self, X):
         # DON'T reset the LSTM hidden state. We DO want the LSTM to treat
         # a new batch as a continuation of a sequence!
         # self.hidden = self.init_hidden()
 
         batch_size, seq_len, _ = X.size()
-        #print("X ....", X.size())
+        # print("X ....", X.size())
 
         # now run through LSTM
         X_lstm, self.hidden = self.lstm(X, self.hidden)
@@ -181,8 +178,8 @@ class TimingMeta(nn.Module):
         X_lstm = X_lstm.view(-1, X_lstm.shape[2])
         # run through actual linear layer
         X_out = self.hidden_to_y(X_lstm)
-        # Then back to (batch_size, seq_len, 1 output)
-        X_out = X_out.view(batch_size, seq_len, 1)
+        # Then back to (batch_size, seq_len, 2 outputs)
+        X_out = X_out.view(batch_size, seq_len, 2)
 
         y_hat = X_out
         return y_hat
@@ -206,7 +203,7 @@ class TimingMeta(nn.Module):
 # ============
 
 
-def train(model, dataloaders, minibatch_size=2, epochs=20, lr=1e-3):
+def train(model, dataloaders, minibatch_size=1, epochs=20, lr=1e-3):
     since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1.
@@ -223,6 +220,8 @@ def train(model, dataloaders, minibatch_size=2, epochs=20, lr=1e-3):
     es = EarlyStopping(patience=10)
     early_stop = False
 
+    phases = ['train', 'val']
+
     for t in range(epochs):
         # train loop. TODO add noise?
         epoch_loss = div_loss = 0.
@@ -234,7 +233,7 @@ def train(model, dataloaders, minibatch_size=2, epochs=20, lr=1e-3):
                 model.eval()   # Set model to evaluate mode
 
             for b_i, sample in enumerate(tqdm(dataloaders[phase], postfix={'phase': phase[0]})):
-                X = sample['X'].to(device)
+                X = sample['X'].unsqueeze(dim=0).to(device)
                 Y = sample['Y'].to(device)
                 model.init_hidden()  # reset the state at the start of a take
                 batch_loss = 0
@@ -287,8 +286,6 @@ def train(model, dataloaders, minibatch_size=2, epochs=20, lr=1e-3):
 
     print('Best validation loss: {:4f}, found in Epoch #{:d}'.format(
         best_loss, best_epoch))
-    print('Best validation MSE (16th note) loss: {:4f}'.format(
-        best_loss * 16 * 16))
     # load best model weights
     model.load_state_dict(best_model_wts)
 
@@ -298,12 +295,14 @@ def train(model, dataloaders, minibatch_size=2, epochs=20, lr=1e-3):
 """
 TEST
 
+
 HIDDEN_DIM = 3
 X = torch.arange(1 + HIDDEN_DIM).double().unsqueeze(dim=0)
 Y = torch.DoubleTensor([[10., 20.]])
 
 varDiff = torch.DoubleTensor([[0.9]])
 hidden = torch.arange(HIDDEN_DIM).double().unsqueeze(dim=0)
+print(varDiff.size())
 
 A = torch.DoubleTensor([[11.]])
 B = torch.DoubleTensor([[21.]])
@@ -314,3 +313,49 @@ save_XY(X, Y)
 
 X, Y, batch_size = load_XY()
 """
+
+if __name__ == '__main__':
+    since = time.time()
+
+    dataset = MetaDataset()
+    batch_size = 1  # TODO fix for more
+    validation_split = .2
+    shuffle_dataset = True
+
+    # Creating data indices for training and validation splits:
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    split = int(np.floor(validation_split * dataset_size))
+    if shuffle_dataset:
+        np.random.shuffle(indices)
+    train_indices, val_indices = indices[split:], indices[:split]
+
+    # Creating data samplers and loaders:
+    train_sampler = SubsetRandomSampler(train_indices)
+    valid_sampler = SubsetRandomSampler(val_indices)
+    dl = {}
+    dl['train'] = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                              sampler=train_sampler)
+    dl['val'] = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                            sampler=valid_sampler)
+    time_elapsed = time.time() - since
+    print('Data loaded in {:.0f}m {:.0f}s\n==========='.format(
+        time_elapsed // 60, time_elapsed % 60))
+
+    print(len(dl['train']), "training batches.",
+          len(dl['val']), "val batches.")
+
+    model = TimingMeta(batch_size=batch_size)
+
+    trained_model, loss = train(model, dl,
+                                epochs=5)
+
+    getNextAB = dataset[-1]['X']
+    getNextAB[0] = 0.
+    A, B = model([[getNextAB]])
+    print("A and B should go towards:", A, B)
+
+    if get_y_n("Save trained model? "):
+        PATH = "models/__meta__.pt"
+        torch.save(trained_model.state_dict(), PATH)
+        print("Saved trained model to", PATH)
