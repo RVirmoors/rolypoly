@@ -348,12 +348,12 @@ if __name__ == '__main__':
     model = TimingMeta(batch_size=batch_size)
 
     trained_model, loss = train(model, dl,
-                                epochs=5)
+                                epochs=1)
 
     getNextAB = dataset[-1]['X']
-    getNextAB[0] = 0.
-    A, B = model([[getNextAB]])
-    print("A and B should go towards:", A, B)
+    getNextAB[0] = 0.   # predict for (desired) zero diff variance
+    nextAB = model(getNextAB.unsqueeze(dim=0).unsqueeze(dim=0))
+    print("A and B should go towards:", nextAB)
 
     if get_y_n("Save trained model? "):
         PATH = "models/__meta__.pt"
