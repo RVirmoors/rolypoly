@@ -36,7 +36,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron3bar.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
     '--root_dir', default='data/groove/',

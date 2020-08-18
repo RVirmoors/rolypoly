@@ -95,7 +95,7 @@ def prepare_X(X, X_lengths, Y_hat, batch_size):
     return X, X_lengths, Y_hat
 
 
-def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, style='constant', online=False):
+def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, B=1, style='constant', online=False):
     """
     Computes Y, the target values to be used in the MSE loss function.
     Starts from difference values between played drum-guitar onsets (currently in diff_hat)
@@ -128,18 +128,27 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, style='constant', online=False):
 
     Y = np.zeros_like(Y_hat)
 
-    factor = np.std(np.ma.masked_equal(diff_hat, 0)) / \
-        np.std(np.ma.masked_equal(Y_hat, 0))
-    diff_hat = diff_hat / factor
+    Y_hat = np.ma.masked_equal(Y_hat, 0)
+    diff_hat = np.ma.masked_equal(diff_hat, 0)
 
-    np.add(Y_hat, diff_hat, Y)   # Y = Y_hat + diff_hat
+    m = np.mean(diff_hat)
+    factor = np.std(diff_hat) / np.std(Y_hat)
+    diff_hat = (diff_hat - m) * A / factor + m
 
-    Y = A * Y       # scale
+    print("var(diff):", np.std(diff_hat), "var(y_hat)", np.std(Y_hat))
 
-    m = np.mean(np.ma.masked_equal(Y, 0))
-    np.subtract(Y, m, Y)  # center Y on zero
+    Y = Y_hat + diff_hat        # here we're using the scaled diff_hat
 
-    Y = torch.Tensor(Y).double()  # dtype=torch.float64)
+    m = np.mean(Y)
+    factor = np.std(Y) / np.std(Y_hat)
+    Y = (Y - m) * B / factor
+
+    print("var(Y):", np.std(Y), "var(y_hat)", np.std(Y_hat))
+
+    mask = torch.BoolTensor(Y.mask)
+    Y = torch.Tensor(Y).double() # dtype=torch.float64)
+    Y[mask] = 0.0
+
     Y_hat = torch.Tensor(Y_hat).double()  # dtype=torch.float64)
 
     if DEBUG:
@@ -147,6 +156,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, style='constant', online=False):
         print("+ diff_hat:", diff_hat[:, 0])
 #        print("- delta:   ", delta[:, 0])
         print("= Y:       ", Y[:, 0])
+        print("var(Y):", torch.var(Y[Y != 0])*10000, "var(Y_hat)", torch.var(Y_hat[Y != 0])*10000)
 
     return Y_hat, Y
 
@@ -238,7 +248,7 @@ def transform(X, Y):
 
 
 class TimingLSTM(nn.Module):
-    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, seq2seq=False, A=1):
+    def __init__(self, nb_layers=2, nb_lstm_units=256, input_dim=15, batch_size=64, dropout=0.3, seq2seq=False, A=1, B=1):
         """
         batch_size: # of sequences (bars) in training batch
         """
@@ -251,6 +261,7 @@ class TimingLSTM(nn.Module):
         self.dropout = dropout
         self.seq2seq = seq2seq
         self.A = A
+        self.B = B
 
         self.init_hidden()
 
