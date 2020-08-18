@@ -393,9 +393,9 @@ async def init_main():
         X, Y_hat, X_lengths = await parseMIDItoFV(model, trainer, X, X_lengths, batch_size)
         client.send_message("/record", 0)
 
-        X, X_lengths, Y_hat = timing.prepare_X(
+        X, X_lengths, yh = timing.prepare_X(
             X, X_lengths, Y_hat, batch_size)
-        Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat, A=args.A, B=args.B,
+        Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A, B=args.B,
                                     # style='diff') # JUST FOR TESTING
                                     # style='EMA', value=0.8)
                                     style='constant')
@@ -408,6 +408,15 @@ async def init_main():
             rows, filename = timing.save_XY(X, X_lengths, Y, Y_hat)
             print("Saved", filename, ": ", rows, "rows.")
             client.send_message("/save", filename[11:-3] + "wav")
+            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*1.1, B=args.B*1.1)
+            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_AB')
+            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*1.1, B=args.B*0.909)
+            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_Ab')
+            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*0.909, B=args.B*1.1)
+            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_aB')
+            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*0.909, B=args.B*0.909)
+            timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename+'_ab')
+
 
         if args.train_online and get_y_n("Save trained model? "):
             PATH = "models/last.pt"
