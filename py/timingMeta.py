@@ -260,7 +260,7 @@ def train(model, dataloaders, minibatch_size=1, epochs=20, lr=1e-3):
                 model.hidden_detach()
 
             epoch_loss = epoch_loss / div_loss
-            if t % 5 == 1:
+            if t % 5 == 4:
                 print("Epoch", t + 1, phase, "loss:", epoch_loss)
 
             if phase == 'train':
@@ -348,7 +348,8 @@ if __name__ == '__main__':
     model = TimingMeta(batch_size=batch_size)
 
     trained_model, loss = train(model, dl,
-                                epochs=100)
+                                epochs=100,
+                                lr=5e-4)
 
     getNextAB = dataset[-1]['X']
     getNextAB[0] = 0.   # predict for (desired) zero diff variance
