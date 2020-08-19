@@ -70,14 +70,18 @@ def save_XY(X, Y, filename=None):
     np.savetxt(filename, to_csv, header=header)
     np.savetxt("data/meta/last.csv", to_csv, header=header)
 
-    print("Saved", filename, ":", rows, "rows.")
+    print("Saved", filename, ":", rows, "meta rows.")
     return rows, filename
 
 
 def load_XY(filename="data/meta/last.csv"):
     data = np.loadtxt(filename)
-    X = torch.DoubleTensor(data[:, :HIDDEN_DIM + 1])
-    Y = torch.DoubleTensor(data[:, -2:])
+    if data.ndim == 2:
+        X = torch.DoubleTensor(data[:, :HIDDEN_DIM + 1])
+        Y = torch.DoubleTensor(data[:, -2:])
+    elif data.ndim == 1:
+        X = torch.DoubleTensor(data[:HIDDEN_DIM + 1]).unsqueeze(dim=0)
+        Y = torch.DoubleTensor(data[-2:]).unsqueeze(dim=0)
     if DEBUG:
         print("load X", X[-5:, :5])
         print("load Y", Y[-5:])
@@ -352,7 +356,7 @@ if __name__ == '__main__':
                                 lr=5e-4)
 
     getNextAB = dataset[-1]['X']
-    getNextAB[0] = 0.   # predict for (desired) zero diff variance
+    getNextAB[0] = 0.01   # predict for (desired) zero diff variance
     nextAB = model(getNextAB.unsqueeze(dim=0).unsqueeze(dim=0).to(device))
     print("A and B should go towards:", nextAB)
 

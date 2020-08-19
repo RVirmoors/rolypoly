@@ -39,16 +39,16 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
+    '--drummidi', default='data/rnr.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
     '--meta', default="data/meta/last.csv", metavar='info.csv',
     help='Meta learning dataset.')
 parser.add_argument(
-    '--A', default=1., type = float,
+    '--A', default=1., type=float,
     help='A scaling value.')
 parser.add_argument(
-    '--B', default=1., type = float,
+    '--B', default=1., type=float,
     help='B scaling value.')
 parser.add_argument(
     '--root_dir', default='data/groove/',
@@ -248,17 +248,18 @@ async def parseMIDItoFV(model, trainer, X, X_lengths, batch_size):
         for _, featVec in enumerate(X[i][:x_len]):
             trainer, y_hat, X, Y_hat, h_i, s_i, X_lengths = \
                 await processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batch_size)
-        diff_hat = torch.DoubleTensor(X[i, :, 14])
-        varDiff = torch.var(diff_hat[Y_hat[i] != 0]).unsqueeze(
-            dim=0).unsqueeze(dim=0)
-        A = torch.DoubleTensor([[args.A]])
-        B = torch.DoubleTensor([[args.B]])
 
-        hid = model.hidden[0][-1]
-        #print("varDiff", varDiff.size())
-        #print("hidden", hid.size())
-        metaX, metaY = timingMeta.add_XY(
-            metaX, metaY, varDiff, hid, A, B)
+    diff_hat = torch.DoubleTensor(X[:, :, 14])
+    varDiff = torch.var(diff_hat[Y_hat != 0]).unsqueeze(
+        dim=0).unsqueeze(dim=0)
+    A = torch.DoubleTensor([[args.A]])
+    B = torch.DoubleTensor([[args.B]])
+
+    hid = model.hidden[0][-1, -1].unsqueeze(dim=0)
+    print("varDiff", varDiff.size())
+    print("hidden", hid.size())
+    metaX, metaY = timingMeta.add_XY(
+        metaX, metaY, varDiff, hid, A, B)
 
     if args.meta is None:
         metaX = metaX[1:]  # remove first (zeros) row
@@ -393,9 +394,9 @@ async def init_main():
         X, Y_hat, X_lengths = await parseMIDItoFV(model, trainer, X, X_lengths, batch_size)
         client.send_message("/record", 0)
 
-        X, X_lengths, yh = timing.prepare_X(
+        X, X_lengths, Y_hat = timing.prepare_X(
             X, X_lengths, Y_hat, batch_size)
-        Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A, B=args.B,
+        Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], Y_hat, A=args.A, B=args.B,
                                     # style='diff') # JUST FOR TESTING
                                     # style='EMA', value=0.8)
                                     style='constant')
@@ -407,15 +408,6 @@ async def init_main():
         if get_y_n("Save performance? "):
             rows, filename = timing.save_XY(X, X_lengths, Y, Y_hat)
             client.send_message("/save", filename[11:-3] + "wav")
-            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*1.1, B=args.B*1.1)
-            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_AABB.csv')
-            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*1.1, B=args.B*0.909)
-            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_AAb.csv')
-            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*0.909, B=args.B*1.1)
-            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_aBB.csv')
-            Y_hat, Y = timing.prepare_Y(X_lengths, X[:, :, 14], yh, A=args.A*0.909, B=args.B*0.909)
-            _,_ = timing.save_XY(X, X_lengths, Y, Y_hat, filename = filename[:-4]+'_ab.csv')
-
 
         if args.train_online and get_y_n("Save trained model? "):
             PATH = "models/last.pt"
