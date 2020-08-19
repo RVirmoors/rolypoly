@@ -131,7 +131,6 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, B=1, style='constant', online=Fal
     Y_hat = np.ma.masked_equal(Y_hat, 0)
     diff_hat = np.ma.masked_equal(diff_hat, 0)
 
-    m = np.mean(diff_hat)
     factor = np.std(diff_hat) / np.std(Y_hat)
     diff_hat = diff_hat * A / factor
     print("FACTOR A", factor)

@@ -39,7 +39,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter
 )  # show docstring from top
 parser.add_argument(
-    '--drummidi', default='data/rnr.mid', metavar='FOO.mid',
+    '--drummidi', default='data/baron.mid', metavar='FOO.mid',
     help='drum MIDI file name')
 parser.add_argument(
     '--meta', default="data/meta/last.csv", metavar='info.csv',
@@ -175,7 +175,7 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
         wait_time = 0  # first note
     # print("    inference time: {:.3f}  || wait time:      {:.3f}   [sec]".
     #      format(inference_time, wait_time))
-    # print("WAIT - ", wait_time)
+    # print("WAIT [/halfdur]", wait_time / (X[s_i, h_i, 9] * 0.5 / 1000))
     if (wait_time < 0):
         print("WARNING: inference is causing extra delays")
     await asyncio.sleep(wait_time)
@@ -199,8 +199,8 @@ async def processFV(trainer, featVec, model, X, Y_hat, h_i, s_i, X_lengths, batc
         # TODO: fix it!
         cols = int(max(X_lengths))
         y_hat, y = timing.prepare_Y(
-            #    None, featVec[14], data.ms_to_bartime(prev_delay, featVec), style='diff', online=True)
-            X_lengths[:s_i + 1], X[:s_i + 1, :cols, 14], Y_hat[:s_i + 1, :cols], style='EMA', value=0.8)
+                None, featVec[14], data.ms_to_bartime(prev_delay, featVec), style='diff', online=True)
+            #X_lengths[:s_i + 1], X[:s_i + 1, :cols, 14], Y_hat[:s_i + 1, :cols])
         if (featVec[9] * 0.5 / 1000 < trainer['train_time']):
             # not enough time to train: accum indices and wait
             trainer['indices'] -= 1
@@ -356,7 +356,7 @@ async def init_main():
 
         trained_model, loss = timing.train(model, dl,
                                            minibatch_size=int(batch_size),
-                                           epochs=30,
+                                           epochs=2,
                                            lr=1e-3)
 
         if get_y_n("Save trained model? "):
