@@ -1,6 +1,6 @@
 # rolypoly~
 
-currently works as a Python + Max ensemble (see [/py](/py) folder), fully integrated Max external coming soon. [demo video](https://youtu.be/UHBIzfc5DCI)
+currently works as a Python + Max ensemble (see [/py](/py) folder), fully integrated Max external coming soon. [intro video](https://youtu.be/UHBIzfc5DCI)
 
 tested on Windows 10 x64 only, no CUDA
 
