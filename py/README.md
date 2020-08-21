@@ -22,7 +22,8 @@ to build the .csv files to be used for training.
 You may then zip your `groove` folder and train it in this [Google Colab](https://colab.research.google.com/drive/1t5SOnI0lW-XssYXgDfp7iXeQG4xt47ZT?usp=sharing) notebook,
 or just follow the steps in the notebook locally.
 
-## training
+
+## train
 
 run `python roly.py -h` to see available arguments. You can run `python roly.py --drummidi myFile.mid` to use your own MIDI drumtrack.
 
@@ -37,3 +38,8 @@ to interactively train your model, open the Max patch in `../max/roly-py-basic.m
 (will automatically use `takes/last.csv`) to train and then save your new model to `models/last.pt`.
 
 ...annnnd repeat.
+
+
+## say hi
+
+if you're interested in this tech and would like to use it / comment / contribute, I want to hear from you! Open an issue here or contact me [@growlerpig](https://twitter.com/growlerpig/) / grigore dot burloiu at unatc dot ro
