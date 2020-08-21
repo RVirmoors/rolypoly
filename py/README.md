@@ -1,6 +1,6 @@
 # rolypoly~ Python implementation
 
-tested on Windows 10 x64 w/ cpu & Google Colab w/cuda
+tested on Windows 10 x64 w/ cpu & Google Colab w/cuda. [intro video](https://youtu.be/UHBIzfc5DCI)
 
 ## build
 
@@ -24,7 +24,9 @@ or just follow the steps in the notebook locally.
 
 ## training
 
-to interactively train your model, open the Max patch in `../max/roly-py-basic.maxpat` and then do:
+run `python roly.py -h` to see available arguments. You can run `python roly.py --drummidi myFile.mid` to use your own MIDI drumtrack.
+
+to interactively train your model, open the Max patch in `../max/roly-py-basic.maxpat`, enable&test your audio input, and then do:
 
     python roly.py
 
