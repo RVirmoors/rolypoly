@@ -1,9 +1,10 @@
 # rolypoly~
-work in progress
+
+currently works as a Python + Max ensemble (see [/py](/py) folder), fully integrated Max external coming soon. [demo video](https://youtu.be/UHBIzfc5DCI)
 
 tested on Windows 10 x64 only, no CUDA
 
-(OSX version coming soon)
+(OSX version tba)
 
 ## build (Win)
 
@@ -16,3 +17,7 @@ copy the libtorch *.dll files to c:\Program Files\Cycling '74\Max 8\resources\su
 open the VS2017 project, set the config to Release / x64
 
 build
+
+## say hi
+
+if you're interested in this tech and would like to use it / comment / contribute, I want to hear from you! Open an issue here or contact me [@growlerpig](https://twitter.com/growlerpig/) / grigore dot burloiu at unatc dot ro
