@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 173.0, -984.0, 1245.0, 246.0 ],
+		"rect" : [ 173.0, -984.0, 1245.0, 247.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 1,
 		"default_fontsize" : 12.0,
@@ -306,7 +306,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "int" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 1287.686859130859375, 54.0, 24.0, 24.0 ]
+					"patching_rect" : [ 1295.686859130859375, 54.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -317,7 +317,7 @@
 					"numinlets" : 0,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 1287.686859130859375, 21.0, 31.0, 22.0 ],
+					"patching_rect" : [ 1295.686859130859375, 21.0, 31.0, 22.0 ],
 					"text" : "r rec"
 				}
 
@@ -545,7 +545,7 @@
 					"numoutlets" : 0,
 					"patching_rect" : [ 1052.75, 533.5, 100.0, 22.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 975.0, 40.0, 61.0, 22.0 ],
+					"presentation_rect" : [ 942.0, 22.0, 61.0, 22.0 ],
 					"text" : "print bang"
 				}
 
@@ -680,7 +680,7 @@
 					"setminmax" : [ -100.0, 100.0 ],
 					"setstyle" : 1,
 					"signed" : 1,
-					"size" : 91,
+					"size" : 12,
 					"slidercolor" : [ 0.823529411764706, 0.635294117647059, 0.384313725490196, 1.0 ]
 				}
 
@@ -1251,19 +1251,19 @@
 								"loop" : 0,
 								"content_state" : 								{
 									"quality" : [ "basic" ],
+									"slurtime" : [ 0.0 ],
 									"timestretch" : [ 1 ],
 									"formantcorrection" : [ 0 ],
-									"formant" : [ 1.0 ],
-									"play" : [ 0 ],
-									"originallength" : [ 0.0, "ticks" ],
-									"slurtime" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
 									"originallengthms" : [ 0.0 ],
-									"basictuning" : [ 440 ],
+									"originallength" : [ 0.0, "ticks" ],
 									"speed" : [ 1.0 ],
+									"pitchshift" : [ 0.5 ],
+									"play" : [ 0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
+									"formant" : [ 1.0 ],
 									"mode" : [ "basic" ],
 									"pitchcorrection" : [ 0 ],
-									"pitchshift" : [ 0.5 ],
 									"followglobaltempo" : [ 0 ]
 								}
 
@@ -1292,19 +1292,19 @@
 								"loop" : 0,
 								"content_state" : 								{
 									"quality" : [ "basic" ],
+									"slurtime" : [ 0.0 ],
 									"timestretch" : [ 0 ],
 									"formantcorrection" : [ 0 ],
-									"formant" : [ 1.0 ],
-									"play" : [ 0 ],
-									"originallength" : [ 0.0, "ticks" ],
-									"slurtime" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
 									"originallengthms" : [ 0.0 ],
-									"basictuning" : [ 440 ],
+									"originallength" : [ 0.0, "ticks" ],
 									"speed" : [ 1.0 ],
+									"pitchshift" : [ 1.0 ],
+									"play" : [ 0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
+									"formant" : [ 1.0 ],
 									"mode" : [ "basic" ],
 									"pitchcorrection" : [ 0 ],
-									"pitchshift" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ]
 								}
 
@@ -1333,19 +1333,19 @@
 								"loop" : 0,
 								"content_state" : 								{
 									"quality" : [ "basic" ],
+									"slurtime" : [ 0.0 ],
 									"timestretch" : [ 0 ],
 									"formantcorrection" : [ 0 ],
-									"formant" : [ 1.0 ],
-									"play" : [ 0 ],
-									"originallength" : [ 0.0, "ticks" ],
-									"slurtime" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
 									"originallengthms" : [ 0.0 ],
-									"basictuning" : [ 440 ],
+									"originallength" : [ 0.0, "ticks" ],
 									"speed" : [ 1.0 ],
+									"pitchshift" : [ 1.5 ],
+									"play" : [ 0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
+									"formant" : [ 1.0 ],
 									"mode" : [ "basic" ],
 									"pitchcorrection" : [ 1 ],
-									"pitchshift" : [ 1.5 ],
 									"followglobaltempo" : [ 0 ]
 								}
 
@@ -1391,7 +1391,7 @@
 					"setminmax" : [ -15.0, 15.0 ],
 					"setstyle" : 1,
 					"signed" : 1,
-					"size" : 175,
+					"size" : 51,
 					"slidercolor" : [ 0.388235294117647, 0.725490196078431, 0.827450980392157, 1.0 ]
 				}
 
@@ -2067,6 +2067,7 @@
 			}
 , 			{
 				"box" : 				{
+					"hidden" : 1,
 					"id" : "obj-72",
 					"maxclass" : "ezadc~",
 					"numinlets" : 1,
@@ -2110,10 +2111,10 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 1216.5, 13.0, 35.0, 22.0 ],
+					"patching_rect" : [ 1276.5, 268.0, 36.5, 22.0 ],
 					"presentation" : 1,
 					"presentation_rect" : [ 1186.0, 68.0, 35.0, 22.0 ],
-					"text" : "open",
+					"text" : "read",
 					"varname" : "sfpOpen"
 				}
 
@@ -2123,25 +2124,13 @@
 					"hidden" : 1,
 					"id" : "obj-63",
 					"maxclass" : "newobj",
-					"numinlets" : 2,
+					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "signal", "bang" ],
-					"patching_rect" : [ 1216.5, 55.0, 57.0, 22.0 ],
+					"patching_rect" : [ 1216.5, 55.0, 69.0, 22.0 ],
 					"presentation" : 1,
-					"presentation_rect" : [ 1186.0, 91.0, 57.0, 22.0 ],
-					"saved_object_attributes" : 					{
-						"basictuning" : 440,
-						"followglobaltempo" : 0,
-						"formantcorrection" : 0,
-						"mode" : "basic",
-						"originallength" : [ 57599.999999999985448, "ticks" ],
-						"originaltempo" : 119.999999999999972,
-						"pitchcorrection" : 0,
-						"quality" : "basic",
-						"timestretch" : [ 0 ]
-					}
-,
-					"text" : "sfplay~ 1",
+					"presentation_rect" : [ 1186.0, 91.0, 70.0, 22.0 ],
+					"text" : "play~ guit 1",
 					"varname" : "sfp"
 				}
 
@@ -2923,12 +2912,12 @@
 					"patching_rect" : [ 154.5, 550.0, 136.0, 41.0 ],
 					"saved_attribute_attributes" : 					{
 						"valueof" : 						{
+							"parameter_mmax" : 6.0,
 							"parameter_shortname" : "live.gain~",
 							"parameter_type" : 0,
 							"parameter_unitstyle" : 4,
 							"parameter_mmin" : -70.0,
-							"parameter_longname" : "live.gain~",
-							"parameter_mmax" : 6.0
+							"parameter_longname" : "live.gain~"
 						}
 
 					}
@@ -3239,19 +3228,19 @@
 								"loop" : 0,
 								"content_state" : 								{
 									"quality" : [ "basic" ],
+									"slurtime" : [ 0.0 ],
 									"timestretch" : [ 0 ],
 									"formantcorrection" : [ 0 ],
-									"formant" : [ 1.0 ],
-									"play" : [ 0 ],
-									"originallength" : [ 0.0, "ticks" ],
-									"slurtime" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
 									"originallengthms" : [ 0.0 ],
-									"basictuning" : [ 440 ],
+									"originallength" : [ 0.0, "ticks" ],
 									"speed" : [ 1.0 ],
+									"pitchshift" : [ 1.0 ],
+									"play" : [ 0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
+									"formant" : [ 1.0 ],
 									"mode" : [ "basic" ],
 									"pitchcorrection" : [ 0 ],
-									"pitchshift" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ]
 								}
 
@@ -3280,19 +3269,19 @@
 								"loop" : 0,
 								"content_state" : 								{
 									"quality" : [ "basic" ],
+									"slurtime" : [ 0.0 ],
 									"timestretch" : [ 0 ],
 									"formantcorrection" : [ 0 ],
-									"formant" : [ 1.0 ],
-									"play" : [ 0 ],
-									"originallength" : [ 0.0, "ticks" ],
-									"slurtime" : [ 0.0 ],
-									"originaltempo" : [ 120.0 ],
 									"originallengthms" : [ 0.0 ],
-									"basictuning" : [ 440 ],
+									"originallength" : [ 0.0, "ticks" ],
 									"speed" : [ 1.0 ],
+									"pitchshift" : [ 1.0 ],
+									"play" : [ 0 ],
+									"originaltempo" : [ 120.0 ],
+									"basictuning" : [ 440 ],
+									"formant" : [ 1.0 ],
 									"mode" : [ "basic" ],
 									"pitchcorrection" : [ 0 ],
-									"pitchshift" : [ 1.0 ],
 									"followglobaltempo" : [ 0 ]
 								}
 
@@ -3468,7 +3457,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 127.0, 203.0, 238.0, 36.0 ],
-					"text" : "0. 1. 0. 0. 0. 0. 0. 0. 0. 214.285 140. 1. 0.875 0.033 0.009"
+					"text" : "0. 0. 1. 0. 0. 0. 0. 0. 0. 500. 60. 1. 0.375 0. -0.047"
 				}
 
 			}
@@ -3562,16 +3551,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-115", 0 ],
-					"order" : 1,
-					"source" : [ "obj-109", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-46", 0 ],
-					"midpoints" : [ 1233.5, 246.0, 1260.0, 246.0, 1260.0, 246.0, 1401.5, 246.0 ],
-					"order" : 0,
 					"source" : [ "obj-109", 0 ]
 				}
 
@@ -3935,6 +3914,16 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-111", 0 ],
+					"order" : 1,
+					"source" : [ "obj-51", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-46", 0 ],
+					"midpoints" : [ 1221.5, 303.0, 1254.0, 303.0, 1254.0, 285.0, 1263.0, 285.0, 1263.0, 252.0, 1401.5, 252.0 ],
+					"order" : 0,
 					"source" : [ "obj-51", 0 ]
 				}
 
@@ -3957,7 +3946,7 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-63", 0 ],
+					"destination" : [ "obj-120", 0 ],
 					"source" : [ "obj-57", 0 ]
 				}
 

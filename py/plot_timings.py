@@ -39,7 +39,7 @@ for i in range(4):
 
 ax.set_ylim(0, 38)
 ax.set_xlim(1, 4.8)
-ax.set_xlabel('bars')
+ax.set_xlabel('time (bars)')
 ax.set_yticks([0, 10, 20, 30])
 ax.set_yticklabels(['baseline', 'iter. 1', 'iter. 2', 'iter. 3'])
 ax.grid(False)

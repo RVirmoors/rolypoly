@@ -132,8 +132,9 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, B=1, style='constant', online=Fal
     diff_hat = np.ma.masked_equal(diff_hat, 0)
 
     factor = np.std(diff_hat) / np.std(Y_hat)
-    diff_hat = diff_hat * A / factor
     print("FACTOR A", factor)
+    A = float(input("A:"))
+    diff_hat = diff_hat * A / factor
 
     print("var(diff):", np.std(diff_hat), "var(y_hat)", np.std(Y_hat))
 
@@ -142,6 +143,7 @@ def prepare_Y(X_lengths, diff_hat, Y_hat, A=1, B=1, style='constant', online=Fal
     m = np.mean(Y)
     factor = np.std(Y) / np.std(Y_hat)
     print("FACTOR B", factor)
+    B = float(input("B:"))
     Y = (Y - m) * B / factor
 
     print("var(Y):", np.std(Y), "var(y_hat)", np.std(Y_hat))
