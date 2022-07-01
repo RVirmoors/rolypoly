@@ -1,7 +1,7 @@
 """Rolypoly Python implementation
 2020 rvirmoors
 
-Requires pythonosc, numpy, librosa.
+Requires pythonosc, numpy, pretty_midi.
 """
 HIDDEN_DIM = 256
 
