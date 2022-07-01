@@ -4,7 +4,7 @@ currently works as a Python + Max ensemble (see [/py](/py) folder) - [intro vide
 
 work on fully integrated Max external NOW IN PROGRESS (July '22)
 
-## build (Win)
+## build
 
 clone repo into Max 8/Packages
 
