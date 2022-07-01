@@ -2,11 +2,11 @@
 
 currently works as a Python + Max ensemble (see [/py](/py) folder) - [intro video](https://youtu.be/UHBIzfc5DCI)
 
-work on fully integrated Max external NOW IN PROGRESS (July '22)
+work on fully integrated Max external NOW IN PROGRESS (July '22), built using [Min-DevKit](https://github.com/Cycling74/min-devkit)
 
 ## build
 
-clone repo into Max 8/Packages
+clone into `Max 8/Packages`, fetching submodules: `git clone https://github.com/RVirmoors/rolypoly --recursive`
 
 download LibTorch into (Project_Dir)/libtorch
 

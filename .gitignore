@@ -1,5 +1,6 @@
 libtorch/
 .vs/
+.vscode/
 py/venv/
 py/data/groove
 py/runs/

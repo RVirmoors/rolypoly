@@ -13,7 +13,7 @@ class panner : public signal_routing_base<panner>, public sample_operator<2, 2> 
 public:
 	MIN_DESCRIPTION {"Pan an input to two outputs."};
 	MIN_TAGS {"audio, routing"};
-	MIN_AUTHOR {"Cycling '74"};
+	MIN_AUTHOR {"Grigore Burloiu // rvirmoors"};
 	MIN_RELATED {"xfade~, matrix~"};
 
 	inlet<>  in1 {this, "(signal) Input 1"};
