@@ -1,22 +1,18 @@
 # rolypoly~
 
-currently works as a Python + Max ensemble (see [/py](/py) folder), fully integrated Max external coming soon. [intro video](https://youtu.be/UHBIzfc5DCI)
+currently works as a Python + Max ensemble (see [/py](/py) folder) - [intro video](https://youtu.be/UHBIzfc5DCI)
 
-tested on Windows 10 x64 only, no CUDA
-
-(OSX version tba)
+work on fully integrated Max external NOW IN PROGRESS
 
 ## build (Win)
 
-clone repo into max-sdk-8.0.3\source\audio\
+clone repo into Max 8/Packages
 
 download LibTorch into (Project_Dir)/libtorch
 
 copy the libtorch *.dll files to c:\Program Files\Cycling '74\Max 8\resources\support\ *(or the /support directory in your package)*
 
-open the VS2017 project, set the config to Release / x64
-
-build
+build using VS/XCode or `cmake --build .`
 
 ## say hi
 
