@@ -2,7 +2,7 @@
 
 currently works as a Python + Max ensemble (see [/py](/py) folder) - [intro video](https://youtu.be/UHBIzfc5DCI)
 
-work on fully integrated Max external NOW IN PROGRESS
+work on fully integrated Max external NOW IN PROGRESS (July '22)
 
 ## build (Win)
 
