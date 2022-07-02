@@ -14,6 +14,20 @@ include(${C74_MIN_API_DIR}/script/min-pretarget.cmake)
 
 include_directories( 
 	"${C74_INCLUDES}"
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include/torch/csrc/api/include
+)
+
+link_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/lib
+)
+
+link_libraries(
+	torch.lib
+	torch_cpu.lib
+	c10.lib
+	caffe2_detectron_ops.lib
+	caffe2_module_test_dynamic.lib
 )
 
 

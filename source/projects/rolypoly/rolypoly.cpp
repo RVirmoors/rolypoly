@@ -5,6 +5,7 @@
 
 #include "c74_min.h"
 #include "../shared/signal_routing_objects.h"
+#include "torch\torch.h"
 
 // The xfade~ object inherits all of it's attributes and messages from the signal_routing_base class.
 // The panner~ object does exactly the same, allowing us to share the code between the two similar but opposite classes.
@@ -20,7 +21,13 @@ public:
 	inlet<>  in_pos {this, "(signal) Position between them (0..1)"};
 	outlet<> out1 {this, "(signal) Left Output", "signal"};
 	outlet<> out2 {this, "(signal) Right Output", "signal"};
-
+/*
+	tensor = torch::rand({ 2, 3 });
+	// Max uses printf to post, we can't use iostream...
+	post("random tensor: %.2f %.2f %.2f | %.2f %.2f %.2f ",
+		tensor[0][0].item<float>(), tensor[0][1].item<float>(), tensor[0][2].item<float>(),
+		tensor[1][0].item<float>(), tensor[1][1].item<float>(), tensor[1][2].item<float>());
+*/
 
 	/// Process one sample
 
