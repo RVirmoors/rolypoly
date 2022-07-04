@@ -7,27 +7,28 @@
 #include "../shared/signal_routing_objects.h"
 #include "torch\torch.h"
 
-// The xfade~ object inherits all of it's attributes and messages from the signal_routing_base class.
-// The panner~ object does exactly the same, allowing us to share the code between the two similar but opposite classes.
-
-class panner : public signal_routing_base<panner>, public sample_operator<2, 2> {
+class rolypoly : public signal_routing_base<rolypoly>, public sample_operator<2, 2> {
 public:
-	MIN_DESCRIPTION {"Pan an input to two outputs."};
+	MIN_DESCRIPTION {"Expressive Drum Machine"};
 	MIN_TAGS {"audio, routing"};
 	MIN_AUTHOR {"Grigore Burloiu // rvirmoors"};
-	MIN_RELATED {"xfade~, matrix~"};
+	MIN_RELATED {"antescofo~"};
 
 	inlet<>  in1 {this, "(signal) Input 1"};
 	inlet<>  in_pos {this, "(signal) Position between them (0..1)"};
 	outlet<> out1 {this, "(signal) Left Output", "signal"};
 	outlet<> out2 {this, "(signal) Right Output", "signal"};
-/*
-	tensor = torch::rand({ 2, 3 });
-	// Max uses printf to post, we can't use iostream...
-	post("random tensor: %.2f %.2f %.2f | %.2f %.2f %.2f ",
-		tensor[0][0].item<float>(), tensor[0][1].item<float>(), tensor[0][2].item<float>(),
-		tensor[1][0].item<float>(), tensor[1][1].item<float>(), tensor[1][2].item<float>());
-*/
+
+	// constructor
+	rolypoly() {
+		torch::Tensor tensor = torch::rand({ 2, 3 });
+		cout << "random tensor: " 
+			<< tensor[0][0].item<float>() << " " << tensor[0][1].item<float>() << " " << tensor[0][2].item<float>() 
+			<< " | " 
+			<< tensor[1][0].item<float>() << " " << tensor[1][1].item<float>() << " " << tensor[1][2].item<float>()
+			<< endl;
+	}
+
 
 	/// Process one sample
 
@@ -42,4 +43,4 @@ public:
 	}
 };
 
-MIN_EXTERNAL(panner);
+MIN_EXTERNAL(rolypoly);
