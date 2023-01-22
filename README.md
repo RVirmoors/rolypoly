@@ -2,7 +2,7 @@
 
 currently works as a Python + Max ensemble (see [/py](/py) folder) - [intro video](https://youtu.be/UHBIzfc5DCI)
 
-work on fully integrated Max external NOW IN PROGRESS (July '22), built using [Min-DevKit](https://github.com/Cycling74/min-devkit)
+work underway (Jan-Feb '22) on porting to ircam's nn~ for real-time use in Max!
 
 ## build
 

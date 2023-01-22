@@ -23,11 +23,9 @@ link_directories(
 )
 
 link_libraries(
-	torch.lib
+#	torch.lib	# for GPU
 	torch_cpu.lib
 	c10.lib
-	caffe2_detectron_ops.lib
-	caffe2_module_test_dynamic.lib
 )
 
 

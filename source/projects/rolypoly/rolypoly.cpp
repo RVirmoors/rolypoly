@@ -5,28 +5,20 @@
 
 #include "c74_min.h"
 #include "../shared/signal_routing_objects.h"
-#include "torch\torch.h"
 
 class rolypoly : public signal_routing_base<rolypoly>, public sample_operator<2, 2> {
 public:
-	MIN_DESCRIPTION {"Expressive Drum Machine"};
-	MIN_TAGS {"audio, routing"};
+	MIN_DESCRIPTION {"Expressive Drum Machine: read MIDI file and output drums"};
+	MIN_TAGS {"MIDI, drums, routing"};
 	MIN_AUTHOR {"Grigore Burloiu // rvirmoors"};
-	MIN_RELATED {"antescofo~"};
+	MIN_RELATED {"nn~, antescofo~"};
 
-	inlet<>  in1 {this, "(signal) Input 1"};
-	inlet<>  in_pos {this, "(signal) Position between them (0..1)"};
+	inlet<>  in1 {this, "(signal) In 1"};
 	outlet<> out1 {this, "(signal) Left Output", "signal"};
-	outlet<> out2 {this, "(signal) Right Output", "signal"};
 
 	// constructor
 	rolypoly() {
-		torch::Tensor tensor = torch::rand({ 2, 3 });
-		cout << "random tensor: " 
-			<< tensor[0][0].item<float>() << " " << tensor[0][1].item<float>() << " " << tensor[0][2].item<float>() 
-			<< " | " 
-			<< tensor[1][0].item<float>() << " " << tensor[1][1].item<float>() << " " << tensor[1][2].item<float>()
-			<< endl;
+
 	}
 
 

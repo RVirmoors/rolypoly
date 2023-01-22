@@ -39,7 +39,7 @@ mir-eval==0.6
 networkx==2.4
 note-seq==0.0.0
 numba==0.48.0
-numpy==1.19.0
+numpy
 oauthlib==3.1.0
 optuna==1.5.0
 packaging==20.4
