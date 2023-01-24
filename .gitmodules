@@ -4,3 +4,9 @@
 [submodule "source/min-lib"]
 	path = source/min-lib
 	url = https://github.com/Cycling74/min-lib.git
+[submodule "midifile"]
+	path = midifile
+	url = https://github.com/craigsapp/midifile
+[submodule "nn_tilde"]
+	path = nn_tilde
+	url = https://github.com/acids-ircam/nn_tilde

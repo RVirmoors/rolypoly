@@ -13,9 +13,8 @@ download LibTorch into `(Project_Dir)/libtorch`
 copy the libtorch *.dll files to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
 
 go to `build/` and run:
-
-`cmake . -S ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release -A x64  -DTorch_DIR="..\libtorch\share\cmake\Torch"`
-`cmake --build . --config Release`
+- `cmake . -S ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release -A x64  -DTorch_DIR="..\libtorch\share\cmake\Torch"`
+- `cmake --build . --config Release`
 
 ## say hi
 
