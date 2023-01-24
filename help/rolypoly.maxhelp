@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 1050.0, 477.0, 520.0, 480.0 ],
+		"rect" : [ 708.0, -801.0, 520.0, 480.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -110,11 +110,11 @@
 				"box" : 				{
 					"id" : "obj-1",
 					"maxclass" : "newobj",
-					"numinlets" : 10,
-					"numoutlets" : 9,
-					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
-					"patching_rect" : [ 111.333332598209381, 186.666667640209198, 164.0, 22.0 ],
-					"text" : "nn~ midiplayer play_midi 512"
+					"numinlets" : 4,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 111.333332598209381, 186.666667640209198, 172.0, 22.0 ],
+					"text" : "rolypoly~ midiplayer baron 512"
 				}
 
 			}
@@ -180,11 +180,7 @@
 
 			}
  ],
-		"dependency_cache" : [ 			{
-				"name" : "nn~.mxe64",
-				"type" : "mx64"
-			}
- ],
+		"dependency_cache" : [  ],
 		"autosave" : 0
 	}
 

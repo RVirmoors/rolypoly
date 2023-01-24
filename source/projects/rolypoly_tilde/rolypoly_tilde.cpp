@@ -5,6 +5,10 @@
 #define VERSION "2.0"
 #endif
 
+// MIDI File library
+#include "MidiFile.h"
+
+// nn~
 #include "c74_min.h"
 #include "torch/torch.h"
 #include "../../../nn_tilde/src/backend/backend.h"
@@ -14,6 +18,7 @@
 #include <vector>
 
 using namespace c74::min;
+using namespace smf;
 
 unsigned power_ceil(unsigned x) {
   if (x <= 1)
@@ -38,6 +43,10 @@ public:
 
 	rolypoly(const atoms &args = {});
 	~rolypoly();
+
+  // MIDI RELATED MEMBERS
+  MidiFile midifile;
+  c74::min::path m_midi_path;
 
 	// BACKEND RELATED MEMBERS
 	Backend m_model;
@@ -169,7 +178,12 @@ rolypoly::rolypoly(const atoms &args)
     m_path = path(model_path);
   }
   if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
-    m_method = std::string(args[1]);
+    //m_method = std::string(args[1]);
+    auto midi_path = std::string(args[1]);
+    if (midi_path.substr(midi_path.length() - 4) != ".mid")
+      midi_path = midi_path + ".mid";
+    m_midi_path = path(midi_path);
+    cout << "midi path: " << midi_path << endl;
   }
   if (args.size() > 2) { // THREE ARGUMENTS ARE GIVEN
     m_buffer_size = int(args[2]);

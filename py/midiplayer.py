@@ -21,7 +21,7 @@ class MidiPlayer(nn_tilde.Module):
 
         # REGISTER METHODS
         self.register_method(
-            'play_midi',
+            'forward',
             in_channels = 10, # timestamp + 9 drum channels
             in_ratio = 1,
             out_channels = 9,
@@ -44,7 +44,7 @@ class MidiPlayer(nn_tilde.Module):
     
     # definition of the main method
     @torch.jit.export
-    def play_midi(self, input: torch.Tensor) -> torch.Tensor:
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
         if self.play[0]:
             # parse X, where the first column is the timestamp
             # and the other columns are the drum channels
