@@ -184,6 +184,21 @@ rolypoly::rolypoly(const atoms &args)
       midi_path = midi_path + ".mid";
     m_midi_path = path(midi_path);
     cout << "midi path: " << midi_path << endl;
+    midifile.read(std::string(m_midi_path));
+    if (!midifile.status()) {
+      cerr << "Error reading MIDI file " << std::string(m_midi_path) << endl;
+    }
+    midifile.linkNotePairs();    // first link note-ons to note-offs
+    midifile.doTimeAnalysis();   // then create ticks to seconds mapping
+
+    for (int i=0; i<midifile[1].size(); i++) {
+      // if the midi message is a drum hit, then print the tick and the pitch
+      if (midifile[1][i].isNoteOn()) {
+        cout << midifile[1][i].tick
+           << ' ' << int(midifile[1][i][1])
+           << endl;
+      }
+    }
   }
   if (args.size() > 2) { // THREE ARGUMENTS ARE GIVEN
     m_buffer_size = int(args[2]);
