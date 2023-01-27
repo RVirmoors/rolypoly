@@ -4,13 +4,13 @@ currently works as a Python + Max ensemble (see [/py](/py) folder) - [intro vide
 
 work underway (Jan-Feb '22) on porting to ircam's nn~ for real-time use in Max!
 
-## build from source
+## build from source (windows)
 
 clone into `Max 8/Packages`, fetching submodules: `git clone https://github.com/RVirmoors/rolypoly --recursive`
 
-download LibTorch into `(Project_Dir)/libtorch`
+[download LibTorch](https://pytorch.org/get-started/locally/) into `(Project_Dir)/libtorch`
 
-copy the libtorch *.dll files to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
+copy the libtorch *.dll files from `libtorch/lib` to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
 
 go to `build/` and run:
 - `cmake . -S ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release -A x64  -DTorch_DIR="..\libtorch\share\cmake\Torch"`
