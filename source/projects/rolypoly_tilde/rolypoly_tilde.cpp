@@ -360,31 +360,38 @@ bool rolypoly::midiFileToModel(double** score, long channels, long vec_size) {
   if (upTo > midifile[1].size()) {
     upTo = midifile[1].size();
   }
-  // fill with midi data: hit, vel, dur, tempo, timesig, pos_in_bar
+  double barStart = 0;
+  double barEnd = 240 / tempo_map[0].second * timesig_map[0].second;
+  // fill with midi data: hit, vel, tempo, timesig, pos_in_bar
   for (int i = startFrom; i < upTo; i++) {
     if (midifile[1][i].isNoteOn()) {
       while ((current_tempo_index < tempo_map.size() - 1) && (midifile[1][i].tick >= tempo_map[current_tempo_index+1].first)) {
-        cout << "tempo change" << endl;
-        cout << tempo_map[current_tempo_index].first << endl;
-        cout << midifile[1][i].tick << endl;
-        cout << tempo_map[current_tempo_index+1].first << endl;
         current_tempo_index++;
+      }      
+      while ((current_timesig_index < timesig_map.size() - 1) && (midifile[1][i].tick >= timesig_map[current_timesig_index+1].first)) {
+        current_timesig_index++;
+      }
+
+      if (midifile[1][i].seconds >= barEnd * 0.999) {
+        barStart = barEnd;
+        barEnd += 240 / tempo_map[current_tempo_index].second * timesig_map[current_timesig_index].second;
+        cout << "==" << barStart << " " << barEnd << endl;
       }
       
-      while ((current_timesig_index < timesig_map.size() - 1) && (midifile[1][i].tick >= timesig_map[current_timesig_index+1].first)) {
-        cout << "timesig change" << endl;
-        cout << timesig_map[current_timesig_index].second << endl;
-        cout << midifile[1][i].tick << endl;
-        cout << timesig_map[current_timesig_index+1].second << endl;
-        current_timesig_index++;
-      }      
+      double pos_in_bar = (midifile[1][i].seconds - barStart) / (barEnd - barStart);
 
       cout << midifile[1][i].seconds
           << ' ' << int(midifile[1][i][1])
           << ' ' << tempo_map[current_tempo_index].second
           << ' ' << timesig_map[current_timesig_index].second
+          << ' ' << pos_in_bar
           << endl;
-      //destination[i] = midifile[1][i][1];
+
+      score[0][i] = midifile[1][i][1]; // hit
+      score[1][i] = midifile[1][i][2]; // vel
+      score[2][i] = tempo_map[current_tempo_index].second; // tempo
+      score[3][i] = timesig_map[current_timesig_index].second; // timesig
+      score[4][i] = pos_in_bar; // pos_in_bar
     }
     //cout << playhead << endl;
     playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
@@ -430,16 +437,20 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       done_reading = false;
       cout << "starting to read" << endl;
     }
-    cout << "reading midi file" << endl;
-    double** score = new double*[m_in_dim];
-    for (int c(0); c < input.channel_count(); c++) {
-      score[c] = new double[vec_size];
-    }
     if (reading_midi) {
+      double** score = new double*[m_in_dim];
+      for (int c(0); c < m_in_dim; c++) {
+        score[c] = new double[vec_size];
+      }
       // copy midiFileToModel output to score
-      done_reading = midiFileToModel(score, input.channel_count(), vec_size);
-      for (int c(0); c < input.channel_count(); c++) {
+      done_reading = midiFileToModel(score, m_in_dim, vec_size);
+      for (int c(0); c < m_in_dim; c++) {
+        //for (int i(0); i < vec_size; i++) {
+        //  score[c][i] = i;
+        //}
         m_in_buffer[c].put(score[c], vec_size);
+        cout << "putting " << c << " into buffer" << endl;
+        cout << score[c][0] << " " << score[c][1] << " " << score[c][2] << endl;
       }
       cout << reading_midi << endl;
       reading_midi ++;

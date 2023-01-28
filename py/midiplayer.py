@@ -17,17 +17,17 @@ class MidiPlayer(nn_tilde.Module):
         self.register_attribute('read', True)
 
         # REGISTER BUFFERS
-        self.register_buffer('X', torch.zeros(1, 10, 1000))
+        self.register_buffer('X', torch.zeros(1, 10, 8192))
         self.register_buffer('time', torch.zeros(1))
 
         # REGISTER METHODS
         self.register_method(
             'forward',
-            in_channels = 10, # timestamp + 9 drum channels
+            in_channels = 5, # hit, vel, tempo, timesig, pos_in_bar
             in_ratio = 1,
             out_channels = 10, # time delay + 9 drum channels
             out_ratio = 1,
-            input_labels = ['timestamp', 'K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd'],
+            input_labels = ['hit', 'vel', 'tempo', 'timesig', 'pos_in_bar'],
             output_labels = ['delay', 'K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd']
         )
 
@@ -58,7 +58,7 @@ class MidiPlayer(nn_tilde.Module):
         if self.read[0]:
             # stack the input onto X
             #self.X = torch.cat((self.X, input), dim=2)
-            self.X = input
+            self.X = torch.cat((input, torch.ones(1, 5, 8192)), dim=1)
             self.set_read(False)
             return self.X
 
@@ -67,10 +67,10 @@ class MidiPlayer(nn_tilde.Module):
             # and the other columns are the drum channels
 
             self.time += 1
-            return input * self.time[0]
+            return torch.cat((input, torch.ones(1, 5, 8192)), dim=1) * self.time[0]
         else:
             # play X
-            return self.X
+            return self.X.reshape(1, 10, 8192)
 
 if __name__ == '__main__':
     # create a new instance of the model
