@@ -47,6 +47,9 @@ public:
   // MIDI RELATED MEMBERS
   MidiFile midifile;
   c74::min::path m_midi_path;
+  long playhead;
+  void midiFileToModel();
+  void playMidiFromModel();
 
 	// BACKEND RELATED MEMBERS
 	Backend m_model;
@@ -87,10 +90,12 @@ public:
   message<> maxclass_setup{
       this, "maxclass_setup",
       [this](const c74::min::atoms &args, const int inlet) -> c74::min::atoms {
-        cout << "rolypoly~ v" << VERSION << " - 2023 rvirmoors.github.io" << endl;
+        cout << "rolypoly~ v" << VERSION << " - 2023 Grigore Burloiu - rvirmoors.github.io" << endl;
         cout << "adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos" << endl;
         return {};
       }};
+
+
 
   message<> anything {this, "anything", "callback for attributes",
     MIN_FUNCTION {
@@ -147,6 +152,16 @@ public:
       }
       return {};
      }};
+
+  message<> start {this, "start", "Start playing the midi file",
+    MIN_FUNCTION {
+      // send "start" message to the backend
+      //m_model.start();
+
+      return {};
+    }
+  };
+
 };
 
 void model_perform(rolypoly *nn_instance) {
@@ -166,7 +181,6 @@ rolypoly::rolypoly(const atoms &args)
 
   m_model = Backend();
 
-
   // CHECK ARGUMENTS
   if (!args.size()) {
     return;
@@ -178,7 +192,7 @@ rolypoly::rolypoly(const atoms &args)
     m_path = path(model_path);
   }
   if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
-    //m_method = std::string(args[1]);
+    //m_method = "read"; //std::string(args[1]);
     auto midi_path = std::string(args[1]);
     if (midi_path.substr(midi_path.length() - 4) != ".mid")
       midi_path = midi_path + ".mid";
@@ -190,18 +204,11 @@ rolypoly::rolypoly(const atoms &args)
     }
     midifile.linkNotePairs();    // first link note-ons to note-offs
     midifile.doTimeAnalysis();   // then create ticks to seconds mapping
-
-    for (int i=0; i<midifile[1].size(); i++) {
-      // if the midi message is a drum hit, then print the tick and the pitch
-      if (midifile[1][i].isNoteOn()) {
-        cout << midifile[1][i].tick
-           << ' ' << int(midifile[1][i][1])
-           << endl;
-      }
-    }
+    playhead = 0;
   }
   if (args.size() > 2) { // THREE ARGUMENTS ARE GIVEN
     m_buffer_size = int(args[2]);
+    midiFileToModel();
   }
 
   // TRY TO LOAD MODEL
@@ -299,6 +306,20 @@ void fill_with_zero(audio_bundle output) {
   }
 }
 
+void rolypoly::midiFileToModel() {
+  for (int i=0; i<midifile[1].size(); i++) {
+    // if the midi message is a drum hit, then print the time and the pitch
+    if (midifile[1][i].isNoteOn()) {
+      cout << midifile[1][i].seconds
+          << ' ' << int(midifile[1][i][1])
+          << endl;
+      //destination[i] = midifile[1][i][1];
+    }
+    cout << playhead << endl;
+    playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
+  }
+}
+
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
   auto dsp_vec_size = output.frame_count();
 
@@ -317,19 +338,33 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
     enable = false;
     fill_with_zero(output);
     return;
-  } 
+  }
 
   perform(input, output);
 }
 
 void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
-
-  // COPY INPUT TO CIRCULAR BUFFER
-  for (int c(0); c < input.channel_count(); c++) {
-    auto in = input.samples(c);
-    m_in_buffer[c].put(in, vec_size);
+  // if the "read" attribute is true, then read the midi file
+  if (m_model.get_attribute_as_string("read") == "true") {
+    cout << "reading midi file" << endl;
+    // copy midiFileToModel output to m_in_buffer
+    double** score = new double*[m_in_dim];
+    for (int c(0); c < input.channel_count(); c++) {
+      score[c] = new double[vec_size];
+      for (int j=0; j<vec_size; j++) {
+        score[c][j] = c+j;
+      }
+      m_in_buffer[c].put(score[c], vec_size);
+    }
+  } else {
+    // COPY INPUT TO CIRCULAR BUFFER
+    for (int c(0); c < input.channel_count(); c++) {
+      auto in = input.samples(c);
+      m_in_buffer[c].put(in, vec_size);
+    }
   }
+
 
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
@@ -358,16 +393,6 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     m_out_buffer[c].get(out, vec_size);
   }
 
-	// constructor
-	//rolypoly() {	}
-
-
-	/// Process one sample
-
-	//samples<2> operator()(sample input, sample position = 0.5) {
-//
-//		return { input};
-//	}
 };
 
 MIN_EXTERNAL(rolypoly);

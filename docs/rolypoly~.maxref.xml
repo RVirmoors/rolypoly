@@ -46,6 +46,11 @@
 
 	<methodlist>
 
+		<method name='start'>
+			<digest>Start playing the midi file </digest>
+			<description>Start playing the midi file </description>
+		</method>
+
 		<method name='anything'>
 			<digest>callback for attributes </digest>
 			<description>callback for attributes </description>
