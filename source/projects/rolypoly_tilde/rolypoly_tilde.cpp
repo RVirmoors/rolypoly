@@ -50,7 +50,14 @@ public:
   int reading_midi;
   bool done_reading;
   long playhead;
-  void midiFileToModel();
+  void parseTimeEvents(MidiFile &midifile);
+  std::vector<std::pair<long, double>> tempo_map;
+  int current_tempo_index;
+  std::vector<std::pair<long, double>> timesig_map;
+  int current_timesig_index;
+
+
+  bool midiFileToModel(double** score, long channels, long vec_size);
   void playMidiFromModel();
 
 	// BACKEND RELATED MEMBERS
@@ -194,7 +201,6 @@ rolypoly::rolypoly(const atoms &args)
     m_path = path(model_path);
   }
   if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
-    //m_method = "read"; //std::string(args[1]);
     auto midi_path = std::string(args[1]);
     if (midi_path.substr(midi_path.length() - 4) != ".mid")
       midi_path = midi_path + ".mid";
@@ -206,11 +212,12 @@ rolypoly::rolypoly(const atoms &args)
     }
     midifile.linkNotePairs();    // first link note-ons to note-offs
     midifile.doTimeAnalysis();   // then create ticks to seconds mapping
-    playhead = 0;
+
+    parseTimeEvents(midifile);
+    playhead = current_tempo_index = current_timesig_index = 0;
   }
   if (args.size() > 2) { // THREE ARGUMENTS ARE GIVEN
     m_buffer_size = int(args[2]);
-    midiFileToModel();
   }
 
   // TRY TO LOAD MODEL
@@ -308,18 +315,84 @@ void fill_with_zero(audio_bundle output) {
   }
 }
 
-void rolypoly::midiFileToModel() {
-  for (int i=0; i<midifile[1].size(); i++) {
-    // if the midi message is a drum hit, then print the time and the pitch
+void rolypoly::parseTimeEvents(MidiFile &midifile) {
+  for (int i=0; i<midifile.getNumEvents(0); i++) {
+    int command = midifile[0][i][0] & 0xf0;
+    if (midifile[0][i][0] == 0xff && midifile[0][i][1] == 0x51) {
+      // tempo change
+      int microseconds = (midifile[0][i][3] << 16) |
+                          (midifile[0][i][4] << 8) |
+                          midifile[0][i][5];
+      double bpm = 60.0 / microseconds * 1000000.0;
+      cout << "Tempo change at tick " << midifile[0][i].tick
+           << " to " << bpm << " beats per minute" << endl;
+      tempo_map.push_back(std::make_pair(midifile[0][i].tick, bpm));
+    }
+    if ((midifile[0][i][0] & 0x0f) == 0x09) {
+      continue;
+    }
+    if (command == 0xf0) {
+      command = midifile[0][i][0];
+    } 
+    if (command == 0xff && midifile[0][i][1] == 0x58) {
+      // time signature change
+      int numerator = midifile[0][i][3];
+      int denominator = midifile[0][i][2];
+      cout << "Time signature change at tick " << midifile[0][i].tick
+            << " to " << numerator << "/" << denominator << endl;
+      timesig_map.push_back(std::make_pair(midifile[0][i].tick, (double)numerator / denominator));
+    }
+  }
+}
+
+bool rolypoly::midiFileToModel(double** score, long channels, long vec_size) {
+  int startFrom = (reading_midi - 1) * vec_size;
+  int upTo = reading_midi * vec_size;
+  // if done, then fill with zeros
+  if (startFrom > midifile[1].size()) {
+    for (int c = 0; c < channels; c++) {
+      for (int i = 0; i < vec_size; i++) {
+        score[c][i] = 0;
+      }
+    }
+    return true; // done
+  }
+  if (upTo > midifile[1].size()) {
+    upTo = midifile[1].size();
+  }
+  // fill with midi data: hit, vel, dur, tempo, timesig, pos_in_bar
+  for (int i = startFrom; i < upTo; i++) {
     if (midifile[1][i].isNoteOn()) {
+      while ((current_tempo_index < tempo_map.size() - 1) && (midifile[1][i].tick >= tempo_map[current_tempo_index+1].first)) {
+        cout << "tempo change" << endl;
+        cout << tempo_map[current_tempo_index].first << endl;
+        cout << midifile[1][i].tick << endl;
+        cout << tempo_map[current_tempo_index+1].first << endl;
+        current_tempo_index++;
+      }
+      
+      while ((current_timesig_index < timesig_map.size() - 1) && (midifile[1][i].tick >= timesig_map[current_timesig_index+1].first)) {
+        cout << "timesig change" << endl;
+        cout << timesig_map[current_timesig_index].second << endl;
+        cout << midifile[1][i].tick << endl;
+        cout << timesig_map[current_timesig_index+1].second << endl;
+        current_timesig_index++;
+      }      
+
       cout << midifile[1][i].seconds
           << ' ' << int(midifile[1][i][1])
+          << ' ' << tempo_map[current_tempo_index].second
+          << ' ' << timesig_map[current_timesig_index].second
           << endl;
       //destination[i] = midifile[1][i][1];
     }
-    cout << playhead << endl;
+    //cout << playhead << endl;
     playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
   }
+  if (upTo >= midifile[1].size()) {
+    return true; // done
+  }
+  return false; // not done yet
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
@@ -353,26 +426,30 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       // if the buffer isn't empty, reset it
       for (int c(0); c < input.channel_count(); c++)
         m_in_buffer[c].reset();
-        
       reading_midi ++;
       done_reading = false;
       cout << "starting to read" << endl;
     }
     cout << "reading midi file" << endl;
-
+    double** score = new double*[m_in_dim];
+    for (int c(0); c < input.channel_count(); c++) {
+      score[c] = new double[vec_size];
+    }
     if (reading_midi) {
-      // copy midiFileToModel output to m_in_buffer
-      double** score = new double*[m_in_dim];
+      // copy midiFileToModel output to score
+      done_reading = midiFileToModel(score, input.channel_count(), vec_size);
       for (int c(0); c < input.channel_count(); c++) {
-        score[c] = new double[vec_size];
-        for (int j = 0; j < vec_size; j++) {
-          score[c][j] = reading_midi*vec_size + j;
-        }
         m_in_buffer[c].put(score[c], vec_size);
       }
       cout << reading_midi << endl;
       reading_midi ++;
-    }    
+
+      if (reading_midi == 4) {
+        cout << "done reading" << endl;
+        reading_midi = 0;
+        done_reading = true;
+      }
+    }  
   } else {
     // COPY INPUT TO CIRCULAR BUFFER
     for (int c(0); c < input.channel_count(); c++) {
@@ -383,16 +460,6 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
 
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
     cout<<"buffer is full"<<endl;
-
-    if (reading_midi) {
-      cout << "done reading" << endl;
-      reading_midi = 0;
-      std::vector<std::string> read_attr;
-      read_attr.push_back("False");
-      //m_model.set_attribute("read", read_attr);
-    }
-
-
 
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {
