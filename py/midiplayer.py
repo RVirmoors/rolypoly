@@ -56,7 +56,8 @@ class MidiPlayer(nn_tilde.Module):
     @torch.jit.export
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if self.read[0]:
-            # record the input
+            # stack the input onto X
+            #self.X = torch.cat((self.X, input), dim=2)
             self.X = input
             self.set_read(False)
             return self.X
@@ -68,7 +69,7 @@ class MidiPlayer(nn_tilde.Module):
             self.time += 1
             return input * self.time[0]
         else:
-            # record the input
+            # play X
             return self.X
 
 if __name__ == '__main__':

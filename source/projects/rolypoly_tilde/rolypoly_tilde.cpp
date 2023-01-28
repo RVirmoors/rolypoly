@@ -47,6 +47,8 @@ public:
   // MIDI RELATED MEMBERS
   MidiFile midifile;
   c74::min::path m_midi_path;
+  int reading_midi;
+  bool done_reading;
   long playhead;
   void midiFileToModel();
   void playMidiFromModel();
@@ -347,16 +349,30 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
   // if the "read" attribute is true, then read the midi file
   if (m_model.get_attribute_as_string("read") == "true") {
-    cout << "reading midi file" << endl;
-    // copy midiFileToModel output to m_in_buffer
-    double** score = new double*[m_in_dim];
-    for (int c(0); c < input.channel_count(); c++) {
-      score[c] = new double[vec_size];
-      for (int j=0; j<vec_size; j++) {
-        score[c][j] = c+j;
-      }
-      m_in_buffer[c].put(score[c], vec_size);
+    if(!m_in_buffer[0].empty() && !reading_midi && !done_reading) {
+      // if the buffer isn't empty, reset it
+      for (int c(0); c < input.channel_count(); c++)
+        m_in_buffer[c].reset();
+        
+      reading_midi ++;
+      done_reading = false;
+      cout << "starting to read" << endl;
     }
+    cout << "reading midi file" << endl;
+
+    if (reading_midi) {
+      // copy midiFileToModel output to m_in_buffer
+      double** score = new double*[m_in_dim];
+      for (int c(0); c < input.channel_count(); c++) {
+        score[c] = new double[vec_size];
+        for (int j = 0; j < vec_size; j++) {
+          score[c][j] = reading_midi*vec_size + j;
+        }
+        m_in_buffer[c].put(score[c], vec_size);
+      }
+      cout << reading_midi << endl;
+      reading_midi ++;
+    }    
   } else {
     // COPY INPUT TO CIRCULAR BUFFER
     for (int c(0); c < input.channel_count(); c++) {
@@ -365,8 +381,19 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     }
   }
 
-
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
+    cout<<"buffer is full"<<endl;
+
+    if (reading_midi) {
+      cout << "done reading" << endl;
+      reading_midi = 0;
+      std::vector<std::string> read_attr;
+      read_attr.push_back("False");
+      //m_model.set_attribute("read", read_attr);
+    }
+
+
+
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {
       m_compute_thread->join();
