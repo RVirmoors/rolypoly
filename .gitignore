@@ -1,10 +1,10 @@
 libtorch/
 .vs/
 .vscode/
-py/venv/
+_old/py/venv/
 py/data/groove
-py/runs/
-py/models/last.pt
+_old/py/runs/
+_old/py/models/last.pt
 *.wav
 *.reapeaks
 
