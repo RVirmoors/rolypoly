@@ -15,9 +15,10 @@ class MidiPlayer(nn_tilde.Module):
         # REGISTER ATTRIBUTES
         self.register_attribute('play', False)
         self.register_attribute('read', True)
+        self.register_attribute('Xattr', torch.ones(1, 10, 8192) * 66)
 
         # REGISTER BUFFERS
-        self.register_buffer('X', torch.zeros(1, 10, 8192))
+        self.register_buffer('X', torch.zeros(1, 10, 8192), persistent=False)
         self.register_buffer('time', torch.zeros(1))
 
         # REGISTER METHODS
@@ -41,6 +42,10 @@ class MidiPlayer(nn_tilde.Module):
     def get_read(self) -> bool:
         return self.read[0]
 
+    @torch.jit.export
+    def get_Xattr(self) -> torch.Tensor:
+        return self.Xattr[0]
+
     # defining attribute setters
     @torch.jit.export
     def set_play(self, value: bool):
@@ -52,6 +57,11 @@ class MidiPlayer(nn_tilde.Module):
         self.read = (value,)
         return 0
     
+    @torch.jit.export
+    def set_Xattr(self, value: torch.Tensor):
+        self.Xattr = (value,)
+        return 0
+
     # definition of the main method
     @torch.jit.export
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -63,17 +73,12 @@ class MidiPlayer(nn_tilde.Module):
             return self.X
 
         if self.play[0]:
-            # parse X, where the first column is the timestamp
-            # and the other columns are the drum channels
-
             self.time += 1
             return torch.cat((input, input), dim=1) * self.time[0]
         else:
             # play X
-            return self.X
+            return torch.cat((input, input), dim=1) * self.Xattr[0][0, 0, 0]
 
 if __name__ == '__main__':
-    # create a new instance of the model
     model = MidiPlayer()
-    # save the module
     model.export_to_ts('../help/midiplayer.ts')

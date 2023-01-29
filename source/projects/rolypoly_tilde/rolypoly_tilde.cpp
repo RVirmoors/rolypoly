@@ -11,6 +11,8 @@
 // nn~
 #include "c74_min.h"
 #include "torch/torch.h"
+#include <torch/script.h>
+#include <torch/csrc/jit/api/method.h>
 #include "../../../nn_tilde/src/backend/backend.h"
 #include "../../../nn_tilde/src/frontend/maxmsp/shared/circular_buffer.h"
 #include <string>
@@ -482,6 +484,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       cout << "done reading" << endl;
       reading_midi = 0;
     }
+    // get a method from the torch model
+    //torch::jit::Method setX = m_model.get_method("set_Xattr");
+
 
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {
