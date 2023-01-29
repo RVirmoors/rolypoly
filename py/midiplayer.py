@@ -58,7 +58,7 @@ class MidiPlayer(nn_tilde.Module):
         if self.read[0]:
             # stack the input onto X
             #self.X = torch.cat((self.X, input), dim=2)
-            self.X = torch.cat((input, torch.ones(1, 5, 8192)), dim=1)
+            self.X = torch.cat((input, input), dim=1)
             self.set_read(False)
             return self.X
 
@@ -67,10 +67,10 @@ class MidiPlayer(nn_tilde.Module):
             # and the other columns are the drum channels
 
             self.time += 1
-            return torch.cat((input, torch.ones(1, 5, 8192)), dim=1) * self.time[0]
+            return torch.cat((input, input), dim=1) * self.time[0]
         else:
             # play X
-            return self.X.reshape(1, 10, 8192)
+            return self.X
 
 if __name__ == '__main__':
     # create a new instance of the model
