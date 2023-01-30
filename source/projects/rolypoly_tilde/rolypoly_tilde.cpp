@@ -375,8 +375,8 @@ bool rolypoly::midiNotesToModel(long vec_size) {
   // fill with midi data: hit, vel, tempo, timesig, pos_in_bar
 
   int counter = 0;
+  int i = startFrom;
   while (counter < vec_size) {
-    int i = startFrom + counter;
     if (i >= midifile[1].size()) {
       break;
     }
@@ -408,15 +408,15 @@ bool rolypoly::midiNotesToModel(long vec_size) {
         << ' ' << pos_in_bar
         << endl;
 
+
     score[0][counter] = midifile[1][i][1]; // hit
     score[1][counter] = midifile[1][i][2]; // vel
     score[2][counter] = tempo_map[current_tempo_index].second; // tempo
     score[3][counter] = timesig_map[current_timesig_index].second; // timesig
     score[4][counter] = pos_in_bar; // pos_in_bar
     score[5][counter] = midifile[1][i].seconds * 1000.; // ms
-    cout << "time: " << score[5][counter] << endl;
-    
     counter++; 
+    i++;
   }
   int upTo = reading_midi * vec_size + skip;
   if (upTo >= midifile[1].size()) {
@@ -449,8 +449,11 @@ void rolypoly::playMidiIntoModel(long vec_size) {
     }
   }
   
-  if (playhead >= midifile[1].back().seconds) {
+  if (playhead >= midifile[1].back().seconds * 1000.) {
     cout << "reached end of midifile" << endl;
+    std::vector<std::string> attribute;
+    attribute.push_back(false);
+    m_model.set_attribute("play", attribute);
     return;
   }
 }
@@ -545,26 +548,25 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     double* new_tau = new double[vec_size];
     m_out_buffer[0].get(new_tau, vec_size); // tau is the first channel
     while (tau.size() <= t) {
-      tau.push_back(new_tau[0]); // all notes at the same timestep have the same tau
-      cout << "new tau: " << tau[tau.size() - 1] << " " 
-        << tau.size() << endl;
+      //tau.push_back(new_tau[0]); // all notes at a timestep have the same tau
+      tau.push_back(0.1);
+      cout << "new tau: " << tau[tau.size() - 1] << endl;
     }
     if (playhead >= score[TIME_SEC][t] + tau[t]) {
       // when the time comes, play the microtime-adjusted note
       cout << "playing note " << t << endl;
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
-        m_out_buffer[c].get(out, vec_size);
+        double* hit = new double[vec_size];
+        out[0] = score[c%SCORE_DIM][t];
+        //m_out_buffer[c].get(out, vec_size);
       }
+      t++;
     } else {
       // if the time hasn't come yet, do nothing
       fill_with_zero(output);
       return;
     }
-
-  } else {
-    // if the "play" attribute is false, do nothing
-    fill_with_zero(output);
   }
 };
 
