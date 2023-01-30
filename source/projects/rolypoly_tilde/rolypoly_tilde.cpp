@@ -351,7 +351,7 @@ bool rolypoly::midiNotesToModel(double** score, long channels, long vec_size) {
   int startFrom = (reading_midi - 1) * vec_size + skip;
   // if done, then fill with zeros
   if (startFrom >= midifile[1].size()) {
-    cout << "DONE" << endl;
+    cout << "reached end of midifile" << endl;
     for (int c = 0; c < channels; c++) {
       for (int i = 0; i < vec_size; i++) {
         score[c][i] = 0;
@@ -407,8 +407,6 @@ bool rolypoly::midiNotesToModel(double** score, long channels, long vec_size) {
     //cout << playhead << endl;
     playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
   }
-  cout << "note copied at return: " << score[0][0] << endl;
-
   int upTo = reading_midi * vec_size + skip;
   if (upTo >= midifile[1].size()) {
     return true; // done
@@ -444,13 +442,14 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   // if the "read" attribute is true, then read the midi file
   if (m_model.get_attribute_as_string("read") == "true") {
     if(!m_in_buffer[0].empty() && !reading_midi && !done_reading) {
+      cout << "resettin" << endl;
       // if the buffer isn't empty, reset it
       for (int c(0); c < input.channel_count(); c++)
         m_in_buffer[c].reset();
-      reading_midi ++;
       done_reading = false;
       cout << "starting to read" << endl;
     }
+    reading_midi ++;
     if (reading_midi) {
       double** score = new double*[m_in_dim];
       for (int c(0); c < m_in_dim; c++) {
@@ -458,17 +457,13 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       }
       // copy midiNotesToModel output to score
       done_reading = midiNotesToModel(score, m_in_dim, vec_size);
-      for (int c(0); c < m_in_dim; c++) {
-        //for (int i(0); i < vec_size; i++) {
-        //  score[c][i] = i;
-        //}
-        
+      for (int c(0); c < m_in_dim; c++) {        
         m_in_buffer[c].put(score[c], vec_size);
         cout << "putting " << c << " into buffer" << endl;
         cout << score[c][0] << " " << score[c][1] << " " << score[c][2] << endl;
       }
-      cout << reading_midi << endl;
-      reading_midi ++;
+      cout << "input vectors read: " << reading_midi << endl;
+      
     }  
   } else {
     // COPY INPUT TO CIRCULAR BUFFER
@@ -484,9 +479,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       cout << "done reading" << endl;
       reading_midi = 0;
     }
-    // get a method from the torch model
-    //torch::jit::Method setX = m_model.get_method("set_Xattr");
-
+    // TODO: what if the buffer is full of midi notes but not done_reading? Does reading several buffers work?
 
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {

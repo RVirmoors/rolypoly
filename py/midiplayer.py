@@ -15,7 +15,6 @@ class MidiPlayer(nn_tilde.Module):
         # REGISTER ATTRIBUTES
         self.register_attribute('play', False)
         self.register_attribute('read', True)
-        self.register_attribute('Xattr', torch.ones(1, 10, 8192) * 66)
 
         # REGISTER BUFFERS
         self.register_buffer('X', torch.zeros(1, 10, 8192), persistent=False)
@@ -42,10 +41,6 @@ class MidiPlayer(nn_tilde.Module):
     def get_read(self) -> bool:
         return self.read[0]
 
-    @torch.jit.export
-    def get_Xattr(self) -> torch.Tensor:
-        return self.Xattr[0]
-
     # defining attribute setters
     @torch.jit.export
     def set_play(self, value: bool):
@@ -55,11 +50,6 @@ class MidiPlayer(nn_tilde.Module):
     @torch.jit.export
     def set_read(self, value: bool):
         self.read = (value,)
-        return 0
-    
-    @torch.jit.export
-    def set_Xattr(self, value: torch.Tensor):
-        self.Xattr = (value,)
         return 0
 
     # definition of the main method
@@ -77,7 +67,7 @@ class MidiPlayer(nn_tilde.Module):
             return torch.cat((input, input), dim=1) * self.time[0]
         else:
             # play X
-            return torch.cat((input, input), dim=1) * self.Xattr[0][0, 0, 0]
+            return self.X
 
 if __name__ == '__main__':
     model = MidiPlayer()
