@@ -149,18 +149,6 @@
 			}
 , 			{
 				"box" : 				{
-					"id" : "obj-19",
-					"maxclass" : "message",
-					"numinlets" : 2,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 266.0, 72.0, 54.0, 22.0 ],
-					"text" : "get Xattr"
-				}
-
-			}
-, 			{
-				"box" : 				{
 					"id" : "obj-14",
 					"maxclass" : "message",
 					"numinlets" : 2,
@@ -355,8 +343,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 10,
 					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
-					"patching_rect" : [ 111.333332598209381, 186.666667640209198, 172.0, 22.0 ],
-					"text" : "rolypoly~ midiplayer baron 512"
+					"patching_rect" : [ 111.333332598209381, 186.666667640209198, 137.0, 22.0 ],
+					"text" : "rolypoly~ roly baron 512"
 				}
 
 			}
@@ -450,13 +438,6 @@
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
 					"source" : [ "obj-17", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-1", 0 ],
-					"source" : [ "obj-19", 0 ]
 				}
 
 			}

@@ -8,27 +8,29 @@ from typing import List, Tuple
 import data # data helper methods
 from constants import ROLAND_DRUM_PITCH_CLASSES
 
-class MidiPlayer(nn_tilde.Module):
+class ExportRoly(nn_tilde.Module):
 
     def __init__(self):
         super().__init__()
         # REGISTER ATTRIBUTES
+        # read: load a new drum track
+        self.register_attribute('read', False)
+        # play: receive X(t), generate Y(t) and send to host
         self.register_attribute('play', False)
-        self.register_attribute('read', True)
 
         # REGISTER BUFFERS
         self.register_buffer('X', torch.zeros(1, 10, 8192), persistent=False)
-        self.register_buffer('time', torch.zeros(1))
+        self.register_buffer('t', torch.zeros(1))
 
         # REGISTER METHODS
         self.register_method(
             'forward',
-            in_channels = 5, # hit, vel, tempo, timesig, pos_in_bar
+            in_channels = 5, # hit, vel, tempo, tsig, pos_in_bar
             in_ratio = 1,
-            out_channels = 10, # time delay + 9 drum channels
+            out_channels = 10, # tau(delay) + 9 drum velocities
             out_ratio = 1,
-            input_labels = ['hit', 'vel', 'tempo', 'timesig', 'pos_in_bar'],
-            output_labels = ['delay', 'K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd']
+            input_labels = ['hit', 'vel', 'tempo', 'tsig', 'pos_in_bar'],
+            output_labels = ['tau', 'K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd']
         )
 
     # defining attribute getters
@@ -63,12 +65,12 @@ class MidiPlayer(nn_tilde.Module):
             return self.X
 
         if self.play[0]:
-            self.time += 1
-            return torch.cat((input, input), dim=1) * self.time[0]
+            self.t += 1
+            return torch.cat((input, input), dim=1) * self.t[0]
         else:
             # play X
             return self.X
 
 if __name__ == '__main__':
-    model = MidiPlayer()
-    model.export_to_ts('../help/midiplayer.ts')
+    model = ExportRoly()
+    model.export_to_ts('../help/roly.ts')
