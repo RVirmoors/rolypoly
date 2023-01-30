@@ -265,17 +265,11 @@ rolypoly::rolypoly(const atoms &args)
   m_use_thread = false;
 #endif
 
-  // CREATE INLETS, OUTLETS and BUFFERS
+  // CREATE INLET, OUTLETS and BUFFERS
+  m_inlets.push_back(std::make_unique<inlet<>>(
+    this, "(signal) musician input", "signal"));
   m_in_buffer = std::make_unique<circular_buffer<double, float>[]>(m_in_dim);
   for (int i(0); i < m_in_dim; i++) {
-    std::string input_label = "";
-    try {
-      input_label = m_model.get_model().attr(m_method + "_input_labels").toList().get(i).toStringRef();
-    } catch (...) {
-      input_label = "(signal) model input " + std::to_string(i);
-    }
-    m_inlets.push_back(std::make_unique<inlet<>>(
-        this, input_label, "signal"));
     m_in_buffer[i].initialize(m_buffer_size);
     m_in_model.push_back(std::make_unique<float[]>(m_buffer_size));
   }
