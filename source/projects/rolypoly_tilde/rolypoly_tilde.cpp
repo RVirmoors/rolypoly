@@ -58,6 +58,8 @@ public:
   long playhead;
   long t; // next timestep to be played
   std::vector<double> tau; // microdelay for each timestep
+  bool done_playing;
+
   std::vector<std::pair<long, double>> tempo_map;
   int current_tempo_index;
   std::vector<std::pair<long, double>> timesig_map;
@@ -426,7 +428,18 @@ bool rolypoly::midiNotesToModel(long vec_size) {
 }
 
 void rolypoly::playMidiIntoModel(long vec_size) {
-  cout << playhead << endl;
+  //cout << playhead << endl;
+  if (playhead >= midifile[1].back().seconds * 1000.) {
+    cout << "reached end of midifile" << endl;
+    // SETTING THE ATTRIBUTE DIRECTLY CRASHES MAX :( 
+    /*
+    std::vector<std::string> attribute;
+    attribute.push_back(false);
+    m_model.set_attribute("play", attribute);
+    return;
+    */
+    done_playing = true; // TODO: change done_playing back to false in start()
+  }
   playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());  
   // if tau[t] doesn't exist yet, then send the next timestep
   if (tau.size() <= t && playhead >= score[TIME_SEC][t]) {
@@ -447,14 +460,6 @@ void rolypoly::playMidiIntoModel(long vec_size) {
       }
       m_in_buffer[c].put(in, vec_size);
     }
-  }
-  
-  if (playhead >= midifile[1].back().seconds * 1000.) {
-    cout << "reached end of midifile" << endl;
-    std::vector<std::string> attribute;
-    attribute.push_back(false);
-    m_model.set_attribute("play", attribute);
-    return;
   }
 }
 
@@ -503,7 +508,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       cout << "input vectors read: " << reading_midi << endl;
       
     }  
-  } else if (m_model.get_attribute_as_string("play") == "true") {
+  } else if (m_model.get_attribute_as_string("play") == "true" && !done_playing) {
     // if the "play" attribute is true, send midi notes
     // to the model, and later get the model output
     playMidiIntoModel(vec_size);
@@ -518,6 +523,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (done_reading && reading_midi) {
       cout << "done reading" << endl;
       reading_midi = 0;
+      done_playing = false;
     }
     // TODO: what if the buffer is full of midi notes but not done_reading? Does reading several buffers work?
 
@@ -542,7 +548,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   }
 
   // OUTPUT
-  if (m_model.get_attribute_as_string("play") == "true") {
+  if (m_model.get_attribute_as_string("play") == "true" && !done_playing) {
     // if the "play" attribute is true, get the model output
     // and save it as a new tau value
     double* new_tau = new double[vec_size];
