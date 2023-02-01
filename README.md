@@ -8,28 +8,29 @@ work underway (Jan-Feb '22) on porting to ircam's nn~ for real-time use in Max!
 
 ## training your own model
 
-clone into `Max 8/Packages`, fetching submodules: `git clone https://github.com/RVirmoors/rolypoly --recursive`
+clone into `Max 8/Packages`, fetching submodules: 
+- `git clone https://github.com/RVirmoors/rolypoly --recursive`
 
-(optional but recommended) create a new virtual environment
+(optional but recommended) create a new virtual environment:
 - `python -m venv venv`
 
 you need the following Python modules:
-- pytorch
+- pytorch (I use `ltt` to get it, but you can go [the clasic way](https://pytorch.org/get-started/locally/)):
 ```
 python -m pip install light-the-torch
 ltt install torch
 ```
-- nn_tilde
+- nn_tilde:
 `pip install nn_tilde`
-- others
+- others:
 `pip install numpy`
 
-make sure you're in the `py` folder
+make sure you're in the `py` folder:
 - `cd py`
 
 and run the train script to train on your data (coming soon)
 
-and then export it to a `.ts` file which `rolypoly~` can use in Max
+and then export it to a `.ts` file which `rolypoly~` can use in Max:
 - `python export.py`
 
 
