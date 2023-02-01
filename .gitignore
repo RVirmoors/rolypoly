@@ -3,6 +3,8 @@ libtorch/
 .vscode/
 _old/py/venv/
 py/data/groove
+py/runs
+py/venv
 _old/py/runs/
 _old/py/models/last.pt
 *.wav
