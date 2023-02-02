@@ -83,10 +83,7 @@ class ExportRoly(nn_tilde.Module):
         if self.play[0]:
             x = self.X.squeeze(0) # a single batch
             y = self.pretrained(x).unsqueeze(0) # a single batch
-            # output is tau + 9 drum velocities            
-            #return self.X[:, :10, :]
-            # tall_tau = tau * torch.ones(self.X.shape[0], 1, m_buf_size)
-            #return torch.cat((tall_tau, self.X[:, 1:10, :]), dim=1)
+            # output is tau + 9 drum velocities
             return y
         else:       
             return self.X
