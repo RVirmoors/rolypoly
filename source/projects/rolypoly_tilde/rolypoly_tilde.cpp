@@ -38,7 +38,7 @@ public:
 	MIN_DESCRIPTION {"Expressive Drum Machine: read MIDI file, listen to audio, and output drums"};
 	MIN_TAGS {"drums, sync, deep learning"};
 	MIN_AUTHOR {"Grigore Burloiu // rvirmoors"};
-	MIN_RELATED {"nn~, antescofo~"};
+	MIN_RELATED {"nn~, flucoma~"};
 
 	// INLETS OUTLETS
 	std::vector<std::unique_ptr<inlet<>>> m_inlets;
@@ -58,7 +58,6 @@ public:
   long playhead;
   long t; // next timestep to be played
   std::vector<double> tau; // microdelay for each timestep
-  bool done_playing;
 
   std::vector<std::pair<long, double>> tempo_map;
   int current_tempo_index;
@@ -171,6 +170,18 @@ public:
       }
       return {};
      }};
+
+  std::string attr;
+  std::string attr_value;
+  queue<> set_attr { this,
+      MIN_FUNCTION {
+        // send low-priority messages to the python model
+        std::vector<std::string> v;
+        v.push_back(attr_value);
+        m_model.set_attribute(attr, v);
+        return {};
+      }
+  };
 
   message<> start {this, "start", "Start playing the midi file",
     MIN_FUNCTION {
@@ -410,7 +421,6 @@ bool rolypoly::midiNotesToModel(long vec_size) {
         << ' ' << pos_in_bar
         << endl;
 
-
     score[0][counter] = midifile[1][i][1]; // hit
     score[1][counter] = midifile[1][i][2]; // vel
     score[2][counter] = tempo_map[current_tempo_index].second; // tempo
@@ -431,14 +441,7 @@ void rolypoly::playMidiIntoModel(long vec_size) {
   //cout << playhead << endl;
   if (playhead >= midifile[1].back().seconds * 1000.) {
     cout << "reached end of midifile" << endl;
-    // SETTING THE ATTRIBUTE DIRECTLY CRASHES MAX :( 
-    /*
-    std::vector<std::string> attribute;
-    attribute.push_back(false);
-    m_model.set_attribute("play", attribute);
-    return;
-    */
-    done_playing = true; // TODO: change done_playing back to false in start()
+    attr = "play"; attr_value = "false"; set_attr();
   }
   playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());  
   // if tau[t] doesn't exist yet, then send the next timestep
@@ -499,16 +502,15 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       cout << "starting to read" << endl;
     }
     reading_midi ++;
-    if (reading_midi) {
+    if (reading_midi && !done_reading) {
       // copy midiNotesToModel output to score
       done_reading = midiNotesToModel(vec_size);
       for (int c(0); c < m_in_dim; c++) {        
         m_in_buffer[c].put(score[c], vec_size);
       }
-      cout << "input vectors read: " << reading_midi << endl;
-      
+      cout << "input vectors read: " << reading_midi << endl;  
     }  
-  } else if (m_model.get_attribute_as_string("play") == "true" && !done_playing) {
+  } else if (m_model.get_attribute_as_string("play") == "true") {
     // if the "play" attribute is true, send midi notes
     // to the model, and later get the model output
     playMidiIntoModel(vec_size);
@@ -523,7 +525,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (done_reading && reading_midi) {
       cout << "done reading" << endl;
       reading_midi = 0;
-      done_playing = false;
+      attr = "read"; attr_value = "false"; set_attr();
     }
     // TODO: what if the buffer is full of midi notes but not done_reading? Does reading several buffers work?
 
@@ -548,7 +550,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   }
 
   // OUTPUT
-  if (m_model.get_attribute_as_string("play") == "true" && !done_playing) {
+  if (m_model.get_attribute_as_string("play") == "true") {
     // if the "play" attribute is true, get the model output
     // and save it as a new tau value
     double* new_tau = new double[vec_size];
@@ -558,14 +560,15 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       tau.push_back(0.1);
       cout << "new tau: " << tau[tau.size() - 1] << endl;
     }
-    if (playhead >= score[TIME_SEC][t] + tau[t]) {
+    cout << "play " << playhead << " - " << score[TIME_SEC][t] << endl;
+    double buf_ms = lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
+    if (playhead >= score[TIME_SEC][t] + tau[t] - buf_ms) {
       // when the time comes, play the microtime-adjusted note
       cout << "playing note " << t << endl;
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
         double* hit = new double[vec_size];
         out[0] = score[c%SCORE_DIM][t];
-        //m_out_buffer[c].get(out, vec_size);
       }
       t++;
     } else {

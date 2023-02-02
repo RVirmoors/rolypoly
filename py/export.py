@@ -1,12 +1,16 @@
-## nn~ module that receives parsed drum info and plays the drum track
-# 2023 rvirmoors
+"""
+Rolypoly Python implementation
+2023 rvirmoors
+
+export the model to a .ts file, loadable by the rolypoly~ Max object
+"""
 
 import torch, torch.nn as nn
 import nn_tilde
 from typing import List, Tuple
 
 import data # data helper methods
-from constants import ROLAND_DRUM_PITCH_CLASSES
+import model
 
 class ExportRoly(nn_tilde.Module):
 
@@ -17,6 +21,8 @@ class ExportRoly(nn_tilde.Module):
         self.register_attribute('read', False)
         # play: receive X(t), generate Y(t) and send to host
         self.register_attribute('play', False)
+        # generate: trigger notes irrespective of score
+        self.register_attribute('generate', False)
 
         # REGISTER BUFFERS
         self.register_buffer('X', torch.zeros(1, 10, 8192), persistent=False)
@@ -43,6 +49,10 @@ class ExportRoly(nn_tilde.Module):
     def get_read(self) -> bool:
         return self.read[0]
 
+    @torch.jit.export
+    def get_generate(self) -> bool:
+        return self.generate[0]
+
     # defining attribute setters
     @torch.jit.export
     def set_play(self, value: bool):
@@ -54,21 +64,22 @@ class ExportRoly(nn_tilde.Module):
         self.read = (value,)
         return 0
 
+    @torch.jit.export
+    def set_generate(self, value: bool):
+        self.generate = (value,)
+        return 0
+
     # definition of the main method
     @torch.jit.export
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if self.read[0]:
-            # stack the input onto X
-            #self.X = torch.cat((self.X, input), dim=2)
-            self.X = torch.cat((input, input), dim=1)
-            self.set_read(False)
-            return self.X
+            self.X = data.readScore(input)
+            return self.X[:,:10,:]
 
         if self.play[0]:
             self.t += 1
             return torch.cat((input, input), dim=1) * self.t[0]
-        else:
-            # play X
+        else:           
             return self.X
 
 if __name__ == '__main__':

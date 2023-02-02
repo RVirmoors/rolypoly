@@ -20,3 +20,6 @@ ROLAND_DRUM_PITCH_CLASSES = [
     # ride cymbal
     [51, 53, 59]
 ]
+
+X_DECODER_CHANNELS = 13 # 9 drum channel velocities + bpm, tsig, pos_in_bar, tau
+X_ENCODER_CHANNELS = 5 # guitar velocity + bpm, tsig, pos_in_bar, tau_guitar
