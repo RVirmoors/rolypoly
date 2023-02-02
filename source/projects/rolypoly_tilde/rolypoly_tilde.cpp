@@ -288,6 +288,11 @@ rolypoly::rolypoly(const atoms &args)
     m_buffer_size = power_ceil(m_buffer_size);
   }
 
+  if (m_buffer_size < 16) {
+    cerr << "buffer size too small, should be at least 16" << endl;
+    m_buffer_size = 16;
+  }
+
   // Calling forward in a thread causes memory leak in windows.
   // See https://github.com/pytorch/pytorch/issues/24237
 #ifdef _WIN32
@@ -525,12 +530,6 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
 
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
     cout<<"buffer is full"<<endl;
-    if (done_reading && reading_midi) {
-      cout << "done reading" << endl;
-      reading_midi = 0;
-      attr = "read"; attr_value = "false"; set_attr();
-    }
-    // TODO: what if the buffer is full of midi notes but not done_reading? Does reading several buffers work?
 
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {
@@ -550,6 +549,13 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
 
     if (m_use_thread) // PROCESS DATA LATER
       m_compute_thread = std::make_unique<std::thread>(model_perform, this);
+
+    if (done_reading && reading_midi) {
+      cout << "done reading" << endl;
+      reading_midi = 0;
+      attr = "read"; attr_value = "false"; set_attr();
+    }
+    // TODO: what if the buffer is full of midi notes but not done_reading? Does reading several buffers work?
   }
   /*
   // OUTPUT

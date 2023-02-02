@@ -14,8 +14,10 @@ import model
 
 class ExportRoly(nn_tilde.Module):
 
-    def __init__(self):
+    def __init__(self, pretrained: model.Basic):
         super().__init__()
+        self.pretrained = pretrained
+
         # REGISTER ATTRIBUTES
         # read: load a new drum track
         self.register_attribute('read', False)
@@ -25,8 +27,7 @@ class ExportRoly(nn_tilde.Module):
         self.register_attribute('generate', False)
 
         # REGISTER BUFFERS
-        self.register_buffer('X', torch.zeros(1, 10, 512), persistent=False)
-        self.register_buffer('t', torch.zeros(1))
+        self.register_buffer('X', torch.ones(1, 10, 512))
 
         # REGISTER METHODS
         self.register_method(
@@ -80,16 +81,17 @@ class ExportRoly(nn_tilde.Module):
             return self.X[:,:10,:]
 
         if self.play[0]:
-            tau = 0.66
-            # output is tau + 9 drum velocities
-            #return torch.cat((input, input), dim=1) * tau
-            #return torch.ones(1, 10, m_buf_size) * tau
-            return self.X[:, :10, :m_buf_size]
-            #return torch.ones(self.X.shape[0], 10, 8192) * tau
-            #return torch.cat((tau * torch.ones(self.X.shape[0], 1, 8192), self.X[:, 1:10, :]), dim=1)
+            x = self.X.squeeze(0) # a single batch
+            y = self.pretrained(x).unsqueeze(0) # a single batch
+            # output is tau + 9 drum velocities            
+            #return self.X[:, :10, :]
+            # tall_tau = tau * torch.ones(self.X.shape[0], 1, m_buf_size)
+            #return torch.cat((tall_tau, self.X[:, 1:10, :]), dim=1)
+            return y
         else:       
             return self.X
 
 if __name__ == '__main__':
-    model = ExportRoly()
-    model.export_to_ts('../help/roly.ts')
+    pretrained = model.Basic()
+    m = ExportRoly(pretrained=pretrained)
+    m.export_to_ts('../help/roly.ts')
