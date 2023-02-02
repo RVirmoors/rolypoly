@@ -2,7 +2,7 @@
 // adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 
 #ifndef VERSION
-#define VERSION "2.0"
+#define VERSION "2.0b1"
 #endif
 
 // midi stuff
@@ -560,15 +560,16 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       tau.push_back(0.1);
       cout << "new tau: " << tau[tau.size() - 1] << endl;
     }
-    cout << "play " << playhead << " - " << score[TIME_SEC][t] << endl;
+    //cout << "play " << playhead << " - " << score[TIME_SEC][t] << endl;
     double buf_ms = lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
     if (playhead >= score[TIME_SEC][t] + tau[t] - buf_ms) {
       // when the time comes, play the microtime-adjusted note
+      // TODO: test sample-accuracy of microtiming
       cout << "playing note " << t << endl;
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
-        double* hit = new double[vec_size];
-        out[0] = score[c%SCORE_DIM][t];
+        m_out_buffer[c].get(out, vec_size);
+        //out[0] = score[c%SCORE_DIM][t];
       }
       t++;
     } else {

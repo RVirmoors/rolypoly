@@ -78,9 +78,10 @@ class ExportRoly(nn_tilde.Module):
 
         if self.play[0]:
             self.t += 1
-            return torch.cat((input, input), dim=1) * self.t[0]
-        else:           
-            return self.X
+            tau = 0.1
+            # output is tau + 9 drum velocities
+            return torch.cat((tau * torch.ones(self.X.shape[0], 1, 8192), self.X[:, 1:10, :]), dim=1)
+
 
 if __name__ == '__main__':
     model = ExportRoly()
