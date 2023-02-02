@@ -66,8 +66,8 @@ public:
 
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
-  bool midiNotesToModel(long vec_size);
-  void playMidiIntoModel(long vec_size);
+  bool midiNotesToModel();
+  void playMidiIntoModel();
 
 	// BACKEND RELATED MEMBERS
 	Backend m_model;
@@ -370,14 +370,14 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
   }
 }
 
-bool rolypoly::midiNotesToModel(long vec_size) {
+bool rolypoly::midiNotesToModel() {
   int channels = SCORE_DIM;
-  int startFrom = (reading_midi - 1) * vec_size + skip;
+  int startFrom = (reading_midi - 1) * m_buffer_size + skip;
   // if done, then fill with zeros
   if (startFrom >= midifile[1].size()) {
     cout << "reached end of midifile" << endl;
     for (int c = 0; c < channels; c++) {
-      for (int i = 0; i < vec_size; i++) {
+      for (int i = 0; i < m_buffer_size; i++) {
         score[c][i] = 0;
       }
     }
@@ -389,7 +389,7 @@ bool rolypoly::midiNotesToModel(long vec_size) {
 
   int counter = 0;
   int i = startFrom;
-  while (counter < vec_size) {
+  while (counter < m_buffer_size) {
     if (i >= midifile[1].size()) {
       break;
     }
@@ -430,18 +430,19 @@ bool rolypoly::midiNotesToModel(long vec_size) {
     counter++; 
     i++;
   }
-  int upTo = reading_midi * vec_size + skip;
+  int upTo = reading_midi * m_buffer_size + skip;
   if (upTo >= midifile[1].size()) {
     return true; // done
   }
   return false; // not done yet
 }
 
-void rolypoly::playMidiIntoModel(long vec_size) {
+void rolypoly::playMidiIntoModel() {
   //cout << playhead << endl;
   if (playhead >= midifile[1].back().seconds * 1000.) {
     cout << "reached end of midifile" << endl;
     attr = "play"; attr_value = "false"; set_attr();
+    playhead = t = 0;
   }
   playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());  
   // if tau[t] doesn't exist yet, then send the next timestep
@@ -449,8 +450,8 @@ void rolypoly::playMidiIntoModel(long vec_size) {
     // send a timestep
     double timestep_ms = score[TIME_SEC][t];
     for (int c = 0; c < m_in_dim; c++) {
-      double *in = new double[vec_size];
-      for (int i = 0; i < vec_size; i++) {
+      double *in = new double[m_buffer_size];
+      for (int i = 0; i < m_buffer_size; i++) {
         // get all notes at the timestep
         if (timestep_ms == score[TIME_SEC][t]) {
           in[i] = score[c][t];
@@ -461,7 +462,7 @@ void rolypoly::playMidiIntoModel(long vec_size) {
           in[i] = 0;
         }
       }
-      m_in_buffer[c].put(in, vec_size);
+      m_in_buffer[c].put(in, m_buffer_size);
     }
   }
 }
@@ -491,6 +492,8 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
 
 void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
+  assert(vec_size == m_buffer_size);
+
   // if the "read" attribute is true, then read the midi file
   if (m_model.get_attribute_as_string("read") == "true") {
     if(!m_in_buffer[0].empty() && !reading_midi && !done_reading) {
@@ -504,7 +507,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     reading_midi ++;
     if (reading_midi && !done_reading) {
       // copy midiNotesToModel output to score
-      done_reading = midiNotesToModel(vec_size);
+      done_reading = midiNotesToModel();
       for (int c(0); c < m_in_dim; c++) {        
         m_in_buffer[c].put(score[c], vec_size);
       }
@@ -513,7 +516,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   } else if (m_model.get_attribute_as_string("play") == "true") {
     // if the "play" attribute is true, send midi notes
     // to the model, and later get the model output
-    playMidiIntoModel(vec_size);
+    playMidiIntoModel();
   } else {
     // neither reading, nor playing: do nothing
     fill_with_zero(output);
@@ -548,16 +551,19 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (m_use_thread) // PROCESS DATA LATER
       m_compute_thread = std::make_unique<std::thread>(model_perform, this);
   }
-
+  /*
   // OUTPUT
   if (m_model.get_attribute_as_string("play") == "true") {
     // if the "play" attribute is true, get the model output
     // and save it as a new tau value
-    double* new_tau = new double[vec_size];
-    m_out_buffer[0].get(new_tau, vec_size); // tau is the first channel
+    double* new_hit = new double[vec_size];
+    for (int c = 0; c < m_out_dim; c++) {
+      m_out_buffer[c].get(new_hit, vec_size);
+      cout << c << ": " << new_hit[0] << endl;
+    }
     while (tau.size() <= t) {
-      //tau.push_back(new_tau[0]); // all notes at a timestep have the same tau
-      tau.push_back(0.1);
+      tau.push_back(new_hit[0]); // all notes at a timestep have the same tau
+      //tau.push_back(0.1);
       cout << "new tau: " << tau[tau.size() - 1] << endl;
     }
     //cout << "play " << playhead << " - " << score[TIME_SEC][t] << endl;
@@ -568,6 +574,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       cout << "playing note " << t << endl;
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
+        //out = new_hit;
         m_out_buffer[c].get(out, vec_size);
         //out[0] = score[c%SCORE_DIM][t];
       }
@@ -575,8 +582,12 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     } else {
       // if the time hasn't come yet, do nothing
       fill_with_zero(output);
-      return;
     }
+  }*/
+    // COPY CIRCULAR BUFFER TO OUTPUT
+  for (int c(0); c < output.channel_count(); c++) {
+    auto out = output.samples(c);
+    m_out_buffer[c].get(out, vec_size);
   }
 };
 

@@ -25,7 +25,7 @@ class ExportRoly(nn_tilde.Module):
         self.register_attribute('generate', False)
 
         # REGISTER BUFFERS
-        self.register_buffer('X', torch.zeros(1, 10, 8192), persistent=False)
+        self.register_buffer('X', torch.zeros(1, 10, 512), persistent=False)
         self.register_buffer('t', torch.zeros(1))
 
         # REGISTER METHODS
@@ -36,7 +36,8 @@ class ExportRoly(nn_tilde.Module):
             out_channels = 10, # tau(delay) + 9 drum velocities
             out_ratio = 1,
             input_labels = ['hit', 'vel', 'tempo', 'tsig', 'pos_in_bar'],
-            output_labels = ['tau', 'K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd']
+            output_labels = ['tau', 'K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd'],
+            test_buffer_size = 512
         )
 
     # defining attribute getters
@@ -72,16 +73,22 @@ class ExportRoly(nn_tilde.Module):
     # definition of the main method
     @torch.jit.export
     def forward(self, input: torch.Tensor) -> torch.Tensor:
+        m_buf_size = input.shape[-1]
+
         if self.read[0]:
             self.X = data.readScore(input)
             return self.X[:,:10,:]
 
         if self.play[0]:
-            self.t += 1
-            tau = 0.1
+            tau = 0.66
             # output is tau + 9 drum velocities
-            return torch.cat((tau * torch.ones(self.X.shape[0], 1, 8192), self.X[:, 1:10, :]), dim=1)
-
+            #return torch.cat((input, input), dim=1) * tau
+            #return torch.ones(1, 10, m_buf_size) * tau
+            return self.X[:, :10, :m_buf_size]
+            #return torch.ones(self.X.shape[0], 10, 8192) * tau
+            #return torch.cat((tau * torch.ones(self.X.shape[0], 1, 8192), self.X[:, 1:10, :]), dim=1)
+        else:       
+            return self.X
 
 if __name__ == '__main__':
     model = ExportRoly()

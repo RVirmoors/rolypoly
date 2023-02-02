@@ -79,8 +79,18 @@ def readScore(input: torch.Tensor):
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
         for j in range(input.shape[2]):
-            hits = pitch_class_map[input[i, 0, j]]
+            print(input[i, 0, j], input[i, 1, j])
+            hits = pitch_class_map[int(input[i, 0, j])]
             X_score[i, hits, j] = input[i, 1, j]
     # next 3 values are tempo, tsig, pos_in_bar
     X_score[:, 9:12, :] = input[:, 2:5, :]
     return X_score
+
+if __name__ == '__main__':
+    test = torch.tensor([[[42, 36, 38, 42, 36],
+                          [70, 60, 111, 120, 101],
+                          [120, 120, 140, 140, 140],
+                          [1, 1, 1, 1.5, 1.5],
+                          [0, 0.5, 0, 0.33, 0.66]]])
+    print(readScore(test).shape)
+    print(readScore(test))
