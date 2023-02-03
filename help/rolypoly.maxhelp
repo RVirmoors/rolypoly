@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 34.0, -1003.0, 1285.0, 969.0 ],
+		"rect" : [ 135.0, 85.0, 926.0, 953.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -539,7 +539,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 274.0, 137.0, 32.0, 22.0 ],
+					"patching_rect" : [ 274.0, 133.333337306976318, 32.0, 22.0 ],
 					"text" : "start"
 				}
 
@@ -617,10 +617,10 @@
 					"id" : "obj-1",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
-					"numoutlets" : 10,
-					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
-					"patching_rect" : [ 111.333332598209381, 186.666667640209198, 137.0, 22.0 ],
-					"text" : "rolypoly~ roly baron 512"
+					"numoutlets" : 13,
+					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
+					"patching_rect" : [ 107.5, 188.666667640209198, 145.0, 22.0 ],
+					"text" : "rolypoly~ roly baron 2048"
 				}
 
 			}

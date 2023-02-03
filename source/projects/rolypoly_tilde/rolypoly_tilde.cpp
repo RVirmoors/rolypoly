@@ -9,7 +9,9 @@
 #include "MidiFile.h"
 #define MAX_SCORE_LENGTH 100000
 #define SCORE_DIM 6 // hit, vel, bpm, tsig, pos_in_bar, time_sec
+#define PLAY_DIM 13 // 9 vels, bpm, tsig, pos_in_bar, tau 
 #define TIME_SEC 5
+#define TAU 12
 
 // nn~
 #include "c74_min.h"
@@ -51,13 +53,14 @@ public:
   MidiFile midifile;
   c74::min::path m_midi_path;
   double** score;
+  long t_score; // next timestep to be sent to the model
   int reading_midi;  
   int skip; // used to skip everything but NoteOn events
   bool done_reading;
 
-  long playhead;
-  long t; // next timestep to be played
-  std::vector<double> tau; // microdelay for each timestep
+  double playhead;  // in ms
+  long t_play; // next timestep to be played from live_notes
+  std::vector<std::vector<double>> play_notes; // hits to be played
 
   std::vector<std::pair<long, double>> tempo_map;
   int current_tempo_index;
@@ -67,7 +70,9 @@ public:
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
   bool midiNotesToModel();
+  void prepareToPlay();
   void playMidiIntoModel();
+  double computeNextNoteTimeMs();
 
 	// BACKEND RELATED MEMBERS
 	Backend m_model;
@@ -243,7 +248,7 @@ rolypoly::rolypoly(const atoms &args)
     parseTimeEvents(midifile);
 
     initialiseScore();
-    playhead = t = 
+    playhead = t_score = t_play =
       current_tempo_index = current_timesig_index = 
       skip = 0;
   }
@@ -383,7 +388,8 @@ bool rolypoly::midiNotesToModel() {
     cout << "reached end of midifile" << endl;
     for (int c = 0; c < channels; c++) {
       for (int i = 0; i < m_buffer_size; i++) {
-        score[c][i] = 0;
+        score[c][i + (reading_midi - 1) * m_buffer_size] = 0;
+        cout << i + (reading_midi - 1) * m_buffer_size << endl;
       }
     }
     return true; // done
@@ -426,12 +432,14 @@ bool rolypoly::midiNotesToModel() {
         << ' ' << pos_in_bar
         << endl;
 
-    score[0][counter] = midifile[1][i][1]; // hit
-    score[1][counter] = midifile[1][i][2]; // vel
-    score[2][counter] = tempo_map[current_tempo_index].second; // tempo
-    score[3][counter] = timesig_map[current_timesig_index].second; // timesig
-    score[4][counter] = pos_in_bar; // pos_in_bar
-    score[5][counter] = midifile[1][i].seconds * 1000.; // ms
+    int loc = counter + (reading_midi - 1) * m_buffer_size;
+
+    score[0][loc] = midifile[1][i][1]; // hit
+    score[1][loc] = midifile[1][i][2]; // vel
+    score[2][loc] = tempo_map[current_tempo_index].second; // tempo
+    score[3][loc] = timesig_map[current_timesig_index].second; // timesig
+    score[4][loc] = pos_in_bar; // pos_in_bar
+    score[5][loc] = midifile[1][i].seconds * 1000.; // ms
     counter++; 
     i++;
   }
@@ -442,34 +450,53 @@ bool rolypoly::midiNotesToModel() {
   return false; // not done yet
 }
 
+void rolypoly::prepareToPlay() {
+  playhead = t_score = t_play = 0;
+  play_notes.clear();
+  std::vector<double> first_note = {0,0,0,0,0,0,0,0,0,
+    score[2][0], score[3][0], score[4][0], 0}; // placeholder
+  play_notes.push_back(first_note);
+}
+
 void rolypoly::playMidiIntoModel() {
-  //cout << playhead << endl;
-  if (playhead >= midifile[1].back().seconds * 1000.) {
-    cout << "reached end of midifile" << endl;
-    attr = "play"; attr_value = "false"; set_attr();
-    playhead = t = 0;
-  }
-  playhead += lib::math::samples_to_milliseconds(m_buffer_size, samplerate());  
   // if tau[t] doesn't exist yet, then send the next timestep
-  if (tau.size() <= t && playhead >= score[TIME_SEC][t]) {
+  double tau = play_notes[t_play][TAU];
+  if (!tau) {
     // send a timestep
-    double timestep_ms = score[TIME_SEC][t];
-    for (int c = 0; c < m_in_dim; c++) {
-      double *in = new double[m_buffer_size];
-      for (int i = 0; i < m_buffer_size; i++) {
-        // get all notes at the timestep
-        if (timestep_ms == score[TIME_SEC][t]) {
-          in[i] = score[c][t];
-          cout << "sending note " << t << endl;
-          t++;
-        } else {
+    if (m_model.get_attribute_as_string("generate") == "false") {
+      double timestep_ms = score[TIME_SEC][t_score];
+      int t_send; // temporary variable, for processing simultaneous hits
+      for (int c = 0; c < m_in_dim; c++) {
+        t_send = t_score;
+        double *in = new double[m_buffer_size];
+        for (int i = 0; i < m_buffer_size; i++) {
+          // get all notes at the timestep
+          if (timestep_ms == score[TIME_SEC][t_send]) {
+            in[i] = score[c][t_send];
+            t_send++;
+          } else {
           // the rest stays zero
           in[i] = 0;
+          }
         }
+        m_in_buffer[c].put(in, m_buffer_size);
       }
-      m_in_buffer[c].put(in, m_buffer_size);
-    }
+      t_score = t_send; // t_send has been incremented for simultaneous notes
+    } // TODO: "generate" == "true" -> play latest note from play_notes
+  } else {
+    for (int c = 0; c < m_in_dim; c++)
+      m_in_buffer[c].reset(); // empty buffer, don't run model.perform yet
   }
+}
+
+double rolypoly::computeNextNoteTimeMs() {
+  double buf_ms = lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
+  if (m_model.get_attribute_as_string("generate") == "false") {
+    return score[TIME_SEC][t_score] + play_notes[t_play][TAU] - buf_ms;
+  } else {
+    // TODO: "generate" == "true" -> use latest note from play_notes
+  }
+  return 0;
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
@@ -497,7 +524,6 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
 
 void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
-  assert(vec_size == m_buffer_size);
 
   // if the "read" attribute is true, then read the midi file
   if (m_model.get_attribute_as_string("read") == "true") {
@@ -510,14 +536,24 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       cout << "starting to read" << endl;
     }
     reading_midi ++;
+    cout << reading_midi << " " << done_reading << endl;
     if (reading_midi && !done_reading) {
       // copy midiNotesToModel output to score
       done_reading = midiNotesToModel();
-      for (int c(0); c < m_in_dim; c++) {        
+      for (int c(0); c < m_in_dim; c++) {
         m_in_buffer[c].put(score[c], vec_size);
       }
-      cout << "input vectors read: " << reading_midi << endl;  
-    }  
+      cout << "input vectors read: " << reading_midi << endl;
+    } else {
+      // fill m_in_buffer with zeros
+      for (int c(0); c < m_in_dim; c++) {
+        double* zeros = new double[vec_size];
+        for (int i = 0; i < vec_size; i++) {
+          zeros[i] = 0;
+        }
+        m_in_buffer[c].put(zeros, vec_size);
+      }
+    }
   } else if (m_model.get_attribute_as_string("play") == "true") {
     // if the "play" attribute is true, send midi notes
     // to the model, and later get the model output
@@ -529,7 +565,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   }
 
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
-    cout<<"buffer is full"<<endl;
+    cout<<"buffer is full "<< t_score << " " << score[TIME_SEC][t_score] << endl;
 
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {
@@ -554,46 +590,54 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       cout << "done reading" << endl;
       reading_midi = 0;
       attr = "read"; attr_value = "false"; set_attr();
+      prepareToPlay();
     }
     // TODO: what if the buffer is full of midi notes but not done_reading? Does reading several buffers work?
   }
-  /*
+
   // OUTPUT
   if (m_model.get_attribute_as_string("play") == "true") {
-    // if the "play" attribute is true, get the model output
-    // and save it as a new tau value
-    double* new_hit = new double[vec_size];
-    for (int c = 0; c < m_out_dim; c++) {
-      m_out_buffer[c].get(new_hit, vec_size);
-      cout << c << ": " << new_hit[0] << endl;
+    // if the "play" attribute is true,
+    // if model just performed, get the model output
+    if (!m_out_buffer[0].empty()) {
+      std::vector<double> new_hit;
+      double* out = new double[vec_size];
+      for (int c = 0; c < m_out_dim; c++) {
+        m_out_buffer[c].get(out, vec_size);
+        new_hit.push_back(out[0]);
+      }
+      play_notes[t_play] = new_hit;
+      std::vector<double> next_note = {0,0,0,0,0,0,0,0,0,
+        score[2][t_score], score[3][t_score], score[4][t_score], 0};
+      play_notes.push_back(next_note);
     }
-    while (tau.size() <= t) {
-      tau.push_back(new_hit[0]); // all notes at a timestep have the same tau
-      //tau.push_back(0.1);
-      cout << "new tau: " << tau[tau.size() - 1] << endl;
-    }
-    //cout << "play " << playhead << " - " << score[TIME_SEC][t] << endl;
-    double buf_ms = lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
-    if (playhead >= score[TIME_SEC][t] + tau[t] - buf_ms) {
+    // if there are notes to play, play them
+    playhead += lib::math::samples_to_milliseconds(vec_size, samplerate());
+    cout << t_play << " " << playhead << " " << computeNextNoteTimeMs() << endl;
+    if (playhead >= midifile[1].back().seconds * 1000.) {
+      cout << "reached end of midifile" << endl;
+      attr = "play"; attr_value = "false"; set_attr();
+      prepareToPlay();
+      fill_with_zero(output);
+      return;
+    }  
+    if (playhead >= computeNextNoteTimeMs()) {
       // when the time comes, play the microtime-adjusted note
       // TODO: test sample-accuracy of microtiming
-      cout << "playing note " << t << endl;
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
-        //out = new_hit;
-        m_out_buffer[c].get(out, vec_size);
-        //out[0] = score[c%SCORE_DIM][t];
+        out[0] = play_notes[t_play][c];
+        for (int i(1); i < output.frame_count(); i++) {
+          out[i] = 0.;
+        }
       }
-      t++;
+      t_play++;
     } else {
       // if the time hasn't come yet, do nothing
       fill_with_zero(output);
     }
-  }*/
-    // COPY CIRCULAR BUFFER TO OUTPUT
-  for (int c(0); c < output.channel_count(); c++) {
-    auto out = output.samples(c);
-    m_out_buffer[c].get(out, vec_size);
+  } else {
+      fill_with_zero(output);
   }
 };
 
