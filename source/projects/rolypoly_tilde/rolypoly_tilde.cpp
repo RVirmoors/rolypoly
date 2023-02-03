@@ -613,7 +613,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     }
     // if there are notes to play, play them
     playhead += lib::math::samples_to_milliseconds(vec_size, samplerate());
-    cout << t_play << " " << playhead << " " << computeNextNoteTimeMs() << endl;
+    //cout << t_play << " " << playhead << " " << computeNextNoteTimeMs() << endl;
     if (playhead >= midifile[1].back().seconds * 1000.) {
       cout << "reached end of midifile" << endl;
       attr = "play"; attr_value = "false"; set_attr();
@@ -624,12 +624,14 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (playhead >= computeNextNoteTimeMs()) {
       // when the time comes, play the microtime-adjusted note
       // TODO: test sample-accuracy of microtiming
+      double microtime = (playhead - computeNextNoteTimeMs()) / lib::math::samples_to_milliseconds(vec_size, samplerate());
+      int micro_index = (int) (microtime * vec_size);
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
-        out[0] = play_notes[t_play][c];
         for (int i(1); i < output.frame_count(); i++) {
           out[i] = 0.;
         }
+        out[micro_index] = play_notes[t_play][c];
       }
       t_play++;
     } else {
