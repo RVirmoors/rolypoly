@@ -61,6 +61,7 @@ public:
   double playhead;  // in ms
   long t_play; // next timestep to be played from live_notes
   std::vector<std::vector<double>> play_notes; // hits to be played
+  bool done_playing;
 
   std::vector<std::pair<long, double>> tempo_map;
   int current_tempo_index;
@@ -190,9 +191,9 @@ public:
 
   message<> start {this, "start", "Start playing the midi file",
     MIN_FUNCTION {
-      // send "start" message to the backend
-      //m_model.start();
-
+      done_playing = false;
+      prepareToPlay();
+      attr = "play"; attr_value = "true"; set_attr();
       return {};
     }
   };
@@ -248,6 +249,7 @@ rolypoly::rolypoly(const atoms &args)
     parseTimeEvents(midifile);
 
     initialiseScore();
+    done_playing = false;
     playhead = t_score = t_play =
       current_tempo_index = current_timesig_index = 
       skip = 0;
@@ -565,7 +567,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   }
 
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
-    cout<<"buffer is full "<< t_score << " " << score[TIME_SEC][t_score] << endl;
+    //cout<<"buffer is full "<< t_score << " " << score[TIME_SEC][t_score] << endl;
 
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {
@@ -617,21 +619,22 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (playhead >= midifile[1].back().seconds * 1000.) {
       cout << "reached end of midifile" << endl;
       attr = "play"; attr_value = "false"; set_attr();
+      done_playing = true;
       prepareToPlay();
       fill_with_zero(output);
       return;
     }  
-    if (playhead >= computeNextNoteTimeMs()) {
+    if (playhead >= computeNextNoteTimeMs() && !done_playing) {
       // when the time comes, play the microtime-adjusted note
       // TODO: test sample-accuracy of microtiming
       double microtime = (playhead - computeNextNoteTimeMs()) / lib::math::samples_to_milliseconds(vec_size, samplerate());
       int micro_index = (int) (microtime * vec_size);
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
-        for (int i(1); i < output.frame_count(); i++) {
+        for (int i = 0; i < output.frame_count(); i++) {
           out[i] = 0.;
         }
-        out[micro_index] = play_notes[t_play][c];
+        out[micro_index] = play_notes[t_play][c] * -1.;
       }
       t_play++;
     } else {
