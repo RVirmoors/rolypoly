@@ -14,7 +14,7 @@ import model
 
 class ExportRoly(nn_tilde.Module):
 
-    def __init__(self, pretrained: model.Basic):
+    def __init__(self, pretrained):
         super().__init__()
         self.pretrained = pretrained
 
@@ -78,19 +78,17 @@ class ExportRoly(nn_tilde.Module):
 
         if self.read[0]:
             self.X = data.readScore(input)
-            tall_tau = torch.zeros(1, 1, m_buf_size)
-            self.X = torch.cat((self.X, tall_tau), dim=1)
             return self.X
 
         if self.play[0]:
-            x = self.X.squeeze(0) # a single batch
-            y = self.pretrained(x).unsqueeze(0) # a single batch
-            # output is a single batch
+            x = data.readScore(input)
+            y = self.pretrained(x)
+            # output is a single timestep
             return y
         else:       
             return self.X
 
 if __name__ == '__main__':
-    pretrained = model.Basic()
+    pretrained = model.Swing()
     m = ExportRoly(pretrained=pretrained)
     m.export_to_ts('../help/roly.ts')

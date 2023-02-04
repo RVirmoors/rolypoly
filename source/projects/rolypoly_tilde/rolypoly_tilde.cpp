@@ -483,6 +483,7 @@ void rolypoly::playMidiIntoModel() {
         }
         m_in_buffer[c].put(in, m_buffer_size);
       }
+      //cout << "sent timestep " << t_score << " at " << timestep_ms << " ms" << endl;
       t_score = t_send; // t_send has been incremented for simultaneous notes
     } // TODO: "generate" == "true" -> play latest note from play_notes
   } else {
@@ -601,7 +602,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   if (m_model.get_attribute_as_string("play") == "true") {
     // if the "play" attribute is true,
     // if model just performed, get the model output
-    if (!m_out_buffer[0].empty()) {
+    if (!m_out_buffer[0].empty() && play_notes.size() == t_play + 1) {
       std::vector<double> new_hit;
       double* out = new double[vec_size];
       for (int c = 0; c < m_out_dim; c++) {
@@ -609,6 +610,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         new_hit.push_back(out[0]);
       }
       play_notes[t_play] = new_hit;
+      //cout << "new tau " << new_hit[TAU] << endl;
       std::vector<double> next_note = {0,0,0,0,0,0,0,0,0,
         score[2][t_score], score[3][t_score], score[4][t_score], 0};
       play_notes.push_back(next_note);
@@ -635,7 +637,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         for (int i = 0; i < output.frame_count(); i++) {
           out[i] = 0.;
         }
-        out[micro_index] = play_notes[t_play][c] * -1.;
+        out[micro_index] = play_notes[t_play][c];
       }
       t_play++;
     } else {

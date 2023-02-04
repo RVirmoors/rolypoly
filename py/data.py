@@ -44,38 +44,57 @@ def classes_to_map():
             class_map[pitch] = cls
     return class_map
 
-def ms_to_bartime(ms, featVec):
+def ms_to_bartime(ms: float, featVec):
     """
     Convert a ms time difference to a bar-relative diff.
     input:
         ms = time to be converted
         featVec = feature of the note we relate to
     """
-    tempo = featVec[10]
-    timeSig = featVec[11]
+    tempo = featVec[9]
+    timeSig = featVec[10]
     barDiff = ms / 1000 * 60 / tempo / timeSig
     return barDiff
 
 
-def bartime_to_ms(bartime, featVec):
+def bartime_to_ms(bartime: float, featVec):
     """
     Convert a bar-relative time difference to a ms interval.
     input:
         bartime = time to be converted
         featVec = feature of the note we relate to
     """
-    tempo = featVec[10]
-    timeSig = featVec[11]
+    tempo = featVec[9]
+    timeSig = featVec[10]
     ms = bartime * 1000 / 60 * tempo * timeSig
     return ms
+
+def upbeat(bartime: torch.Tensor) -> bool:
+    """
+    Check if a bar-relative time is on an upbeat.
+    input:
+        bartime = time to be checked
+    """
+    bartime = torch.tensor(bartime)
+    if torch.isclose(bartime, torch.tensor(0.), atol=0.05):
+        return False
+    if torch.isclose(bartime, torch.tensor(0.25), atol=0.05):
+        return False
+    if torch.isclose(bartime, torch.tensor(0.5), atol=0.05):
+        return False
+    if torch.isclose(bartime, torch.tensor(0.75), atol=0.05):
+        return False
+    if torch.isclose(bartime, torch.tensor(1.), atol=0.05):
+        return False
+    return True
 
 # === DATA PROCESSING ===
 
 def readScore(input: torch.Tensor):
     # input: (batch, 5, vec_size) from cpp host
-    # output: (batch, 12, vec_size)
+    # output: (batch, 13, vec_size)
     pitch_class_map = classes_to_map()
-    X_score = torch.zeros(input.shape[0], 12, input.shape[2])
+    X_score = torch.zeros(input.shape[0], 13, input.shape[2])
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
         for j in range(input.shape[2]):
@@ -85,11 +104,20 @@ def readScore(input: torch.Tensor):
     X_score[:, 9:12, :] = input[:, 2:5, :]
     return X_score
 
+
+
+# === TESTS ===
 if __name__ == '__main__':
+    print(upbeat(0.05), upbeat(0.24))
     test = torch.tensor([[[42, 36, 38, 42, 36],
-                          [70, 60, 111, 120, 101],
+                          [70, 60, 111, 105, 101],
                           [120, 120, 140, 140, 140],
                           [1, 1, 1, 1.5, 1.5],
                           [0, 0.5, 0, 0.33, 0.66]]])
     print(readScore(test).shape)
-    print(readScore(test)[:, :10, :])
+    #print(readScore(test)[:, :10, :])
+    x = readScore(test)
+    feat = x.squeeze(0)
+    for i in range(feat.shape[1]):
+        print("->", feat[:, i])
+        print(bartime_to_ms(0.1, feat[:, i]))
