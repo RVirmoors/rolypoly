@@ -494,7 +494,7 @@ void rolypoly::playMidiIntoModel() {
 double rolypoly::computeNextNoteTimeMs() {
   double buf_ms = lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
   if (m_model.get_attribute_as_string("generate") == "false") {
-    return score[TIME_SEC][t_score] + play_notes[t_play][TAU] - buf_ms;
+    return score[TIME_SEC][t_score] + play_notes[t_play][TAU];
   } else {
     // TODO: "generate" == "true" -> use latest note from play_notes
   }
@@ -614,7 +614,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       play_notes.push_back(next_note);
     }
     // if there are notes to play, play them
-    playhead += lib::math::samples_to_milliseconds(vec_size, samplerate());
+    
+    double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
+    playhead += buf_ms;
     //cout << t_play << " " << playhead << " " << computeNextNoteTimeMs() << endl;
     if (playhead >= midifile[1].back().seconds * 1000.) {
       cout << "reached end of midifile" << endl;
@@ -624,11 +626,10 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       fill_with_zero(output);
       return;
     }  
-    if (playhead >= computeNextNoteTimeMs() && !done_playing) {
+    if (playhead >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note
       // TODO: test sample-accuracy of microtiming
-      double microtime = (playhead - computeNextNoteTimeMs()) / lib::math::samples_to_milliseconds(vec_size, samplerate());
-      int micro_index = (int) (microtime * vec_size);
+      int micro_index = (computeNextNoteTimeMs() - playhead) / buf_ms * vec_size;
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
         for (int i = 0; i < output.frame_count(); i++) {
