@@ -34,6 +34,23 @@ class Swing(nn.Module):
                 x[0, 12, i] = nudge
         return x + 0.01
 
+class Transformer(nn.Module):
+    def __init__(self, in_channels=13, out_channels=13):
+        # in: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
+        # out: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
+        super(Transformer, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.transformer_model = nn.Transformer(d_model=13, nhead=13)
+
+    def forward(self, x):
+        # https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
+        x = x.permute(2, 0, 1)
+        x = self.transformer_model(x, x)
+        x = x.permute(1, 2, 0)
+        return x
+        
+
 
 
 # === TESTS ===
@@ -47,5 +64,5 @@ if __name__ == '__main__':
     #print(readScore(test)[:, :10, :])
     x = data.readScore(test)
     #feat = x.squeeze(0)
-    s = Swing()
+    s = Transformer()
     print(s(x))

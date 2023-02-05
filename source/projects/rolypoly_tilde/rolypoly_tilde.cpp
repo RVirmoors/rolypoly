@@ -1,6 +1,8 @@
 // 2023 rvirmoors
 // adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 
+#define DEBUG true
+
 #ifndef VERSION
 #define VERSION "2.0b1"
 #endif
@@ -361,7 +363,7 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
                           (midifile[0][i][4] << 8) |
                           midifile[0][i][5];
       double bpm = 60.0 / microseconds * 1000000.0;
-      cout << "Tempo change at tick " << midifile[0][i].tick
+      if (DEBUG) cout << "Tempo change at tick " << midifile[0][i].tick
            << " to " << bpm << " beats per minute" << endl;
       tempo_map.push_back(std::make_pair(midifile[0][i].tick, bpm));
     }
@@ -375,7 +377,7 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
       // time signature change
       int numerator = midifile[0][i][3];
       int denominator = midifile[0][i][2];
-      cout << "Time signature change at tick " << midifile[0][i].tick
+      if (DEBUG) cout << "Time signature change at tick " << midifile[0][i].tick
             << " to " << numerator << "/" << denominator << endl;
       timesig_map.push_back(std::make_pair(midifile[0][i].tick, (double)numerator / denominator));
     }
@@ -387,11 +389,11 @@ bool rolypoly::midiNotesToModel() {
   int startFrom = (reading_midi - 1) * m_buffer_size + skip;
   // if done, then fill with zeros
   if (startFrom >= midifile[1].size()) {
-    cout << "reached end of midifile" << endl;
+    if (DEBUG) cout << "reached end of midifile" << endl;
     for (int c = 0; c < channels; c++) {
       for (int i = 0; i < m_buffer_size; i++) {
         score[c][i + (reading_midi - 1) * m_buffer_size] = 0;
-        cout << i + (reading_midi - 1) * m_buffer_size << endl;
+        if (DEBUG) cout << i + (reading_midi - 1) * m_buffer_size << endl;
       }
     }
     return true; // done
@@ -427,7 +429,7 @@ bool rolypoly::midiNotesToModel() {
     }    
     double pos_in_bar = (midifile[1][i].seconds - barStart) / (barEnd - barStart);
 
-    cout << midifile[1][i].seconds
+    if (DEBUG) cout << midifile[1][i].seconds
         << ' ' << int(midifile[1][i][1])
         << ' ' << tempo_map[current_tempo_index].second
         << ' ' << timesig_map[current_timesig_index].second
@@ -483,7 +485,7 @@ void rolypoly::playMidiIntoModel() {
         }
         m_in_buffer[c].put(in, m_buffer_size);
       }
-      //cout << "sent timestep " << t_score << " at " << timestep_ms << " ms" << endl;
+      if (DEBUG) cout << "sent timestep " << t_score << " at " << timestep_ms << " ms" << endl;
       t_score = t_send; // t_send has been incremented for simultaneous notes
     } // TODO: "generate" == "true" -> play latest note from play_notes
   } else {
@@ -531,22 +533,22 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   // if the "read" attribute is true, then read the midi file
   if (m_model.get_attribute_as_string("read") == "true") {
     if(!m_in_buffer[0].empty() && !reading_midi && !done_reading) {
-      cout << "resettin" << endl;
+      if (DEBUG) cout << "resettin" << endl;
       // if the buffer isn't empty, reset it
       for (int c(0); c < input.channel_count(); c++)
         m_in_buffer[c].reset();
       done_reading = false;
-      cout << "starting to read" << endl;
+      if (DEBUG) cout << "starting to read" << endl;
     }
     reading_midi ++;
-    cout << reading_midi << " " << done_reading << endl;
+    if (DEBUG) cout << reading_midi << " " << done_reading << endl;
     if (reading_midi && !done_reading) {
       // copy midiNotesToModel output to score
       done_reading = midiNotesToModel();
       for (int c(0); c < m_in_dim; c++) {
         m_in_buffer[c].put(score[c], vec_size);
       }
-      cout << "input vectors read: " << reading_midi << endl;
+      if (DEBUG) cout << "input vectors read: " << reading_midi << endl;
     } else {
       // fill m_in_buffer with zeros
       for (int c(0); c < m_in_dim; c++) {
@@ -568,7 +570,6 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   }
 
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
-    //cout<<"buffer is full "<< t_score << " " << score[TIME_SEC][t_score] << endl;
 
     // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
     if (m_compute_thread && m_use_thread) {
@@ -579,8 +580,12 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     for (int c(0); c < m_in_dim; c++)
       m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
 
+    if (DEBUG) cout << "start perform" << endl;
+
     if (!m_use_thread) // PROCESS DATA RIGHT NOW
       model_perform(this);
+
+    if (DEBUG) cout << "end perform" << endl;
 
     // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
     for (int c(0); c < m_out_dim; c++)
@@ -590,7 +595,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       m_compute_thread = std::make_unique<std::thread>(model_perform, this);
 
     if (done_reading && reading_midi) {
-      cout << "done reading" << endl;
+      if (DEBUG) cout << "done reading" << endl;
       reading_midi = 0;
       attr = "read"; attr_value = "false"; set_attr();
       prepareToPlay();
@@ -610,7 +615,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         new_hit.push_back(out[0]);
       }
       play_notes[t_play] = new_hit;
-      //cout << "new tau " << new_hit[TAU] << endl;
+      if (DEBUG) cout << "new tau " << new_hit[TAU] << endl;
       std::vector<double> next_note = {0,0,0,0,0,0,0,0,0,
         score[2][t_score], score[3][t_score], score[4][t_score], 0};
       play_notes.push_back(next_note);
@@ -619,9 +624,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
     playhead += buf_ms;
-    //cout << t_play << " " << playhead << " " << computeNextNoteTimeMs() << endl;
+    if (DEBUG) cout << t_play << " " << playhead << " " << computeNextNoteTimeMs() << endl;
     if (playhead >= midifile[1].back().seconds * 1000.) {
-      cout << "reached end of midifile" << endl;
+      if (DEBUG) cout << "reached end of midifile" << endl;
       attr = "play"; attr_value = "false"; set_attr();
       done_playing = true;
       prepareToPlay();
