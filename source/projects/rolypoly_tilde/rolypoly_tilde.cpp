@@ -92,11 +92,10 @@ public:
 	std::vector<std::unique_ptr<float[]>> m_in_model, m_out_model;
 
 	// AUDIO PERFORM
-	bool m_use_thread;
-	std::unique_ptr<std::thread> m_compute_thread;
 	void operator()(audio_bundle input, audio_bundle output);
 	void buffered_perform(audio_bundle input, audio_bundle output);
 	void perform(audio_bundle input, audio_bundle output);
+  bool running_model;
 
 
   // ONLY FOR DOCUMENTATION
@@ -191,6 +190,43 @@ public:
       }
   };
 
+  timer<> timed_run_model { this,
+      MIN_FUNCTION {
+        run_model();
+        run_model.post();
+        return {};
+      }
+  };
+
+  queue<> run_model { this,
+      MIN_FUNCTION {
+        // call forward deferred (on the Main thread)
+        std::vector<float *> in_model, out_model;
+        for (int c(0); c < m_in_dim; c++)
+          in_model.push_back(m_in_model[c].get());
+        for (int c(0); c < m_out_dim; c++)
+          out_model.push_back(m_out_model[c].get());
+        cout << "======= queue perform" << endl;
+        running_model = true;
+        m_model.perform(in_model, out_model, m_buffer_size,
+                                    m_method, 1);
+        running_model = false;
+        cout << "======= end queue perform" << endl;
+        return {};
+      }
+  };
+
+  timer<> check_result {this,
+    MIN_FUNCTION {
+      if (!running_model) {
+        cout << "======= check" << endl;
+      }
+      check_result.delay(100);
+      return {};
+    }
+  };
+
+
   message<> start {this, "start", "Start playing the midi file",
     MIN_FUNCTION {
       done_playing = false;
@@ -220,9 +256,8 @@ void rolypoly::initialiseScore() {
 }
 
 rolypoly::rolypoly(const atoms &args)
-    : m_compute_thread(nullptr), m_in_dim(1), m_in_ratio(1), m_out_dim(1),
-      m_out_ratio(1), m_buffer_size(4096), m_method("forward"),
-      m_use_thread(true) {
+    : m_in_dim(1), m_in_ratio(1), m_out_dim(1),
+      m_out_ratio(1), m_buffer_size(4096), m_method("forward"){
 
   m_model = Backend();
 
@@ -251,7 +286,7 @@ rolypoly::rolypoly(const atoms &args)
     parseTimeEvents(midifile);
 
     initialiseScore();
-    done_playing = false;
+    done_playing = running_model = false;
     playhead = t_score = t_play =
       current_tempo_index = current_timesig_index = 
       skip = 0;
@@ -288,7 +323,6 @@ rolypoly::rolypoly(const atoms &args)
 
   if (!m_buffer_size) {
     // NO THREAD MODE
-    m_use_thread = false;
     m_buffer_size = m_higher_ratio;
   } else if (m_buffer_size < m_higher_ratio) {
     m_buffer_size = m_higher_ratio;
@@ -301,12 +335,6 @@ rolypoly::rolypoly(const atoms &args)
     cerr << "buffer size too small, should be at least 16" << endl;
     m_buffer_size = 16;
   }
-
-  // Calling forward in a thread causes memory leak in windows.
-  // See https://github.com/pytorch/pytorch/issues/24237
-#ifdef _WIN32
-  m_use_thread = false;
-#endif
 
   // CREATE INLET, OUTLETS and BUFFERS
   m_inlets.push_back(std::make_unique<inlet<>>(
@@ -333,8 +361,6 @@ rolypoly::rolypoly(const atoms &args)
 }
 
 rolypoly::~rolypoly() {
-  if (m_compute_thread)
-    m_compute_thread->join();
 }
 
 bool rolypoly::has_settable_attribute(std::string attribute) {
@@ -570,29 +596,24 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   }
 
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
+    cout << "buffer full, running " << running_model << endl;
 
-    // IF USE THREAD, CHECK THAT COMPUTATION IS OVER
-    if (m_compute_thread && m_use_thread) {
-      m_compute_thread->join();
+    if (!running_model) {
+      // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
+      for (int c(0); c < m_in_dim; c++)
+        m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
+
+      if (DEBUG) cout << "start perform" << endl;
+      //model_perform(this);
+      //run_model();
+      timed_run_model.delay(0);
+      check_result.delay(0);
+      if (DEBUG) cout << "end perform" << endl;
+
+      // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
+      for (int c(0); c < m_out_dim; c++)
+        m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
     }
-
-    // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
-    for (int c(0); c < m_in_dim; c++)
-      m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
-
-    if (DEBUG) cout << "start perform" << endl;
-
-    if (!m_use_thread) // PROCESS DATA RIGHT NOW
-      model_perform(this);
-
-    if (DEBUG) cout << "end perform" << endl;
-
-    // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
-    for (int c(0); c < m_out_dim; c++)
-      m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
-
-    if (m_use_thread) // PROCESS DATA LATER
-      m_compute_thread = std::make_unique<std::thread>(model_perform, this);
 
     if (done_reading && reading_midi) {
       if (DEBUG) cout << "done reading" << endl;
@@ -601,13 +622,18 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       prepareToPlay();
     }
     // TODO: what if the buffer is full of midi notes but not done_reading? Does reading several buffers work?
+    cout << "done buffer full" << endl;
   }
 
   // OUTPUT
   if (m_model.get_attribute_as_string("play") == "true") {
     // if the "play" attribute is true,
     // if model just performed, get the model output
-    if (!m_out_buffer[0].empty() && play_notes.size() == t_play + 1) {
+    cout << "play, running: " << running_model << endl;
+    if (!m_out_buffer[0].empty() 
+      && play_notes.size() == t_play + 1 
+      && !running_model) {
+
       std::vector<double> new_hit;
       double* out = new double[vec_size];
       for (int c = 0; c < m_out_dim; c++) {
@@ -635,7 +661,6 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     }  
     if (playhead >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note
-      // TODO: test sample-accuracy of microtiming
       int micro_index = (computeNextNoteTimeMs() - playhead) / buf_ms * vec_size;
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
