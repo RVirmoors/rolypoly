@@ -34,7 +34,7 @@ and then export it to a `.ts` file which `rolypoly~` can use in Max:
 - `python export.py`
 
 
-## build from source (windows)
+## build the Max object from source (windows)
 
 you need [CMake](https://cmake.org/download/) installed
 
