@@ -47,8 +47,8 @@
 	<methodlist>
 
 		<method name='start'>
-			<digest>Start playing the midi file </digest>
-			<description>Start playing the midi file </description>
+			<digest>Start playing </digest>
+			<description>Start playing </description>
 		</method>
 
 		<method name='anything'>

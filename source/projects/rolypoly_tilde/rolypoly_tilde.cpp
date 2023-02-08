@@ -97,6 +97,8 @@ public:
 	void operator()(audio_bundle input, audio_bundle output);
 	void buffered_perform(audio_bundle input, audio_bundle output);
 	void perform(audio_bundle input, audio_bundle output);
+  void wait_a_sec();
+  fifo<int> nums { 100 };
 
 
   // ONLY FOR DOCUMENTATION
@@ -191,16 +193,52 @@ public:
       }
   };
 
-  message<> start {this, "start", "Start playing the midi file",
+  timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
+    cout << "timer" << endl;
+    perform_threaded.set();
+    m_timer.delay(1500);
+    return {};
+  }};
+
+  queue<> perform_threaded { this,
+      MIN_FUNCTION {
+        if (m_compute_thread && m_use_thread) {
+          cout << "joinin thread" << endl;
+          cout << m_compute_thread->get_id() << endl;
+          m_compute_thread->join();
+        }
+
+        int n;
+        while (nums.try_dequeue(n)) {
+          cout << "got " << n << endl;
+        }
+          
+        if (m_use_thread) { // PROCESS DATA LATER 
+          m_compute_thread = std::make_unique<std::thread>(&rolypoly::wait_a_sec, this);
+          cout << "started thread" << endl;
+          cout << m_compute_thread->get_id() << endl;
+          torch::set_num_threads(1);
+          //cout << "num threads " << torch::get_num_threads() << endl;
+        }
+        return {};
+      }
+  };
+
+  message<> start {this, "start", "Start playing",
     MIN_FUNCTION {
       done_playing = false;
       prepareToPlay();
       attr = "play"; attr_value = "true"; set_attr();
+      m_timer.delay(0);
       return {};
     }
   };
 
 };
+
+void rolypoly::wait_a_sec() {
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+}
 
 void model_perform(rolypoly *nn_instance) {
   std::vector<float *> in_model, out_model;
@@ -288,7 +326,7 @@ rolypoly::rolypoly(const atoms &args)
 
   if (!m_buffer_size) {
     // NO THREAD MODE
-    m_use_thread = false;
+    //m_use_thread = false;
     m_buffer_size = m_higher_ratio;
   } else if (m_buffer_size < m_higher_ratio) {
     m_buffer_size = m_higher_ratio;
@@ -305,7 +343,7 @@ rolypoly::rolypoly(const atoms &args)
   // Calling forward in a thread causes memory leak in windows.
   // See https://github.com/pytorch/pytorch/issues/24237
 #ifdef _WIN32
-  m_use_thread = false;
+  m_use_thread = true;
 #endif
 
   // CREATE INLET, OUTLETS and BUFFERS
@@ -539,17 +577,16 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   if (m_in_buffer[0].full()) { // BUFFER IS FULL
     cout << "buffer full " << playhead << endl;
     playhead++;
+    nums.try_enqueue(playhead);
 
     // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
     for (int c(0); c < m_in_dim; c++)
       m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
 
-    if (!m_use_thread) // PROCESS DATA RIGHT NOW
-      model_perform(this);
-
     // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
     for (int c(0); c < m_out_dim; c++)
       m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
+
   }
 
   // COPY CIRCULAR BUFFER TO OUTPUT
