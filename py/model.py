@@ -6,6 +6,7 @@ Rolypoly timing model
 import torch
 import torch.nn as nn
 import data
+import time
 
 class Basic(nn.Module):
     def __init__(self, in_channels=13, out_channels=13):
@@ -64,5 +65,7 @@ if __name__ == '__main__':
     #print(readScore(test)[:, :10, :])
     x = data.readScore(test)
     #feat = x.squeeze(0)
+    start = time.time()
     s = Transformer()
     print(s(x))
+    print(time.time() - start, "s")
