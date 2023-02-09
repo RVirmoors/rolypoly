@@ -72,7 +72,6 @@ public:
   bool done_playing;
   int m_lookahead_ms; // in ms
   short timer_mode; // 0 inactive, 1 read, 2 play
-  bool played_already;
 
   std::vector<std::pair<long, double>> tempo_map;
   int current_tempo_index;
@@ -206,6 +205,7 @@ public:
   };
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
+    cout << "t_score and size ============  " << t_score << "    <<<<  " << score_size << endl;
     if (timer_mode == TIMER_READ) {
       cout << "timer read" << endl;
       read_deferred.set();
@@ -215,11 +215,7 @@ public:
       if (!done_playing) {
         m_timer.delay(m_lookahead_ms);
       }
-    } else { // stop timer, clean up thread
-      if (m_compute_thread && m_use_thread) {
-        m_compute_thread->join();
-      }
-    }
+    } 
     return {};
   }};
 
@@ -242,7 +238,6 @@ public:
           m_in_buffer[c].reset();
         }
       }
-
       // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
       for (int c(0); c < m_in_dim; c++)
         m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
@@ -265,7 +260,7 @@ public:
 
   queue<> perform_threaded { this,
     MIN_FUNCTION {
-      if (m_compute_thread && m_use_thread) {
+      if (m_compute_thread && m_compute_thread->joinable()) {
         if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
         //if (DEBUG) cout << m_compute_thread->get_id() << endl;
         m_compute_thread->join();
@@ -291,7 +286,7 @@ public:
       }
 
       if (m_use_thread && !done_playing) {
-        m_compute_thread = std::make_unique<std::thread>(&rolypoly::model_perform, this);
+        m_compute_thread = std::make_unique<std::thread>(&rolypoly::wait_a_sec, this);
         if (DEBUG) cout << "started thread" << endl;
         //if (DEBUG) cout << m_compute_thread->get_id() << endl;
       }
@@ -315,16 +310,12 @@ public:
         cerr << "no score loaded, can't play yet!" << endl;
         return {};
       }
-      if (!played_already) {
-        played_already = true;
-        done_playing = false;
-        prepareToPlay();
-        attr = "play"; attr_value = "true"; set_attr();
-        timer_mode = TIMER_PLAY;
-        m_timer.delay(0);
-      }
-      
       done_playing = false;
+      prepareToPlay();
+      attr = "play"; attr_value = "true"; set_attr();
+      timer_mode = TIMER_PLAY;
+      m_timer.delay(0);
+      
       return {};
     }
   };
@@ -357,7 +348,6 @@ rolypoly::rolypoly(const atoms &args)
       m_use_thread(true), m_lookahead_ms(2000) {
 
   m_model = Backend();
-  played_already = false;
 
   // CHECK ARGUMENTS
   if (!args.size()) {
@@ -467,8 +457,8 @@ rolypoly::rolypoly(const atoms &args)
 }
 
 rolypoly::~rolypoly() {
-  if (m_compute_thread)
-  m_compute_thread->join();
+  if (m_compute_thread && m_compute_thread->joinable())
+    m_compute_thread->join();
 }
 
 bool rolypoly::has_settable_attribute(std::string attribute) {
@@ -603,8 +593,10 @@ bool rolypoly::midiNotesToModel() {
 }
 
 void rolypoly::prepareToPlay() {
-  if (m_compute_thread && m_use_thread) {
+  if (m_compute_thread && m_compute_thread->joinable()) {
+    cout << "JOINING THREAD" << endl;
     m_compute_thread->join();
+    cout << "JOINED THREAD" << endl;
   }
   playhead_ms = i_toModel = i_fromModel =
     t_score = t_play = 0;
@@ -630,8 +622,8 @@ void rolypoly::playMidiIntoModel() {
         // get all notes in the next m_lookahead_ms
         if (timestep_ms < start_ms + m_lookahead_ms && t_send < score_size) {
           in[i] = score[c][t_send];
+          if (DEBUG && c==0) cout << "sent timestep " << t_send << " at " << timestep_ms << " ms" << endl;
           t_send++;
-          if (DEBUG) cout << "sent timestep " << t_send << " at " << timestep_ms << " ms" << endl;
         } else {
         // the rest stays zero
         in[i] = 0;
@@ -664,10 +656,10 @@ void rolypoly::getTauFromModel() {
 
 double rolypoly::computeNextNoteTimeMs() {
   double buf_ms = lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
-  if (m_model.get_attribute_as_string("generate") == "false") {
+  if (m_model.get_attribute_as_string("generate") == "false" && !done_playing) {
     return score[TIME_MS][t_score] + play_notes[t_play][TAU];
   } else {
-    // TODO: "generate" == "true" -> use latest note from play_notes
+    // TODO: "generate" == "true" -> use latest notes from play_notes
   }
   return 0;
 }
@@ -713,23 +705,18 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     // if the "play" attribute is true,
     // if there are notes to play, play them
     
+    // increment playhead
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
-    if (playhead_ms < score[TIME_MS][i_toModel])
+
+    if (rand() % 2 == 0)  cout << " next " << score[TIME_MS][i_toModel] << endl;
+    double next_ms;
+    //if (i_toModel == 0) next_ms = score[TIME_MS][0];
+    //  else next_ms = std::max(score[TIME_MS][i_toModel], score[TIME_MS][i_toModel-1]);
+    next_ms = score[TIME_MS][i_toModel];
+    if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 
-    /*double* out = output.samples(0);
-    for (int i = 0; i < vec_size; i++) {
-      out[i] = playhead_ms;
-    }*/
-    //if (DEBUG) cout << playhead_ms << " " << buf_ms << " " << computeNextNoteTimeMs() << endl;
-    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score_size) {
-      if (DEBUG) cout << "reached end of midifile" << endl;
-      attr = "play"; attr_value = "false"; set_attr();
-      done_playing = true;
-      timer_mode = TIMER_INACTIVE;
-      fill_with_zero(output);
-      return;
-    }
+    if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
 
     if (playhead_ms >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note
@@ -745,6 +732,18 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     } else {
       // if the time hasn't come yet, do nothing
       fill_with_zero(output);
+    }
+    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score_size) {
+      if (DEBUG) cout << "reached end of midifile" << endl;
+      attr = "play"; attr_value = "false"; set_attr();
+      done_playing = true;
+      timer_mode = TIMER_INACTIVE;
+      m_timer.stop();
+      if (m_compute_thread && m_compute_thread->joinable()) {
+        cout << "==END==JOINING THREAD" << endl;
+        m_compute_thread->join();
+        cout << "==END==JOINED THREAD" << endl;
+      }
     }
   } else {
     fill_with_zero(output);
