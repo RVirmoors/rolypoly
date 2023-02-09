@@ -215,6 +215,7 @@ public:
       resetInputBuffer();
       reading_midi ++;
       if (DEBUG) cout << reading_midi << " " << done_reading << endl;
+      
       if (reading_midi && !done_reading) {
         // populate score and place it into m_in_buffer
         done_reading = midiNotesToModel();
@@ -233,25 +234,12 @@ public:
       for (int c(0); c < m_in_dim; c++)
         m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
 
-      cout <<" processing ..." << endl;
       // PROCESS SCORE
       model_perform();
-      cout << "done " << done_reading << endl;
-
-      // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
-      for (int c(0); c < m_out_dim; c++)
-        m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
-
-      double* out = new double[m_buffer_size];
-      m_out_buffer[9].get(out, m_buffer_size);
-
-
-      if (DEBUG) cout << "score loaded: " << out[0] << " " << out[1] << endl;
 
       if (!done_reading) {
         m_timer.delay(10);
       }
-
       return {};
     }
   };
