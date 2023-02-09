@@ -47,13 +47,18 @@
 	<methodlist>
 
 		<method name='start'>
-			<digest>Start playing the midi file </digest>
-			<description>Start playing the midi file </description>
+			<digest>Start playing </digest>
+			<description>Start playing </description>
 		</method>
 
 		<method name='anything'>
 			<digest>callback for attributes </digest>
 			<description>callback for attributes </description>
+		</method>
+
+		<method name='read'>
+			<digest>Load score </digest>
+			<description>Load score </description>
 		</method>
 
 	</methodlist>
