@@ -238,7 +238,16 @@ public:
       model_perform();
       cout << "done " << done_reading << endl;
 
-      if (DEBUG) cout << "score loaded: " << m_out_model[0].get()[9] << endl;
+      // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
+      for (int c(0); c < m_out_dim; c++)
+        m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
+
+      double* out = new double[m_buffer_size];
+      m_out_buffer[9].get(out, m_buffer_size);
+
+
+      if (DEBUG) cout << "score loaded: " << out[0] << " " << out[1] << endl;
+
       if (!done_reading) {
         m_timer.delay(10);
       }
