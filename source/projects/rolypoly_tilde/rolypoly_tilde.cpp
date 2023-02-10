@@ -709,10 +709,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
 
     if (rand() % 2 == 0)  cout << " next " << score[TIME_MS][i_toModel] << endl;
-    double next_ms;
-    //if (i_toModel == 0) next_ms = score[TIME_MS][0];
-    //  else next_ms = std::max(score[TIME_MS][i_toModel], score[TIME_MS][i_toModel-1]);
-    next_ms = score[TIME_MS][i_toModel];
+    double next_ms; // usually it's the next note that doesn't have a tau yet
+    // but at the end of the score, it can be the final note (computeNext...)
+    next_ms = std::max(score[TIME_MS][i_toModel], computeNextNoteTimeMs() );
     if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 
