@@ -26,6 +26,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <chrono>
 
 using namespace c74::min;
 using namespace smf;
@@ -258,6 +259,21 @@ public:
     }
   };
 
+  queue<> warmup { this,
+    MIN_FUNCTION {
+      // warmup the model
+      for (int i(0); i < 10; i++) {
+        cout << "warming up " << i+1 << "/10 ..." << endl;
+        auto start = std::chrono::high_resolution_clock::now();
+        model_perform();
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end-start;
+        cout << "elapsed time: " << elapsed_seconds.count() << "s" << endl;
+      }
+      return {};
+    }
+  };
+
   queue<> perform_threaded { this,
     MIN_FUNCTION {
       if (m_compute_thread && m_compute_thread->joinable()) {
@@ -454,6 +470,11 @@ rolypoly::rolypoly(const atoms &args)
     m_out_buffer[i].initialize(m_buffer_size);
     m_out_model.push_back(std::make_unique<float[]>(m_buffer_size));
   }
+  
+  cout << "Running warmup, please wait (Max may freeze) ..." << endl;
+  // "play must be set to true for this to work"
+  warmup();
+  attr = "play"; attr_value = "false"; set_attr();
 }
 
 rolypoly::~rolypoly() {

@@ -22,7 +22,7 @@ class ExportRoly(nn_tilde.Module):
         # read: load a new drum track
         self.register_attribute('read', False)
         # play: receive X(t), generate Y(t) and send to host
-        self.register_attribute('play', False)
+        self.register_attribute('play', True)
         # generate: trigger notes irrespective of score
         self.register_attribute('generate', False)
 

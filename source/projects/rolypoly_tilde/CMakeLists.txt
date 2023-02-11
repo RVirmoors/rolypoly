@@ -82,3 +82,11 @@ endif()
 #############################################################
 
 # include(${C74_MIN_API_DIR}/test/min-object-unittest.cmake)
+
+target_precompile_headers(${PROJECT_NAME} 
+	PRIVATE 
+	<torch/torch.h>
+	<string>
+	<thread>
+	<vector>
+	<MidiFile.h>)
