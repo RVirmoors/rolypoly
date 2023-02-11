@@ -286,7 +286,7 @@ public:
       }
 
       if (m_use_thread && !done_playing) {
-        m_compute_thread = std::make_unique<std::thread>(&rolypoly::wait_a_sec, this);
+        m_compute_thread = std::make_unique<std::thread>(&rolypoly::model_perform, this);
         if (DEBUG) cout << "started thread" << endl;
         //if (DEBUG) cout << m_compute_thread->get_id() << endl;
       }
@@ -707,15 +707,13 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     
     // increment playhead
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
-
-    if (rand() % 2 == 0)  cout << " next " << score[TIME_MS][i_toModel] << endl;
     double next_ms; // usually it's the next note that doesn't have a tau yet
     // but at the end of the score, it can be the final note (computeNext...)
     next_ms = std::max(score[TIME_MS][i_toModel], computeNextNoteTimeMs() );
     if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 
-    if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
+    //if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
 
     if (playhead_ms >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note

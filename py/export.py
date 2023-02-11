@@ -89,6 +89,10 @@ class ExportRoly(nn_tilde.Module):
             return self.X
 
 if __name__ == '__main__':
-    pretrained = model.Swing()
+    pretrained = model.Transformer()
+    pretrained.eval()
+    # warmup pass
+    x = torch.zeros(1, 13, 5)
+    pretrained(x)
     m = ExportRoly(pretrained=pretrained)
     m.export_to_ts('../help/roly.ts')

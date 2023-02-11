@@ -65,7 +65,11 @@ if __name__ == '__main__':
     #print(readScore(test)[:, :10, :])
     x = data.readScore(test)
     #feat = x.squeeze(0)
-    start = time.time()
+    
     s = Transformer()
+    # warmup pass
+    x = torch.zeros(1, 13, 5)
+    s(x)
+    start = time.time()
     print(s(x))
     print(time.time() - start, "s")
