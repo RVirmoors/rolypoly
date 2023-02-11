@@ -1,0 +1,3 @@
+C:/Users/rv/Documents/Max 8/Packages/rolypoly/cpp_app/CMakeFiles/TestLibtorch.dir
+C:/Users/rv/Documents/Max 8/Packages/rolypoly/cpp_app/CMakeFiles/ALL_BUILD.dir
+C:/Users/rv/Documents/Max 8/Packages/rolypoly/cpp_app/CMakeFiles/ZERO_CHECK.dir
