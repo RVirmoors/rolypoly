@@ -95,7 +95,7 @@ public:
 	std::vector<std::string> settable_attributes;
 	bool has_settable_attribute(std::string attribute);
 	c74::min::path m_path;
-	int m_in_dim, m_in_ratio, m_out_dim, m_out_ratio, m_higher_ratio;
+	int m_in_dim, m_in_ratio, m_out_dim, m_out_ratio;
 
 	// BUFFER RELATED MEMBERS
 	int m_buffer_size;
@@ -205,6 +205,20 @@ public:
       }
   };
 
+  timer<timer_options::defer_delivery> warmup { this,
+    MIN_FUNCTION {
+      // warmup the model
+      for (int i = 0; i < 7; i++) {
+          auto start = std::chrono::high_resolution_clock::now();
+          model_perform();
+          auto end = std::chrono::high_resolution_clock::now();
+          auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+          if (DEBUG) cout << "step " << i+1 << "/7: " << duration.count() / 1000. << " ms" << endl;
+      }
+      return {};
+    }
+  };
+
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
     cout << "t_score and size ============  " << t_score << "    <<<<  " << score_size << endl;
     if (timer_mode == TIMER_READ) {
@@ -254,21 +268,6 @@ public:
         prepareToPlay();
       } else {
         m_timer.delay(10);
-      }
-      return {};
-    }
-  };
-
-  queue<> warmup { this,
-    MIN_FUNCTION {
-      // warmup the model
-      for (int i(0); i < 10; i++) {
-        cout << "warming up " << i+1 << "/10 ..." << endl;
-        auto start = std::chrono::high_resolution_clock::now();
-        model_perform();
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed_seconds = end-start;
-        cout << "elapsed time: " << elapsed_seconds.count() << "s" << endl;
       }
       return {};
     }
@@ -360,8 +359,8 @@ void rolypoly::initialiseScore() {
 
 rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr), m_in_dim(1), m_in_ratio(1), m_out_dim(1),
-      m_out_ratio(1), m_buffer_size(4096), m_method("forward"),
-      m_use_thread(true), m_lookahead_ms(2000) {
+      m_out_ratio(1), m_buffer_size(64), m_method("forward"),
+      m_use_thread(true), m_lookahead_ms(200) {
 
   m_model = Backend();
 
@@ -407,8 +406,6 @@ rolypoly::rolypoly(const atoms &args)
     return;
   }
 
-  m_higher_ratio = m_model.get_higher_ratio();
-
   // GET MODEL'S METHOD PARAMETERS
   auto params = m_model.get_method_params(m_method);
 
@@ -426,21 +423,11 @@ rolypoly::rolypoly(const atoms &args)
   m_out_dim = params[2];
   m_out_ratio = params[3];
 
-  if (!m_buffer_size) {
-    // NO THREAD MODE
-    //m_use_thread = false;
-    m_buffer_size = m_higher_ratio;
-  } else if (m_buffer_size < m_higher_ratio) {
-    m_buffer_size = m_higher_ratio;
-    cerr << "buffer size too small, switching to " << m_buffer_size << endl;
-  } else {
-    m_buffer_size = power_ceil(m_buffer_size);
-  }
-
   if (m_buffer_size < 16) {
     cerr << "buffer size too small, should be at least 16" << endl;
     m_buffer_size = 16;
   }
+  m_buffer_size = power_ceil(m_buffer_size);
 
   // Calling forward in a thread causes memory leak in windows.
   // See https://github.com/pytorch/pytorch/issues/24237
@@ -471,10 +458,10 @@ rolypoly::rolypoly(const atoms &args)
     m_out_model.push_back(std::make_unique<float[]>(m_buffer_size));
   }
   
-  cout << "Running warmup, please wait (Max may freeze) ..." << endl;
+  cout << "Running warmup, please wait (Max will freeze for a few seconds) ..." << endl;
   // "play must be set to true for this to work"
-  warmup();
-  attr = "play"; attr_value = "false"; set_attr();
+  attr = "play"; attr_value = "false"; set_attr();  
+  warmup.delay(500);
 }
 
 rolypoly::~rolypoly() {
@@ -676,7 +663,6 @@ void rolypoly::getTauFromModel() {
 }
 
 double rolypoly::computeNextNoteTimeMs() {
-  double buf_ms = lib::math::samples_to_milliseconds(m_buffer_size, samplerate());
   if (m_model.get_attribute_as_string("generate") == "false" && !done_playing) {
     return score[TIME_MS][t_score] + play_notes[t_play][TAU];
   } else {
@@ -696,21 +682,8 @@ void rolypoly::incrementPlayIndexes() {
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
-  auto dsp_vec_size = output.frame_count();
-
   // CHECK IF MODEL IS LOADED AND ENABLED
   if (!m_model.is_loaded() || !enable) {
-    fill_with_zero(output);
-    return;
-  }
-
-  // CHECK IF DSP_VEC_SIZE IS LARGER THAN BUFFER SIZE
-  if (dsp_vec_size > m_buffer_size) {
-    cerr << "vector size (" << dsp_vec_size << ") ";
-    cerr << "larger than buffer size (" << m_buffer_size << "). ";
-    cerr << "disabling model.";
-    cerr << endl;
-    enable = false;
     fill_with_zero(output);
     return;
   }

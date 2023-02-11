@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 260.0, 85.0, 926.0, 953.0 ],
+		"rect" : [ 212.0, -995.0, 926.0, 953.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -40,24 +40,11 @@
 		"assistshowspatchername" : 0,
 		"boxes" : [ 			{
 				"box" : 				{
-					"id" : "obj-57",
-					"maxclass" : "slider",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"parameter_enable" : 0,
-					"patching_rect" : [ 424.0, 466.0, 187.0, 61.0 ],
-					"size" : 20000.0
-				}
-
-			}
-, 			{
-				"box" : 				{
 					"id" : "obj-58",
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 347.0, 55.0, 150.0, 20.0 ],
+					"patching_rect" : [ 292.0, 81.0, 150.0, 20.0 ],
 					"text" : "overdrive!"
 				}
 
@@ -730,7 +717,7 @@
 					"numoutlets" : 13,
 					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
 					"patching_rect" : [ 107.5, 188.666667640209198, 145.0, 22.0 ],
-					"text" : "rolypoly~ roly baron 2048"
+					"text" : "rolypoly~ roly baron 64"
 				}
 
 			}
@@ -1109,13 +1096,6 @@
 				"patchline" : 				{
 					"destination" : [ "obj-55", 0 ],
 					"source" : [ "obj-56", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-57", 0 ],
-					"source" : [ "obj-6", 0 ]
 				}
 
 			}
