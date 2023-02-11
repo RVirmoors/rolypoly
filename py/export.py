@@ -74,19 +74,11 @@ class ExportRoly(nn_tilde.Module):
     # definition of the main method
     @torch.jit.export
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        m_buf_size = input.shape[-1]
 
-        if self.read[0]:
-            self.X = data.readScore(input)
-            return self.X
-
-        if self.play[0]:
-            x = data.readScore(input)
-            y = self.pretrained(x)
-            # output is a single timestep
-            return y
-        else:       
-            return self.X
+        x = data.readScore(input)
+        y = self.pretrained(x)
+        # output is a single timestep
+        return y
 
 if __name__ == '__main__':
     pretrained = model.Transformer()

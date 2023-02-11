@@ -78,6 +78,7 @@ public:
   std::vector<std::pair<long, double>> timesig_map;
   int current_timesig_index;
 
+  torch::jit::script::Module mod;
 
 	// BACKEND RELATED MEMBERS
 	Backend m_model;
@@ -206,20 +207,12 @@ public:
 
       if (m_in_buffer[0].full()) { 
         cout << "buffer full " << playhead_ms - start << endl;
-        // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
-        for (int c(0); c < m_in_dim; c++)
-          m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
 
-        model_perform();
+        torch::Tensor input = torch::rand({1, m_in_dim, m_buffer_size});
+        torch::Tensor output;
+        output = mod.forward({input}).toTensor().detach();
 
-        // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
-        for (int c(0); c < m_out_dim; c++)
-          m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
-
-        double* out = new double[m_buffer_size];
-        m_out_buffer[0].get(out, m_buffer_size);
-
-        cout << "received " << out[0] << " " << out[1] << endl;
+        cout << output << endl;
       }
 
       cout << "end " << playhead_ms - start << endl;
@@ -298,6 +291,14 @@ rolypoly::rolypoly(const atoms &args)
     error();
     return;
   }
+
+  try {
+    mod = torch::jit::load(std::string(m_path));
+	  mod.eval();
+  } catch (const std::exception &e) {
+    std::cerr << e.what() << '\n';
+  }
+  cout << "loaded model " << mod.is_optimized() << endl;
 
   m_higher_ratio = m_model.get_higher_ratio();
 

@@ -66,7 +66,7 @@ if __name__ == '__main__':
     x = data.readScore(test)
     #feat = x.squeeze(0)
     
-    s = Transformer()
+    s = Swing()
     # warmup pass
     x = torch.zeros(1, 13, 5)
     s(x)
