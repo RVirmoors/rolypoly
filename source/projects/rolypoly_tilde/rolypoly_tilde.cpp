@@ -11,7 +11,6 @@
 #include "MidiFile.h"
 #define MAX_SCORE_LENGTH 100000
 #define SCORE_DIM 6 // hit, vel, bpm, tsig, pos_in_bar, TIME_MS
-#define PLAY_DIM 13 // 9 vels, bpm, tsig, pos_in_bar, tau 
 #define TIME_MS 5
 #define TAU 12
 #define TIMER_INACTIVE 0
@@ -88,6 +87,7 @@ public:
   void getTauFromModel();
   double computeNextNoteTimeMs();
   void incrementPlayIndexes();
+  void processLiveOnsets(audio_bundle input);
 
 	// BACKEND RELATED MEMBERS
 	Backend m_model;
@@ -126,6 +126,10 @@ public:
   attribute<bool> enable{this, "enable", true,
                          description{"Enable / disable tensor computation"}};
 
+  // LATENCY (guitar onsets) ATTRIBUTE
+  attribute<int> latency{this, "latency", 512,
+                         description{"Onset detection latency (samples)"}};
+
   // BOOT STAMP
   message<> maxclass_setup{
       this, "maxclass_setup",
@@ -134,8 +138,6 @@ public:
         cout << "adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos" << endl;
         return {};
       }};
-
-
 
   message<> anything {this, "anything", "callback for attributes",
     MIN_FUNCTION {
@@ -222,10 +224,10 @@ public:
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
     cout << "t_score and size ============  " << t_score << "    <<<<  " << score_size << endl;
     if (timer_mode == TIMER_READ) {
-      cout << "timer read" << endl;
+      //cout << "timer read" << endl;
       read_deferred.set();
     } else if (timer_mode == TIMER_PLAY) {
-      cout << "timer play" << endl;
+      //cout << "timer play" << endl;
       perform_threaded.set();
       if (!done_playing) {
         m_timer.delay(m_lookahead_ms);
@@ -276,19 +278,18 @@ public:
   queue<> perform_threaded { this,
     MIN_FUNCTION {
       if (m_compute_thread && m_compute_thread->joinable()) {
-        if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
+        //if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
         //if (DEBUG) cout << m_compute_thread->get_id() << endl;
         m_compute_thread->join();
       }
 
-      if (DEBUG) cout << "joined at " << playhead_ms << " i_toModel " << i_toModel << endl;
+      if (DEBUG) cout << "joined at " << playhead_ms << " ms : " << i_toModel << endl;
       // send midi notes
       // to the circular buffer, to later get the model output
       if (!done_playing)
         playMidiIntoModel();
 
-      if (m_in_buffer[0].full()) { 
-        cout << "buffer full " << playhead_ms << endl;
+      if (m_in_buffer[0].full()) {
         // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
         for (int c(0); c < m_in_dim; c++)
           m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
@@ -302,8 +303,7 @@ public:
 
       if (m_use_thread && !done_playing) {
         m_compute_thread = std::make_unique<std::thread>(&rolypoly::model_perform, this);
-        if (DEBUG) cout << "started thread" << endl;
-        //if (DEBUG) cout << m_compute_thread->get_id() << endl;
+        //if (DEBUG) cout << "started thread" << endl;
       }
       return {};
     }
@@ -570,7 +570,6 @@ bool rolypoly::midiNotesToModel() {
     if (midifile[1][i].seconds >= barEnd * 0.999) {
       barStart = barEnd;
       barEnd += 240 / tempo_map[current_tempo_index].second * timesig_map[current_timesig_index].second;
-      //cout << "== bar ==" << barStart << " " << barEnd << endl;
     }    
     double pos_in_bar = (midifile[1][i].seconds - barStart) / (barEnd - barStart);
 
@@ -648,7 +647,6 @@ void rolypoly::getTauFromModel() {
   // populate play_notes[...i_toModel][TAU]
   long writeTo;
   double* out = new double[m_buffer_size];
-  cout << "getting tau" << endl;
   for (int c = 0; c < m_out_dim; c++) {
     m_out_buffer[c].get(out, m_buffer_size);
     writeTo = i_fromModel;
@@ -681,6 +679,58 @@ void rolypoly::incrementPlayIndexes() {
   t_play++;
 }
 
+void rolypoly::processLiveOnsets(audio_bundle input) {
+  int location = -1;
+  for (int i = 0; i < input.frame_count(); i++) {
+    // find onset
+    if (input.samples(0)[i]) {
+      location = i;
+      break;
+    }
+  }
+  if (location == -1) return; // no onset in this buffer
+
+  // get the onset time in ms
+  double onset_time_ms = playhead_ms + 
+    lib::math::samples_to_milliseconds(location - latency, samplerate());
+  
+  cout << "onset at " << onset_time_ms << " ms" << endl;
+
+  // find the closest note in the score
+  int closest_note = 0;
+  double closest_note_time = score[TIME_MS][0];
+  for (int i = 0; i < t_score+1; i++) { // for all notes played so far
+    double note_time = score[TIME_MS][i];
+    if (abs(note_time - onset_time_ms) < abs(closest_note_time - onset_time_ms)) {
+      closest_note = i;
+      closest_note_time = note_time;
+    }
+  }
+
+  // is the onset within 1/3 of the closest note duration?
+  double closest_note_duration;
+  if (onset_time_ms > closest_note_time && closest_note < score_size-1) {
+    closest_note_duration = score[TIME_MS][closest_note+1] - closest_note_time;
+  } else if (onset_time_ms < closest_note_time && closest_note > 0) {
+    closest_note_duration = closest_note_time - score[TIME_MS][closest_note-1];
+  } else return;
+
+  double tau_guitar = onset_time_ms - closest_note_time;
+  if (abs(tau_guitar) < closest_note_duration/3) {
+    // if so, then we have a hit
+    cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
+  } else return;
+
+  torch::Tensor input_tensor = torch::zeros({1, m_in_dim, 1});
+  input_tensor[0][0][0] = 666; // mark this as a live onset
+  input_tensor[0][1][0] = tau_guitar; // in ms
+  for (int c = 2; c < m_in_dim; c++) {
+    input_tensor[0][c][0] = score[c][closest_note]; // bpm, tsig, pos_in_bar
+  }
+  // send the onset to the model
+  m_model.get_model().forward({input_tensor}).toTensor();
+}
+
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
   // CHECK IF MODEL IS LOADED AND ENABLED
   if (!m_model.is_loaded() || !enable) {
@@ -693,6 +743,10 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
 
 void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
+  // INPUT
+  if (m_model.get_attribute_as_string("play") == "true") {
+    processLiveOnsets(input);
+  }
 
   // OUTPUT
   if (m_model.get_attribute_as_string("play") == "true") {

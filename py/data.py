@@ -6,10 +6,11 @@ data preprocessing methods
 """
 
 import torch
-import numpy as np
 
-X_DECODER_CHANNELS = 13 # 9 drum channel velocities + bpm, tsig, pos_in_bar, tau
-X_ENCODER_CHANNELS = 5 # guitar velocity + bpm, tsig, pos_in_bar, tau_guitar
+X_ENCODER_CHANNELS = 12 # 9 drum channel velocities + bpm, tsig, pos_in_bar
+X_DECODER_CHANNELS = 14 # above + tau_drum, tau_guitar
+IN_DRUM_CHANNELS = 5 # hit, vel, tempo, tsig, pos_in_bar
+IN_ONSET_CHANNELS = 5 # 666, tau_guitar, tempo, tsig, pos_in_bar
 
 # === HELPER FUNCTIONS ===
 
@@ -92,9 +93,9 @@ def upbeat(bartime: torch.Tensor) -> bool:
 
 def readScore(input: torch.Tensor):
     # input: (batch, 5, vec_size) from cpp host
-    # output: (batch, 13, vec_size)
+    # output: (batch, 12, vec_size)
     pitch_class_map = classes_to_map()
-    X_score = torch.zeros(input.shape[0], 13, input.shape[2])
+    X_score = torch.zeros(input.shape[0], X_ENCODER_CHANNELS, input.shape[2])
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
         for j in range(input.shape[2]):
@@ -104,6 +105,30 @@ def readScore(input: torch.Tensor):
     X_score[:, 9:12, :] = input[:, 2:5, :]
     return X_score
 
+def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor):
+    # add tau_guitar to decoder input
+    # input: (batch, 5, 1) from cpp host
+    # output: (batch, 14, vec_size)
+    if input[:, 0, 0] != 666:
+        return x_dec
+    i = x_dec.shape[2] - 1
+    while i > 0:
+        if input[:, 2:5, 0].all() == x_dec[:, 9:12, i].all():
+            x_dec[:, 13, i] = input[:, 1, 0]
+            return x_dec
+        i -= 1
+    return x_dec
+
+def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
+    # input: (batch, 5, vec_size) from cpp host
+    # output: (batch, 14, vec_size)
+    live_notes = readScore(input) # (batch, 12, vec_size)
+    live_notes = torch.cat((live_notes, torch.zeros(live_notes.shape[0], 2, live_notes.shape[2])), dim=1) # (batch, 14, vec_size)
+    i = 0
+    while live_notes[:, 9, i] != 0: # non-zero bpm = note exists
+        torch.cat(x_dec, live_notes[:, :, i], dim=2)
+        i += 1
+    return x_dec
 
 
 # === TESTS ===

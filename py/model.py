@@ -9,9 +9,9 @@ import data
 import time
 
 class Basic(nn.Module):
-    def __init__(self, in_channels=13, out_channels=13):
-        # in: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
-        # out: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
+    def __init__(self, in_channels=14, out_channels=14):
+        # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
+        # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
         super(Basic, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -20,9 +20,9 @@ class Basic(nn.Module):
         return x + 0.66
 
 class Swing(nn.Module):
-    def __init__(self, in_channels=13, out_channels=13):
-        # in: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
-        # out: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
+    def __init__(self, in_channels=14, out_channels=14):
+        # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
+        # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
         super(Swing, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -36,20 +36,22 @@ class Swing(nn.Module):
         return x + 0.01
 
 class Transformer(nn.Module):
-    def __init__(self, in_channels=13, out_channels=13):
-        # in: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
-        # out: 13 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau)
+    def __init__(self, in_channels=14, out_channels=14):
+        # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
+        # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
         super(Transformer, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.transformer_model = nn.Transformer(d_model=13, nhead=13)
+        self.transformer_model = nn.Transformer(d_model=14, nhead=14)
 
-    def forward(self, x):
+    def forward(self, x_enc, x_dec):
         # https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
-        x = x.permute(2, 0, 1)
-        x = self.transformer_model(x, x)
-        x = x.permute(1, 2, 0)
-        return x
+        x_enc = torch.cat((x_enc, torch.zeros(1, 2, x_enc.shape[2])), dim=1)
+        x_enc = x_enc.permute(2, 0, 1)
+        x_dec = x_dec.permute(2, 0, 1)
+        y = self.transformer_model(x_enc, x_dec)
+        y = y.permute(1, 2, 0)
+        return y
         
 
 
@@ -68,7 +70,8 @@ if __name__ == '__main__':
     
     s = Transformer()
     # warmup pass
-    x = torch.zeros(1, 13, 5)
+    #x = torch.zeros(1, 14, 5)
+    x = torch.cat((x, torch.zeros(1, 2, x.shape[2])), dim=1)
     s(x)
     start = time.time()
     print(s(x))

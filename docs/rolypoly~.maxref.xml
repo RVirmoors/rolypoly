@@ -73,6 +73,11 @@
 			<description>Enable / disable tensor computation </description>
 		</attribute>
 
+		<attribute name='latency' get='1' set='1' type='long' size='1' >
+			<digest>Onset detection latency (samples) </digest>
+			<description>Onset detection latency (samples) </description>
+		</attribute>
+
 	</attributelist>
 
 
