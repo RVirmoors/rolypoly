@@ -99,10 +99,14 @@ def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
         for j in range(input.shape[2]):
-            hits = pitch_class_map[int(input[i, 0, j])]
-            X_score[i, hits, j] = input[i, 1, j]
+            if input[i, 0, j] != 0 and input[i, 0, j] != 666:
+                hits = pitch_class_map[int(input[i, 0, j])]
+                X_score[i, hits, j] = input[i, 1, j]
     # next 3 values are tempo, tsig, pos_in_bar
     X_score[:, 9:12, :] = input[:, 2:5, :]
+    # remove all rows with only zeros
+    mask = ~torch.all(X_score == 0, dim=1).squeeze()
+    X_score = X_score[:, :, mask]
     return X_score
 
 def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor):

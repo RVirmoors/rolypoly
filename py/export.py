@@ -27,8 +27,8 @@ class ExportRoly(nn_tilde.Module):
         self.register_attribute('generate', False)
 
         # REGISTER BUFFERS
-        self.register_buffer('x_enc', torch.zeros(1, 12, 512))
-        self.register_buffer('x_dec', torch.zeros(1, 14, 0))
+        self.register_buffer('x_enc', torch.zeros(1, 12, 0))
+        self.register_buffer('x_dec', torch.zeros(1, 14, 0)) # actuals
         self.register_buffer('y_hat', torch.zeros(1, 14, 0)) # predictions
 
         # REGISTER METHODS
@@ -40,7 +40,8 @@ class ExportRoly(nn_tilde.Module):
             out_ratio = 1,
             input_labels = ['hit', 'vel', 'bpm', 'tsig', 'pos_in_bar'],
             output_labels = ['K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd', 'bpm', 'tsig', 'pos_in_bar', 'tau', 'tau_g'],
-            test_buffer_size = 512
+            test_buffer_size = 512,
+            test_method = False
         )
 
     # defining attribute getters
@@ -85,27 +86,58 @@ class ExportRoly(nn_tilde.Module):
 
         if self.play[0]:
             if m_buf_size == 1: # just one onset
+                print("one onset")
                 # update x_dec[:,:,14] with realised tau_guitar
                 self.x_dec = data.readLiveOnset(input, self.x_dec)
                 # make x_dec have m_buf_size samples
-                out = torch.cat((self.x_dec, 
-                    torch.zeros(1, 14, m_buf_size - self.x_dec.shape[2])), dim=-1)
-                return out   
+                #out = torch.cat((self.x_dec, 
+                    #torch.zeros(1, 14, m_buf_size - self.x_dec.shape[2])), dim=-1)
+                return self.x_dec   
             else: # full buffer = receiving drum hits
+                print("full buffer")
+                # add latest hits to x_dec
+                before = self.x_dec.shape[-1]
                 self.x_dec = data.readScoreLive(input, self.x_dec)
-            # get predictions
-            #y_hat = self.pretrained(self.x_enc, self.x_dec)
-            # add latest prediction to x_dec
-            #self.x_dec = torch.cat((self.x_dec, y_hat), dim=-1)
-            # make y_hat have m_buf_size samples
-            #y_hat = torch.cat((y_hat, torch.zeros(1, 14, m_buf_size - y_hat.shape[2])), dim=-1)
-            return self.x_dec
+                latest = self.x_dec.shape[-1] - before
+                # get predictions
+                preds = self.pretrained(self.x_enc, self.x_dec)                
+                # update x_dec with latest predictions
+                self.y_hat = torch.cat((self.y_hat, preds[:,:,-latest:]), dim=-1) 
+                return self.y_hat
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
             return out
 
 if __name__ == '__main__':
+    test = False
+
     pretrained = model.Transformer()
     pretrained.eval()
     m = ExportRoly(pretrained=pretrained)
-    m.export_to_ts('../help/roly.ts')
+    if not test:
+        m.export_to_ts('../help/roly.ts')
+        print("exported to ../help/roly.ts")
+    else:
+        score = torch.tensor([[[42, 36, 38, 42, 36],
+                          [70, 60, 111, 105, 101],
+                          [120, 120, 140, 140, 140],
+                          [1, 1, 1, 1.5, 1.5],
+                          [0, 0.5, 0.33, 0.33, 0.66]]])
+        live_drums = torch.tensor([[[42, 36, 38, 0, 0],
+                            [70, 60, 111, 0, 0],
+                            [120, 120, 140, 0, 0],
+                            [1, 1, 1, 0, 0],
+                            [0, 0.5, 0.33, 0, 0]]])
+        guit = torch.tensor([[[666],[0.6],[120],[1],[0]]])
+        m.set_read(True)
+        out = m.forward(score)
+        print("read -> enc: ", out[:,:,-1], out.shape)
+        m.set_read(False)
+        print("=====================")
+        m.set_play(True)
+        out = m.forward(live_drums)
+        print("drums -> y_hat: ", out[:,:,-1], out.shape)
+        out = m.forward(live_drums)
+        print("drums2 > y_hat: ", out[:,:,-1], out.shape)
+        out = m.forward(guit)
+        print("guit -> dec: ", out[:,:,3], out.shape)
