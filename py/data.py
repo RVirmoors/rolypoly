@@ -123,11 +123,9 @@ def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
     # input: (batch, 5, vec_size) from cpp host
     # output: (batch, 14, vec_size)
     live_notes = readScore(input) # (batch, 12, vec_size)
-    live_notes = torch.cat((live_notes, torch.zeros(live_notes.shape[0], 2, live_notes.shape[2])), dim=1) # (batch, 14, vec_size)
-    i = 0
-    while live_notes[:, 9, i] != 0: # non-zero bpm = note exists
-        torch.cat((x_dec, live_notes[:, :, i]), dim=2)
-        i += 1
+    live_notes = torch.cat((live_notes, torch.zeros(
+        live_notes.shape[0], 2, live_notes.shape[2])), dim=1) # (batch, 14, vec_size)
+    x_dec = torch.cat((x_dec, live_notes), dim=2)
     return x_dec
 
 
@@ -140,7 +138,6 @@ if __name__ == '__main__':
                           [1, 1, 1, 1.5, 1.5],
                           [0, 0.5, 0.33, 0.33, 0.66]]])
     print(readScore(test).shape)
-    #print(readScore(test)[:, :10, :])
     x = readScore(test)
     feat = x.squeeze(0)
     for i in range(feat.shape[1]):

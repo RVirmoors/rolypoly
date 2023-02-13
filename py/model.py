@@ -63,16 +63,15 @@ if __name__ == '__main__':
                           [120, 120, 140, 140, 140],
                           [1, 1, 1, 1.5, 1.5],
                           [0, 0.5, 0, 0.33, 0.66]]])
-    print(data.readScore(test).shape)
+    #print(data.readScore(test).shape)
     #print(readScore(test)[:, :10, :])
-    x = data.readScore(test)
+    x_enc = data.readScore(test)
+    x_dec = torch.zeros(1, 14, 0)
+    x_dec = data.readScoreLive(test[:,:,:2], x_dec)
+    print(x_dec[:,:,0])
     #feat = x.squeeze(0)
     
     s = Transformer()
-    # warmup pass
-    #x = torch.zeros(1, 14, 5)
-    x = torch.cat((x, torch.zeros(1, 2, x.shape[2])), dim=1)
-    s(x)
     start = time.time()
-    print(s(x))
+    print(s(x_enc, x_dec)[:,:,0])
     print(time.time() - start, "s")

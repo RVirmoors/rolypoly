@@ -694,7 +694,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   double onset_time_ms = playhead_ms + 
     lib::math::samples_to_milliseconds(location - latency, samplerate());
   
-  cout << "onset at " << onset_time_ms << " ms" << endl;
+  cout << "-> ONSET at " << onset_time_ms << " ms" << endl;
 
   // find the closest note in the score
   int closest_note = 0;

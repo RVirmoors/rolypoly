@@ -29,7 +29,7 @@ class ExportRoly(nn_tilde.Module):
         # REGISTER BUFFERS
         self.register_buffer('x_enc', torch.zeros(1, 12, 512))
         self.register_buffer('x_dec', torch.zeros(1, 14, 0))
-        self.register_buffer('y_hat', torch.zeros(1, 1,  0))
+        self.register_buffer('y_hat', torch.zeros(1, 14, 0)) # predictions
 
         # REGISTER METHODS
         self.register_method(
@@ -40,8 +40,7 @@ class ExportRoly(nn_tilde.Module):
             out_ratio = 1,
             input_labels = ['hit', 'vel', 'bpm', 'tsig', 'pos_in_bar'],
             output_labels = ['K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd', 'bpm', 'tsig', 'pos_in_bar', 'tau', 'tau_g'],
-            test_buffer_size = 512,
-            test_method = False
+            test_buffer_size = 512
         )
 
     # defining attribute getters
@@ -81,23 +80,29 @@ class ExportRoly(nn_tilde.Module):
 
         if self.read[0]:
             self.x_enc = data.readScore(input)
-            return self.x_enc
+            out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
+            return out
 
         if self.play[0]:
             if m_buf_size == 1: # just one onset
-                # get x_dec[14] = realised tau_guitar
-                self.x_dec = data.readLiveOnset(input, self.x_dec) 
-                return self.x_dec[:, :-1, :]
+                # update x_dec[:,:,14] with realised tau_guitar
+                self.x_dec = data.readLiveOnset(input, self.x_dec)
+                # make x_dec have m_buf_size samples
+                out = torch.cat((self.x_dec, 
+                    torch.zeros(1, 14, m_buf_size - self.x_dec.shape[2])), dim=-1)
+                return out   
             else: # full buffer = receiving drum hits
                 self.x_dec = data.readScoreLive(input, self.x_dec)
-
-            # get prediction
-            y_hat = self.pretrained(self.x_enc, self.x_dec)
+            # get predictions
+            #y_hat = self.pretrained(self.x_enc, self.x_dec)
             # add latest prediction to x_dec
-            self.x_dec = torch.cat((self.x_dec[:, :, :], y_hat), dim=-1)
-            return y_hat
+            #self.x_dec = torch.cat((self.x_dec, y_hat), dim=-1)
+            # make y_hat have m_buf_size samples
+            #y_hat = torch.cat((y_hat, torch.zeros(1, 14, m_buf_size - y_hat.shape[2])), dim=-1)
+            return self.x_dec
         else:
-            return self.x_enc
+            out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
+            return out
 
 if __name__ == '__main__':
     pretrained = model.Transformer()
