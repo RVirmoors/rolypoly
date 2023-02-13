@@ -40,7 +40,8 @@ class ExportRoly(nn_tilde.Module):
             out_ratio = 1,
             input_labels = ['hit', 'vel', 'bpm', 'tsig', 'pos_in_bar'],
             output_labels = ['K', 'S', 'HI-c', 'HI-o', 'T-l', 'T-m', 'T-h', "cr", 'rd', 'bpm', 'tsig', 'pos_in_bar', 'tau', 'tau_g'],
-            test_buffer_size = 512
+            test_buffer_size = 512,
+            test_method = False
         )
 
     # defining attribute getters
@@ -84,10 +85,8 @@ class ExportRoly(nn_tilde.Module):
 
         if self.play[0]:
             if m_buf_size == 1: # just one onset
-                # get x_dec[14] = tau_guitar
+                # get x_dec[14] = realised tau_guitar
                 self.x_dec = data.readLiveOnset(input, self.x_dec) 
-                # save realised tau_guitar to y
-                self.y[:, :, -1] = input[:, 1, :]
                 return self.x_dec[:, :-1, :]
             else: # full buffer = receiving drum hits
                 self.x_dec = data.readScoreLive(input, self.x_dec)

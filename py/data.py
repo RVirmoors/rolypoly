@@ -91,11 +91,11 @@ def upbeat(bartime: torch.Tensor) -> bool:
 
 # === DATA PROCESSING ===
 
-def readScore(input: torch.Tensor):
+def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
     # input: (batch, 5, vec_size) from cpp host
     # output: (batch, 12, vec_size)
     pitch_class_map = classes_to_map()
-    X_score = torch.zeros(input.shape[0], X_ENCODER_CHANNELS, input.shape[2])
+    X_score = torch.zeros(input.shape[0], m_enc_dim, input.shape[2])
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
         for j in range(input.shape[2]):
@@ -126,7 +126,7 @@ def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
     live_notes = torch.cat((live_notes, torch.zeros(live_notes.shape[0], 2, live_notes.shape[2])), dim=1) # (batch, 14, vec_size)
     i = 0
     while live_notes[:, 9, i] != 0: # non-zero bpm = note exists
-        torch.cat(x_dec, live_notes[:, :, i], dim=2)
+        torch.cat((x_dec, live_notes[:, :, i]), dim=2)
         i += 1
     return x_dec
 
