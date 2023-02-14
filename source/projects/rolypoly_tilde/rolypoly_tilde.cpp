@@ -81,6 +81,7 @@ public:
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
   void resetInputBuffer();
+  void vectorToModel(std::vector<std::vector<double>> &v);
   bool midiNotesToModel();
   void prepareToPlay();
   void playMidiIntoModel();
@@ -527,6 +528,23 @@ void rolypoly::resetInputBuffer() {
   }
 }
 
+void rolypoly::vectorToModel(std::vector<std::vector<double>> &v) {
+  int channels = v.size();
+  int length = v[0].size();
+
+  // create a tensor from the vector
+  torch::Tensor input_tensor = torch::zeros({1, channels, length});
+  for (int c = 0; c < channels; c++) {
+    for (int i = 0; i < length; i++) {
+      input_tensor[0][c][i] = v[c][i];
+    }
+  }
+
+  // send the onset to the model
+  auto output = m_model.get_model().forward({input_tensor}).toTensor();
+  cout << output << endl;
+}
+
 bool rolypoly::midiNotesToModel() {
   // populates score
   int channels = SCORE_DIM;
@@ -727,8 +745,10 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   for (int c = 2; c < m_in_dim; c++) {
     input_tensor[0][c][0] = score[c][closest_note]; // bpm, tsig, pos_in_bar
   }
+  //cout << "input: " << input_tensor << endl;
   // send the onset to the model
-  m_model.get_model().forward({input_tensor}).toTensor();
+  auto output = m_model.get_model().forward({input_tensor}).toTensor();
+  cout << "output: " << output << endl;
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {

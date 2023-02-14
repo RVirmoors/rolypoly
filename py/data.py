@@ -116,7 +116,7 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor):
     if input[:, 0, 0] != 666:
         return x_dec
     i = x_dec.shape[2] - 1
-    while i > 0:
+    while i >= 0:
         if input[:, 2:5, 0].all() == x_dec[:, 9:12, i].all():
             x_dec[:, 13, i] = input[:, 1, 0]
             return x_dec

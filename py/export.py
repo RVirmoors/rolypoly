@@ -85,10 +85,10 @@ class ExportRoly(nn_tilde.Module):
             return out
 
         if self.play[0]:
-            if m_buf_size == 1: # just one onset
+            if input[:, 0, 0] == 666: # just one onset
                 print("one onset")
                 # update x_dec[:,:,14] with realised tau_guitar
-                self.x_dec = data.readLiveOnset(input, self.x_dec)
+                #self.x_dec = data.readLiveOnset(input, self.x_dec)
                 # make x_dec have m_buf_size samples
                 #out = torch.cat((self.x_dec, 
                     #torch.zeros(1, 14, m_buf_size - self.x_dec.shape[2])), dim=-1)
@@ -101,7 +101,7 @@ class ExportRoly(nn_tilde.Module):
                 latest = self.x_dec.shape[-1] - before
                 # get predictions
                 preds = self.pretrained(self.x_enc, self.x_dec)                
-                # update x_dec with latest predictions
+                # update y_hat with latest predictions
                 self.y_hat = torch.cat((self.y_hat, preds[:,:,-latest:]), dim=-1) 
                 return self.y_hat
         else:
@@ -135,9 +135,9 @@ if __name__ == '__main__':
         m.set_read(False)
         print("=====================")
         m.set_play(True)
-        out = m.forward(live_drums)
-        print("drums -> y_hat: ", out[:,:,-1], out.shape)
+        #out = m.forward(live_drums)
+        #print("drums -> y_hat: ", out[:,:,-1], out.shape)
         out = m.forward(live_drums)
         print("drums2 > y_hat: ", out[:,:,-1], out.shape)
         out = m.forward(guit)
-        print("guit -> dec: ", out[:,:,3], out.shape)
+        print("guit -> dec: ", out, out.shape)
