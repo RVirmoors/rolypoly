@@ -13,9 +13,6 @@
 #define SCORE_DIM 6 // hit, vel, bpm, tsig, pos_in_bar, TIME_MS
 #define TIME_MS 5
 #define TAU 12
-#define TIMER_INACTIVE 0
-#define TIMER_READ 1
-#define TIMER_PLAY 2
 
 // nn~
 #include "c74_min.h"
@@ -72,6 +69,7 @@ public:
   bool done_playing;
   int m_lookahead_ms; // in ms
   short timer_mode; // 0 inactive, 1 read, 2 play
+  enum TIMER {INACTIVE, READ, PLAY};
 
   std::vector<std::pair<long, double>> tempo_map;
   int current_tempo_index;
@@ -224,10 +222,10 @@ public:
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
     cout << "t_score and size ============  " << t_score << "    <<<<  " << score_size << endl;
-    if (timer_mode == TIMER_READ) {
+    if (timer_mode == TIMER::READ) {
       //cout << "timer read" << endl;
       read_deferred.set();
-    } else if (timer_mode == TIMER_PLAY) {
+    } else if (timer_mode == TIMER::PLAY) {
       //cout << "timer play" << endl;
       perform_threaded.set();
       if (!done_playing) {
@@ -303,7 +301,7 @@ public:
       }
 
       if (m_use_thread && !done_playing) {
-        m_compute_thread = std::make_unique<std::thread>(&rolypoly::model_perform, this);
+        //m_compute_thread = std::make_unique<std::thread>(&rolypoly::model_perform, this);
         //if (DEBUG) cout << "started thread" << endl;
       }
       return {};
@@ -314,7 +312,7 @@ public:
     MIN_FUNCTION {
       done_reading = false;
       attr = "read"; attr_value = "true"; set_attr();
-      timer_mode = TIMER_READ;
+      timer_mode = TIMER::READ;
       m_timer.delay(0);
       return {};
     }
@@ -329,7 +327,7 @@ public:
       done_playing = false;
       prepareToPlay();
       attr = "play"; attr_value = "true"; set_attr();
-      timer_mode = TIMER_PLAY;
+      timer_mode = TIMER::PLAY;
       m_timer.delay(0);
       
       return {};
@@ -399,13 +397,21 @@ rolypoly::rolypoly(const atoms &args)
   if (args.size() > 2) { // THREE ARGUMENTS ARE GIVEN
     m_buffer_size = int(args[2]);
   }
-
-  // TRY TO LOAD MODEL
-  if (m_model.load(std::string(m_path))) {
-    cerr << "error during loading" << endl;
-    error();
-    return;
+  torch::jit::script::Module mod;
+  try {
+      mod = torch::jit::load(std::string(m_path));
+	  mod.eval();
   }
+  catch (const std::exception& e) {
+      std::cerr << e.what() << '\n';
+  }
+  cout << "loaded model " << m_model.get_model().is_optimized() << endl;
+
+  torch::Tensor input = torch::rand({1, 5, 1});
+        torch::Tensor output;
+        output = mod.forward({input}).toTensor().detach();
+
+        cout << output << endl;
 
   // GET MODEL'S METHOD PARAMETERS
   auto params = m_model.get_method_params(m_method);
@@ -802,7 +808,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       if (DEBUG) cout << "reached end of midifile" << endl;
       attr = "play"; attr_value = "false"; set_attr();
       done_playing = true;
-      timer_mode = TIMER_INACTIVE;
+      timer_mode = TIMER::INACTIVE;
       m_timer.stop();
       if (m_compute_thread && m_compute_thread->joinable()) {
         cout << "==END==JOINING THREAD" << endl;

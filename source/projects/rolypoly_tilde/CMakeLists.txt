@@ -20,8 +20,8 @@ include_directories(
 
 link_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/lib
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/Release
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/backend/Release
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/Debug
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/backend/Debug
 )
 
 link_libraries(
@@ -77,16 +77,18 @@ if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
 endif()
 endif()
 
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MT")
+
 #############################################################
 # UNIT TEST
 #############################################################
 
 # include(${C74_MIN_API_DIR}/test/min-object-unittest.cmake)
 
-target_precompile_headers(${PROJECT_NAME} 
-	PRIVATE 
-	<torch/torch.h>
-	<string>
-	<thread>
-	<vector>
-	<MidiFile.h>)
+#target_precompile_headers(${PROJECT_NAME} 
+#	PRIVATE 
+#	<torch/torch.h>
+#	<string>
+#	<thread>
+#	<vector>
+#	<MidiFile.h>)

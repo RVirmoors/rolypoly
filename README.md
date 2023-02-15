@@ -47,7 +47,7 @@ first you need to build `nn_tilde` (just the backend is enough): inside `nn_tild
 - `mkdir build`
 - `cd build`
 inside it, run:
-- `cmake . -S ..\src\backend  -DCMAKE_BUILD_TYPE:STRING=Release -A x64 -DTorch_DIR="..\libtorch\share\cmake\Torch"` (if this Torch_DIR doesn't work, replace it with the absolute path)
+- `cmake . -S ..\src\backend  -DCMAKE_BUILD_TYPE:STRING=Release -A x64 -DTorch_DIR="..\..\libtorch\share\cmake\Torch"` (if this Torch_DIR doesn't work, replace it with the absolute path)
 - `cmake --build . --config Release`
 
 now go back to the project root, create a `build` subfolder and enter it:

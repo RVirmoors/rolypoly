@@ -85,13 +85,12 @@ class ExportRoly(nn_tilde.Module):
             return out
 
         if self.play[0]:
-            if input[:, 0, 0] == 666: # just one onset
+            if m_buf_size == 1 and input[:, 0, 0] == 666: # just one onset
                 print("one onset")
+                if self.x_dec.shape[2] == 0:
+                    return torch.zeros(1, 14, 1) # can't modify x_dec yet!
                 # update x_dec[:,:,14] with realised tau_guitar
                 #self.x_dec = data.readLiveOnset(input, self.x_dec)
-                # make x_dec have m_buf_size samples
-                #out = torch.cat((self.x_dec, 
-                    #torch.zeros(1, 14, m_buf_size - self.x_dec.shape[2])), dim=-1)
                 return self.x_dec   
             else: # full buffer = receiving drum hits
                 print("full buffer")
