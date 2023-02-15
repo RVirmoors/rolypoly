@@ -85,6 +85,7 @@ class ExportRoly(nn_tilde.Module):
             return out
 
         if self.play[0]:
+            return torch.zeros(1, 14, 1)
             if m_buf_size == 1 and input[:, 0, 0] == 666: # just one onset
                 print("one onset")
                 if self.x_dec.shape[2] == 0:

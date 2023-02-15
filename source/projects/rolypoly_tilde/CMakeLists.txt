@@ -14,14 +14,14 @@ include(${C74_MIN_API_DIR}/script/min-pretarget.cmake)
 include_directories( 
 	"${C74_INCLUDES}"
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../midifile/include
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../_debug/libtorch/include
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../_debug/libtorch/include/torch/csrc/api/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include/torch/csrc/api/include
 )
 
 link_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../_debug/libtorch/lib
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/Debug
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/backend/Debug
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/lib
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/Release
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/backend/Release
 )
 
 link_libraries(
@@ -85,10 +85,10 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
 
 # include(${C74_MIN_API_DIR}/test/min-object-unittest.cmake)
 
-#target_precompile_headers(${PROJECT_NAME} 
-#	PRIVATE 
-#	<torch/torch.h>
-#	<string>
-#	<thread>
-#	<vector>
-#	<MidiFile.h>)
+target_precompile_headers(${PROJECT_NAME} 
+	PRIVATE 
+	<torch/torch.h>
+	<string>
+	<thread>
+	<vector>
+	<MidiFile.h>)

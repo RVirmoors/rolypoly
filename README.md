@@ -38,7 +38,7 @@ and then export it to a `.ts` file which `rolypoly~` can use in Max:
 
 you need [CMake](https://cmake.org/download/) installed
 
-create a subfolder called `libtorch` and[download+extract LibTorch](https://pytorch.org/get-started/locally/) into it
+create a subfolder called `libtorch` and[download+extract LibTorch](https://pytorch.org/get-started/locally/) (Release version) into it
 
 copy the libtorch *.dll files from `libtorch/lib` to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
 
