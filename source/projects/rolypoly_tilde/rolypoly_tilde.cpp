@@ -397,21 +397,13 @@ rolypoly::rolypoly(const atoms &args)
   if (args.size() > 2) { // THREE ARGUMENTS ARE GIVEN
     m_buffer_size = int(args[2]);
   }
-  torch::jit::script::Module mod;
-  try {
-      mod = torch::jit::load(std::string(m_path));
-	  mod.eval();
-  }
-  catch (const std::exception& e) {
-      std::cerr << e.what() << '\n';
-  }
-  cout << "loaded model " << m_model.get_model().is_optimized() << endl;
 
-  torch::Tensor input = torch::rand({1, 5, 1});
-        torch::Tensor output;
-        output = mod.forward({input}).toTensor().detach();
-
-        cout << output << endl;
+  // TRY TO LOAD MODEL
+  if (m_model.load(std::string(m_path))) {
+      cerr << "error during loading" << endl;
+      error();
+      return;
+  }
 
   // GET MODEL'S METHOD PARAMETERS
   auto params = m_model.get_method_params(m_method);
