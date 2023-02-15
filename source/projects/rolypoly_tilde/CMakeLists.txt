@@ -19,7 +19,7 @@ include_directories(
 )
 
 link_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/lib
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../_debug/libtorch/lib
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/Debug
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/backend/Debug
 )
