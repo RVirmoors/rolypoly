@@ -7,7 +7,7 @@ using namespace std;
 
 int main() {
     torch::jit::script::Module mod;
-    std::string m_path = "../../help/roly.ts";
+    std::string m_path = "c:/Users/rv/Documents/Max 8/Packages/rolypoly/help/roly.ts";
 
     try {
         mod = torch::jit::load(m_path);

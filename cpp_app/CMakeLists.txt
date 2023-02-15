@@ -7,12 +7,12 @@ set(SOURCE_FILES
 )
 
 include_directories(	
-    ${CMAKE_CURRENT_SOURCE_DIR}/../libtorch/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../libtorch/include/torch/csrc/api/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_debug/libtorch/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_debug/libtorch/include/torch/csrc/api/include
 )
 
 link_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/../libtorch/lib
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_debug/libtorch/lib
 )
 
 link_libraries(
