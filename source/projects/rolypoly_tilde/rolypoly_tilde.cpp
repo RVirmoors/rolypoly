@@ -66,8 +66,9 @@ public:
   long i_fromModel; // next timestep to be read from the model
   long t_play; // next timestep to be played from play_notes
   std::vector<std::vector<double>> play_notes; // hits to be played
+  std::vector<std::vector<double>> modelOut; // result from calling model.forward()
   bool done_playing;
-  int m_lookahead_ms; // in ms
+  int lookahead_ms; // in ms
   short timer_mode; // 0 inactive, 1 read, 2 play
   enum TIMER {INACTIVE, READ, PLAY};
 
@@ -83,7 +84,7 @@ public:
   bool midiNotesToModel();
   void prepareToPlay();
   void playMidiIntoModel();
-  void getTauFromModel();
+  void getTauFromModel(std::vector<std::vector<double>> &modelOut);
   double computeNextNoteTimeMs();
   void incrementPlayIndexes();
   void processLiveOnsets(audio_bundle input);
@@ -209,12 +210,18 @@ public:
   timer<timer_options::defer_delivery> warmup { this,
     MIN_FUNCTION {
       // warmup the model
+      std::chrono::microseconds duration;
       for (int i = 0; i < 7; i++) {
           auto start = std::chrono::high_resolution_clock::now();
           model_perform();
           auto end = std::chrono::high_resolution_clock::now();
-          auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+          duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
           if (DEBUG) cout << "step " << i+1 << "/7: " << duration.count() / 1000. << " ms" << endl;
+      }
+      // if the model is too slow, we need to increase the lookahead
+      if (duration.count() / 1000. > lookahead_ms) {
+        lookahead_ms = duration.count() / 1000. + 50;
+        if (DEBUG) cout << "increasing lookahead to " << lookahead_ms << " ms" << endl;
       }
       return {};
     }
@@ -229,7 +236,7 @@ public:
       //cout << "timer play" << endl;
       perform_threaded.set();
       if (!done_playing) {
-        m_timer.delay(m_lookahead_ms);
+        m_timer.delay(lookahead_ms);
       }
     } 
     return {};
@@ -277,31 +284,31 @@ public:
   queue<> perform_threaded { this,
     MIN_FUNCTION {
       if (m_compute_thread && m_compute_thread->joinable()) {
-        //if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
+        if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
         //if (DEBUG) cout << m_compute_thread->get_id() << endl;
         m_compute_thread->join();
+        if (DEBUG) cout << "joined at " << playhead_ms << " ms : " << i_toModel << endl;
       }
 
-      if (DEBUG) cout << "joined at " << playhead_ms << " ms : " << i_toModel << endl;
       // send midi notes
       // to the circular buffer, to later get the model output
-      if (!done_playing)
-        playMidiIntoModel();
+      //if (!done_playing)
+        //playMidiIntoModel();
 
-      if (m_in_buffer[0].full()) {
+      // if (m_in_buffer[0].full()) {
         // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
-        for (int c(0); c < m_in_dim; c++)
-          m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
+        // for (int c(0); c < m_in_dim; c++)
+        //   m_in_buffer[c].get(m_in_model[c].get(), m_buffer_size);
 
         // TRANSFER MEMORY BETWEEN OUTPUT CIRCULAR BUFFER AND MODEL BUFFER
-        for (int c(0); c < m_out_dim; c++)
-          m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
+        // for (int c(0); c < m_out_dim; c++)
+        //   m_out_buffer[c].put(m_out_model[c].get(), m_buffer_size);
 
-        getTauFromModel();
-      }
+        //getTauFromModel();
+      // }
 
       if (m_use_thread && !done_playing) {
-        //m_compute_thread = std::make_unique<std::thread>(&rolypoly::model_perform, this);
+        m_compute_thread = std::make_unique<std::thread>(&rolypoly::vectorToModel, this, play_notes);
         //if (DEBUG) cout << "started thread" << endl;
       }
       return {};
@@ -359,7 +366,7 @@ void rolypoly::initialiseScore() {
 rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr), m_in_dim(1), m_in_ratio(1), m_out_dim(1),
       m_out_ratio(1), m_buffer_size(64), m_method("forward"),
-      m_use_thread(true), m_lookahead_ms(200) {
+      m_use_thread(true), lookahead_ms(200) {
 
   m_model = Backend();
 
@@ -466,6 +473,11 @@ rolypoly::rolypoly(const atoms &args)
 rolypoly::~rolypoly() {
   if (m_compute_thread && m_compute_thread->joinable())
     m_compute_thread->join();
+  // delete score
+  for (int i = 0; i < score_size; i++) {
+    delete[] score[i];
+  }
+  delete[] score;
 }
 
 bool rolypoly::has_settable_attribute(std::string attribute) {
@@ -537,10 +549,18 @@ void rolypoly::vectorToModel(std::vector<std::vector<double>> &v) {
       input_tensor[0][c][i] = v[c][i];
     }
   }
-
+  cout << "input_tensor:" << input_tensor << endl;
   // send the onset to the model
   auto output = m_model.get_model().forward({input_tensor}).toTensor();
-  cout << output << endl;
+  cout << "output:" << output << endl;
+  // print the output shape
+
+  // convert the output to a vector
+  for (int c = 0; c < output.size(1); c++) {
+    for (int i = 0; i < output.size(2); i++) {
+      modelOut[c][i] = output[0][c][i].item<float>();
+    }
+  }
 }
 
 bool rolypoly::midiNotesToModel() {
@@ -624,42 +644,38 @@ void rolypoly::prepareToPlay() {
   playhead_ms = i_toModel = i_fromModel =
     t_score = t_play = 0;
   play_notes.clear();
-  for (int i = 0; i < score_size; i++) {
-    std::vector<double> next_note = {0,0,0,0,0,0,0,0,0,
-    score[2][i], score[3][i], score[4][i], 0};
-    play_notes.push_back(next_note);
+  play_notes.reserve(m_out_dim);
+  for (int c = 0; c < m_out_dim; c++) {
+    play_notes[c].reserve(score_size);
   }
 }
 
 void rolypoly::playMidiIntoModel() {
   // populate m_in_buffer with notes that don't have a tau yet
-  // taking all the notes in the upcoming m_lookahead_ms
+  // taking all the notes in the upcoming lookahead_ms
   double start_ms = score[TIME_MS][i_toModel];
+  std::vector<std::vector<double>> in;
+  in.reserve(m_in_dim);
   if (m_model.get_attribute_as_string("generate") == "false") {
     long t_send; // for sending on each channel
     for (int c = 0; c < m_in_dim; c++) {
-      t_send = i_toModel; 
-      double *in = new double[m_buffer_size];
+      t_send = i_toModel;
       for (int i = 0; i < m_buffer_size; i++) {
         double timestep_ms = score[TIME_MS][t_send];
-        // get all notes in the next m_lookahead_ms
-        if (timestep_ms < start_ms + m_lookahead_ms && t_send < score_size) {
-          in[i] = score[c][t_send];
+        // get all notes in the next lookahead_ms
+        if (timestep_ms < start_ms + lookahead_ms && t_send < score_size) {
+          in[c].push_back(score[c][t_send]);
           if (DEBUG && c==0) cout << "sent timestep " << t_send << " at " << timestep_ms << " ms" << endl;
           t_send++;
-        } else {
-        // the rest stays zero
-        in[i] = 0;
         }
       }
-      m_in_buffer[c].put(in, m_buffer_size);
     }
     i_toModel = t_send;
   } // TODO: "generate" == "true" -> play latest note from play_notes
     // TODO: if pos_in_bar < previous pos_in_bar, then we have a new bar
 }
 
-void rolypoly::getTauFromModel() {
+void rolypoly::getTauFromModel(std::vector<std::vector<double>> &modelOut) {
   // populate play_notes[...i_toModel][TAU]
   long writeTo;
   double* out = new double[m_buffer_size];
