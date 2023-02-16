@@ -79,7 +79,8 @@ public:
 
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
-  void resetInputBuffer();
+  //void resetInputBuffer();
+
   void vectorToModel(std::vector<std::vector<double>> &v);
   bool midiNotesToModel();
   void prepareToPlay();
@@ -244,7 +245,7 @@ public:
 
   queue<> read_deferred {this, 
     MIN_FUNCTION {
-      resetInputBuffer();
+      //resetInputBuffer();
       reading_midi ++;
       if (DEBUG) cout << reading_midi << " " << done_reading << endl;
 
@@ -527,16 +528,16 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
   }
 }
 
-void rolypoly::resetInputBuffer() {
-  if(!m_in_buffer[0].empty() && !reading_midi && !done_reading) {
-    if (DEBUG) cout << "resettin" << endl;
-    // if the buffer isn't empty, reset it
-    for (int c(0); c < m_in_dim; c++)
-      m_in_buffer[c].reset();
-    done_reading = false;
-    if (DEBUG) cout << "starting to read" << endl;
-  }
-}
+// void rolypoly::resetInputBuffer() {
+//   if(!m_in_buffer[0].empty() && !reading_midi && !done_reading) {
+//     if (DEBUG) cout << "resettin" << endl;
+//     // if the buffer isn't empty, reset it
+//     for (int c(0); c < m_in_dim; c++)
+//       m_in_buffer[c].reset();
+//     done_reading = false;
+//     if (DEBUG) cout << "starting to read" << endl;
+//   }
+// }
 
 void rolypoly::vectorToModel(std::vector<std::vector<double>> &v) {
   int channels = v.size();
