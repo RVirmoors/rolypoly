@@ -638,7 +638,7 @@ void rolypoly::playMidiIntoVector() {
       for (int c = 0; c < IN_DIM; c++) {
         note[c] = score[c][i_toModel];
       }
-      in.push_back(note);
+      in_notes.push_back(note);
       i_toModel++;          
       if (DEBUG) cout << "sent timestep " << i_toModel << " at " << timestep_ms << " ms" << endl;    
       timestep_ms = score[TIME_MS][i_toModel];
