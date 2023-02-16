@@ -68,6 +68,8 @@ public:
   long i_fromModel; // next timestep to be read from the model  
   at::Tensor modelOut; // result from calling model.forward()
   long t_play; // next timestep to be played from play_notes
+  std::vector<std::array<double, IN_DIM>> in_notes; // notes to be sent to the model
+  std::array<double, IN_DIM> in_onset; // onset to be sent to the model
   std::vector<std::array<double, OUT_DIM>> play_notes; // hits to be played
   bool done_playing;
   int lookahead_ms; // in ms
@@ -85,7 +87,7 @@ public:
   bool midiNotesToModel();
 
   void prepareToPlay();
-  std::vector<std::array<double, IN_DIM>> playMidiIntoVector();
+  void playMidiIntoVector();
   void vectorToModel(std::vector<std::array<double, IN_DIM>> &v);
   void getTauFromModel();
   double computeNextNoteTimeMs();
@@ -622,12 +624,12 @@ void rolypoly::prepareToPlay() {
   play_notes.reserve(score_size);
 }
 
-std::vector<std::array<double, IN_DIM>> rolypoly::playMidiIntoVector() {
-  // populate 2D vector with notes that don't have a tau yet
+void rolypoly::playMidiIntoVector() {
+  // populate vector of arrays with notes that don't have a tau yet
   // taking all the notes in the upcoming lookahead_ms
   double start_ms = score[TIME_MS][i_toModel];
-  std::vector<std::array<double, IN_DIM>> in;
-  in.reserve(lookahead_ms / 100); // 10 notes per second
+  in_notes.clear();
+  in_notes.reserve(lookahead_ms / 100); // 10 notes per second
   if (m_model.get_attribute_as_string("generate") == "false") {
     double timestep_ms = score[TIME_MS][i_toModel];
     // get all notes in the next lookahead_ms
@@ -643,7 +645,6 @@ std::vector<std::array<double, IN_DIM>> rolypoly::playMidiIntoVector() {
     }
   } // TODO: "generate" == "true" -> play latest note from play_notes
     // TODO: if pos_in_bar < previous pos_in_bar, then we have a new bar
-  return in;
 }
 
 void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
