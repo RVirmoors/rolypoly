@@ -41,7 +41,7 @@ unsigned power_ceil(unsigned x) {
 
 class rolypoly : public object<rolypoly>, public vector_operator<> {
 public:
-	MIN_DESCRIPTION {"Expressive Drum Machine: read MIDI file, listen to audio, and output drums"};
+	MIN_DESCRIPTION {"Expressive Drum Machine: read MIDI file, listen to audio, output drums"};
 	MIN_TAGS {"drums, sync, deep learning"};
 	MIN_AUTHOR {"Grigore Burloiu // rvirmoors"};
 	MIN_RELATED {"nn~, flucoma~"};
@@ -66,10 +66,10 @@ public:
 
   double playhead_ms;  // in ms
   long i_fromModel; // next timestep to be read from the model  
-  at::Tensor modelOut; // result from calling model.forward()
   long t_play; // next timestep to be played from play_notes
   std::vector<std::array<double, IN_DIM>> in_notes; // notes to be sent to the model
   std::array<double, IN_DIM> in_onset; // onset to be sent to the model
+  at::Tensor modelOut; // result from calling model.forward()
   std::vector<std::array<double, OUT_DIM>> play_notes; // hits to be played
   bool done_playing;
   int lookahead_ms; // in ms
