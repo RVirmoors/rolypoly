@@ -701,7 +701,11 @@ void rolypoly::getTauFromModel() {
 }
 
 double rolypoly::computeNextNoteTimeMs() {
-  if (!done_playing) { // m_generate == "false" &&
+  if (!m_generate && !done_playing) { 
+    if (t_play >= play_notes.size()) {
+      //cout << "no tau yet" << endl;
+      return score[TIME_MS][t_score];
+    }
     return score[TIME_MS][t_score] + play_notes[t_play][TAU];
   } else {
     // TODO: "generate" == "true" -> use latest notes from play_notes
@@ -803,7 +807,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 
-    if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
+    //if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
 
     if (playhead_ms >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note
