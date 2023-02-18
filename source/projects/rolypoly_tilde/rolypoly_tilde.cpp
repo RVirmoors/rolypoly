@@ -100,6 +100,7 @@ public:
 	std::vector<std::string> settable_attributes;
 	bool has_settable_attribute(std::string attribute);
 	c74::min::path m_path;
+  int m_in_dim, m_out_dim;
 
 	// BUFFER RELATED MEMBERS
 	int m_buffer_size;
@@ -368,7 +369,7 @@ void rolypoly::initialiseScore() {
 }
 
 rolypoly::rolypoly(const atoms &args)
-    : m_compute_thread(nullptr), 
+    : m_compute_thread(nullptr),
       m_buffer_size(64), m_method("forward"),
       m_use_thread(true), lookahead_ms(200) {
 
@@ -428,8 +429,8 @@ rolypoly::rolypoly(const atoms &args)
     error("method " + m_method + " not found !");
   }
 
-  //IN_DIM = params[0];
-  //OUT_DIM = params[2];
+  m_in_dim = params[0];
+  m_out_dim = params[2];
 
   if (m_buffer_size < 16) {
     cerr << "buffer size too small, should be at least 16" << endl;
@@ -446,14 +447,14 @@ rolypoly::rolypoly(const atoms &args)
   // CREATE INLET, OUTLETS and BUFFERS
   m_inlets.push_back(std::make_unique<inlet<>>(
     this, "(signal) musician input", "signal"));
-  m_in_buffer = std::make_unique<circular_buffer<double, float>[]>(IN_DIM);
-  for (int i(0); i < IN_DIM; i++) {
+  m_in_buffer = std::make_unique<circular_buffer<double, float>[]>(m_in_dim);
+  for (int i(0); i < m_in_dim; i++) {
     m_in_buffer[i].initialize(m_buffer_size);
     m_in_model.push_back(std::make_unique<float[]>(m_buffer_size));
   }
 
-  m_out_buffer = std::make_unique<circular_buffer<float, double>[]>(OUT_DIM);
-  for (int i(0); i < OUT_DIM; i++) {
+  m_out_buffer = std::make_unique<circular_buffer<float, double>[]>(m_out_dim);
+  for (int i(0); i < m_out_dim; i++) {
     std::string output_label = "";
     try {
       output_label = m_model.get_model().attr(m_method + "_output_labels").toList().get(i).toStringRef();
@@ -465,7 +466,6 @@ rolypoly::rolypoly(const atoms &args)
     m_out_buffer[i].initialize(m_buffer_size);
     m_out_model.push_back(std::make_unique<float[]>(m_buffer_size));
   }
-  
   cout << "Running warmup, please wait (Max will freeze for a few seconds) ..." << endl;
   // "play must be set to true for this to work"
   attr = "play"; attr_value = "false"; set_attr();  
@@ -639,8 +639,8 @@ void rolypoly::playMidiIntoVector() {
         note[c] = score[c][i_toModel];
       }
       in_notes.push_back(note);
-      i_toModel++;          
-      if (DEBUG) cout << "sent timestep " << i_toModel << " at " << timestep_ms << " ms" << endl;    
+      i_toModel++;
+      if (DEBUG) cout << "added timestep " << i_toModel << " at " << timestep_ms << " ms" << endl;    
       timestep_ms = score[TIME_MS][i_toModel];
     }
   } // TODO: "generate" == "true" -> play latest note from play_notes

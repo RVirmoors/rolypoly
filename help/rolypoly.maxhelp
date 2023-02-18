@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 212.0, -995.0, 926.0, 953.0 ],
+		"rect" : [ 212.0, 85.0, 926.0, 953.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -779,7 +779,7 @@
 					"numoutlets" : 14,
 					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
 					"patching_rect" : [ 107.5, 188.666667640209198, 155.5, 22.0 ],
-					"text" : "rolypoly~ roly baron 64"
+					"text" : "rolypoly~ roly baron"
 				}
 
 			}
