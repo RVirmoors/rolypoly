@@ -361,7 +361,14 @@ void rolypoly::model_perform() {
   m_model.perform(in_model, out_model, m_buffer_size, m_method, 1);
 }
 
-void rolypoly::initialiseScore() {
+void rolypoly::initialiseScore() {\
+  // delete score
+  if (score_size) {
+    for (int c = 0; c < SCORE_DIM; c++) {
+        delete[] score[c];
+    }
+    delete[] score;
+  }
   score = new double*[SCORE_DIM];
   for (int c(0); c < SCORE_DIM; c++) {
     score[c] = new double[MAX_SCORE_LENGTH];
@@ -369,7 +376,7 @@ void rolypoly::initialiseScore() {
 }
 
 rolypoly::rolypoly(const atoms &args)
-    : m_compute_thread(nullptr),
+    : m_compute_thread(nullptr), score_size(0),
       m_buffer_size(64), m_method("forward"),
       m_use_thread(true), lookahead_ms(200) {
 
@@ -401,7 +408,7 @@ rolypoly::rolypoly(const atoms &args)
 
     initialiseScore();
     done_playing = false;
-    playhead_ms = i_fromModel = i_toModel = score_size = 
+    playhead_ms = i_fromModel = i_toModel = 
       t_score = t_play =
       current_tempo_index = current_timesig_index = 
       skip = 0;
@@ -476,10 +483,13 @@ rolypoly::~rolypoly() {
   if (m_compute_thread && m_compute_thread->joinable())
     m_compute_thread->join();
   // delete score
-  for (int i = 0; i < score_size; i++) {
-    delete[] score[i];
+  if (score_size) {
+    for (int c = 0; c < SCORE_DIM; c++) {
+        delete[] score[c];
+    }
+    delete[] score;
   }
-  delete[] score;
+
 }
 
 bool rolypoly::has_settable_attribute(std::string attribute) {
