@@ -224,8 +224,8 @@ public:
           if (DEBUG) cout << "step " << i+1 << "/7: " << duration.count() / 1000. << " ms" << endl;
       }
       // if the model is too slow, we need to increase the lookahead
-      if (duration.count() / 1000. > lookahead_ms) {
-        lookahead_ms = duration.count() / 1000. + 50;
+      if (duration.count() / 1000. > lookahead_ms / 4) {
+        lookahead_ms = duration.count() / 1000. * 4 + 50;
         if (DEBUG) cout << "increasing lookahead to " << lookahead_ms << " ms" << endl;
       }
       return {};
@@ -241,7 +241,7 @@ public:
       //cout << "timer play" << endl;
       perform_threaded.set();
       if (!done_playing) {
-        m_timer.delay(lookahead_ms);
+        m_timer.delay(lookahead_ms / 2);
       }
     } 
     return {};
@@ -297,8 +297,8 @@ public:
 
       // send midi notes
       // to the circular buffer, to later get the model output
-      //if (!done_playing)
-        //playMidiIntoVector();
+      if (!done_playing)
+        playMidiIntoVector();
 
       // if (m_in_buffer[0].full()) {
         // TRANSFER MEMORY BETWEEN INPUT CIRCULAR BUFFER AND MODEL BUFFER
@@ -489,7 +489,6 @@ rolypoly::~rolypoly() {
     }
     delete[] score;
   }
-
 }
 
 bool rolypoly::has_settable_attribute(std::string attribute) {
@@ -637,7 +636,8 @@ void rolypoly::prepareToPlay() {
 void rolypoly::playMidiIntoVector() {
   // populate vector of arrays with notes that don't have a tau yet
   // taking all the notes in the upcoming lookahead_ms
-  double start_ms = score[TIME_MS][i_toModel];
+  double start_ms = playhead_ms; //score[TIME_MS][i_toModel];
+  //cout << "taking new notes looking ahead from " << start_ms << " ms" << endl;
   in_notes.clear();
   in_notes.reserve(lookahead_ms / 100); // 10 notes per second
   if (m_model.get_attribute_as_string("generate") == "false") {
@@ -692,7 +692,7 @@ void rolypoly::getTauFromModel() {
 }
 
 double rolypoly::computeNextNoteTimeMs() {
-  if (m_model.get_attribute_as_string("generate") == "false" && !done_playing) {
+  if (!done_playing) { // m_model.get_attribute_as_string("generate") == "false" &&
     return score[TIME_MS][t_score] + play_notes[t_play][TAU];
   } else {
     // TODO: "generate" == "true" -> use latest notes from play_notes
