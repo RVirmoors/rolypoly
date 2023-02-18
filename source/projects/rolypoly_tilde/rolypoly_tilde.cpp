@@ -1,6 +1,8 @@
 // 2023 rvirmoors
 // adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 
+// TODO remove m_model.get_attribute_as_string from all perform()-related methods
+
 #define DEBUG true
 
 #ifndef VERSION
