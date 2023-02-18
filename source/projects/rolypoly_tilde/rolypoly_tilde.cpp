@@ -1,8 +1,6 @@
 // 2023 rvirmoors
 // adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 
-// TODO remove m_model.get_attribute_as_string from all perform()-related methods
-
 #define DEBUG true
 
 #ifndef VERSION
@@ -55,6 +53,11 @@ public:
 	rolypoly(const atoms &args = {});
 	~rolypoly();
 
+  // ATTRIBUTES
+  bool m_read;
+  bool m_play;
+  bool m_generate;
+
   // MIDI RELATED MEMBERS
   MidiFile midifile;
   c74::min::path m_midi_path;
@@ -66,6 +69,7 @@ public:
   int skip; // used to skip everything but NoteOn events
   bool done_reading;
 
+  // PLAY RELATED MEMBERS
   double playhead_ms;  // in ms
   long i_fromModel; // next timestep to be read from the model  
   long t_play; // next timestep to be played from play_notes
@@ -280,6 +284,7 @@ public:
         if (DEBUG) cout << "done reading" << endl;
         reading_midi = 0;
         attr = "read"; attr_value = "false"; set_attr();
+        m_read = false;
         prepareToPlay();
       } else {
         m_timer.delay(10);
@@ -326,6 +331,7 @@ public:
     MIN_FUNCTION {
       done_reading = false;
       attr = "read"; attr_value = "true"; set_attr();
+      m_read = true;
       timer_mode = TIMER::READ;
       m_timer.delay(0);
       return {};
@@ -341,6 +347,7 @@ public:
       done_playing = false;
       prepareToPlay();
       attr = "play"; attr_value = "true"; set_attr();
+      m_play = true;
       timer_mode = TIMER::PLAY;
       m_timer.delay(0);
       
@@ -379,6 +386,7 @@ void rolypoly::initialiseScore() {\
 
 rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr), score_size(0),
+      m_read(false), m_play(false), m_generate(false),
       m_buffer_size(64), m_method("forward"),
       m_use_thread(true), lookahead_ms(200) {
 
@@ -476,8 +484,7 @@ rolypoly::rolypoly(const atoms &args)
     m_out_model.push_back(std::make_unique<float[]>(m_buffer_size));
   }
   cout << "Running warmup, please wait (Max will freeze for a few seconds) ..." << endl;
-  // "play must be set to true for this to work"
-  attr = "play"; attr_value = "false"; set_attr();  
+  // "play must be set to true in the python module for this to work"
   warmup.delay(500);
 }
 
@@ -642,7 +649,7 @@ void rolypoly::playMidiIntoVector() {
   //cout << "taking new notes looking ahead from " << start_ms << " ms" << endl;
   in_notes.clear();
   in_notes.reserve(lookahead_ms / 100); // 10 notes per second
-  if (m_model.get_attribute_as_string("generate") == "false") {
+  if (!m_generate) {
     double timestep_ms = score[TIME_MS][i_toModel];
     // get all notes in the next lookahead_ms
     while (timestep_ms < start_ms + lookahead_ms && i_toModel < score_size) {
@@ -694,7 +701,7 @@ void rolypoly::getTauFromModel() {
 }
 
 double rolypoly::computeNextNoteTimeMs() {
-  if (!done_playing) { // m_model.get_attribute_as_string("generate") == "false" &&
+  if (!done_playing) { // m_generate == "false" &&
     return score[TIME_MS][t_score] + play_notes[t_play][TAU];
   } else {
     // TODO: "generate" == "true" -> use latest notes from play_notes
@@ -779,12 +786,12 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
 void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
   // INPUT
-  if (m_model.get_attribute_as_string("play") == "true") {
+  if (m_play) {
     processLiveOnsets(input);
   }
 
   // OUTPUT
-  if (m_model.get_attribute_as_string("play") == "true") {
+  if (m_play) {
     // if the "play" attribute is true,
     // if there are notes to play, play them
     
@@ -796,7 +803,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 
-    //if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
+    if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
 
     if (playhead_ms >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note
@@ -816,6 +823,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score_size) {
       if (DEBUG) cout << "reached end of midifile" << endl;
       attr = "play"; attr_value = "false"; set_attr();
+      m_play = false;
       done_playing = true;
       timer_mode = TIMER::INACTIVE;
       m_timer.stop();
