@@ -86,6 +86,7 @@ public:
   int current_tempo_index;
   std::vector<std::pair<long, double>> timesig_map;
   int current_timesig_index;
+  double barStart = 0, barEnd = 0;
 
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
@@ -565,8 +566,7 @@ bool rolypoly::midiNotesToModel() {
     }
     return true; // done
   }
-  double barStart = 0;
-  double barEnd = 240 / tempo_map[0].second * timesig_map[0].second;
+
   // fill with midi data: hit, vel, tempo, timesig, pos_in_bar
 
   int counter = 0;
@@ -590,18 +590,21 @@ bool rolypoly::midiNotesToModel() {
       current_timesig_index++;
     }
     // bar positions
-    if (midifile[1][i].seconds >= barEnd * 0.999) {
+    if (barEnd == 0) // initialise
+      barEnd = 240 / tempo_map[0].second * timesig_map[0].second;
+    if (midifile[1][i].seconds >= barEnd * 0.99) {
       barStart = barEnd;
       barEnd += 240 / tempo_map[current_tempo_index].second * timesig_map[current_timesig_index].second;
+      //cout << "EOB" << endl;
     }    
-    double pos_in_bar = (midifile[1][i].seconds - barStart) / (barEnd - barStart);
+    double pos_in_bar = std::max(0., midifile[1][i].seconds - barStart) / (barEnd - barStart);
 
     if (DEBUG) cout << midifile[1][i].seconds
         << ' ' << int(midifile[1][i][1])
         << ' ' << tempo_map[current_tempo_index].second
         << ' ' << timesig_map[current_timesig_index].second
         << ' ' << pos_in_bar
-        << endl;
+        << ' ' << endl;
 
     writeTo = counter + (reading_midi - 1) * m_buffer_size;
 
