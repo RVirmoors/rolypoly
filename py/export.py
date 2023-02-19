@@ -85,7 +85,7 @@ class ExportRoly(nn_tilde.Module):
             return out
 
         if self.play[0]:
-            return torch.zeros(1, 14, 1)
+            #return torch.zeros(1, 14, 1)
             if m_buf_size == 1 and input[:, 0, 0] == 666: # just one onset
                 print("one onset")
                 if self.x_dec.shape[2] == 0:
@@ -103,7 +103,7 @@ class ExportRoly(nn_tilde.Module):
                 preds = self.pretrained(self.x_enc, self.x_dec)                
                 # update y_hat with latest predictions
                 self.y_hat = torch.cat((self.y_hat, preds[:,:,-latest:]), dim=-1) 
-                return self.y_hat
+                return self.y_hat[:, :, -latest:]
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
             return out

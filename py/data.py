@@ -106,6 +106,9 @@ def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
     X_score[:, 9:12, :] = input[:, 2:5, :]
     # remove all rows with only zeros
     mask = ~torch.all(X_score == 0, dim=1).squeeze()
+    print("mask:", mask.dim(), mask.shape, mask)
+    if mask.dim() == 0:
+        return X_score
     X_score = X_score[:, :, mask]
     return X_score
 
@@ -135,15 +138,17 @@ def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
 
 # === TESTS ===
 if __name__ == '__main__':
-    print(upbeat(0.05), upbeat(0.24))
-    test = torch.tensor([[[42, 36, 38, 42, 36],
-                          [70, 60, 111, 105, 101],
-                          [120, 120, 140, 140, 140],
-                          [1, 1, 1, 1.5, 1.5],
-                          [0, 0.5, 0.33, 0.33, 0.66]]])
-    print(readScore(test).shape)
-    x = readScore(test)
+    #print(upbeat(0.05), upbeat(0.24))
+    test = torch.tensor([[[0, 42, 36, 38, 42, 36],
+                          [0, 70, 60, 111, 105, 101],
+                          [0, 120, 120, 140, 140, 140],
+                          [0, 1, 1, 1, 1.5, 1.5],
+                          [0, 0, 0.5, 0.33, 0.33, 0.66]]])
+    test0 = torch.tensor([[[0],[0],[0],[0],[0]]])
+    test1 = torch.tensor([[[38],[95],[150],[1],[0.25]]])
+    x = readScore(test0)
+    print("readScore shape =", x.shape)
     feat = x.squeeze(0)
     for i in range(feat.shape[1]):
         print("->", feat[:, i])
-        print(bartime_to_ms(0.1, feat[:, i]))
+        #print(bartime_to_ms(0.1, feat[:, i]))
