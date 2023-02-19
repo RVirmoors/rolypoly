@@ -703,11 +703,12 @@ void rolypoly::getTauFromModel() {
   }
   long writeTo = i_fromModel;
   int i = 0;
-  cout << "notes from model: " << modelOut.size(2) << " | toModel: " << i_toModel-i_fromModel << endl; 
+  cout << "notes from model: " << modelOut.size(2) << " | toModel: " << i_toModel-i_fromModel << endl;
+  cout << "play_notes: " << play_notes.size() << " | writeTo: " << writeTo << endl;
   while (writeTo < i_toModel && i < modelOut.size(2)) {
     play_notes.emplace_back(std::array<double, OUT_DIM>());
     for (int c = 0; c < modelOut.size(1); c++) {
-      play_notes[writeTo][c] = modelOut[0][c][i].item<double>();
+      //play_notes[writeTo][c] = modelOut[0][c][i].item<double>();
       if (DEBUG && c==TAU) cout << writeTo << " got tau " << play_notes[writeTo][TAU] << endl;
       writeTo++; i++;
     }

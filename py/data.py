@@ -96,14 +96,19 @@ def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
     # output: (batch, 12, vec_size)
     pitch_class_map = classes_to_map()
     X_score = torch.zeros(input.shape[0], m_enc_dim, input.shape[2])
+    k = 0 # write index
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
         for j in range(input.shape[2]):
             if input[i, 0, j] != 0 and input[i, 0, j] != 666:
                 hits = pitch_class_map[int(input[i, 0, j])]
-                X_score[i, hits, j] = input[i, 1, j]
-    # next 3 values are tempo, tsig, pos_in_bar
-    X_score[:, 9:12, :] = input[:, 2:5, :]
+                X_score[i, hits, k] = input[i, 1, j]
+                # next 3 values are tempo, tsig, pos_in_bar
+                X_score[:, 9:12, k] = input[:, 2:5, j]
+                if j < input.shape[2] - 1:
+                    if input[:, 2, j] != input[:, 2, j + 1] or input[:, 3, j] != input[:, 3, j + 1] or input[:, 4, j] != input[:, 4, j + 1]:
+                        # next timestep
+                        k += 1
     # remove all rows with only zeros
     mask = ~torch.all(X_score == 0, dim=1).squeeze()
     print("mask:", mask.dim(), mask.shape, mask)
@@ -142,13 +147,11 @@ if __name__ == '__main__':
     test = torch.tensor([[[0, 42, 36, 38, 42, 36],
                           [0, 70, 60, 111, 105, 101],
                           [0, 120, 120, 140, 140, 140],
-                          [0, 1, 1, 1, 1.5, 1.5],
+                          [0, 1, 1, 1.5, 1.5, 1.5],
                           [0, 0, 0.5, 0.33, 0.33, 0.66]]])
     test0 = torch.tensor([[[0],[0],[0],[0],[0]]])
     test1 = torch.tensor([[[38],[95],[150],[1],[0.25]]])
-    x = readScore(test0)
+    x = readScore(test)
     print("readScore shape =", x.shape)
     feat = x.squeeze(0)
-    for i in range(feat.shape[1]):
-        print("->", feat[:, i])
-        #print(bartime_to_ms(0.1, feat[:, i]))
+    print(feat)
