@@ -100,7 +100,8 @@ class ExportRoly(nn_tilde.Module):
                 self.x_dec = data.readScoreLive(input, self.x_dec)
                 latest = self.x_dec.shape[-1] - before
                 # get predictions
-                preds = self.x_dec # self.pretrained(self.x_enc, self.x_dec)                
+                preds = self.x_dec # self.pretrained(self.x_enc, self.x_dec)
+                preds[:, -2, -1] = before # set tau_drums to latest             
                 # update y_hat with latest predictions
                 self.y_hat = torch.cat((self.y_hat, preds[:,:,-latest:]), dim=-1) 
                 return self.y_hat[:, :, -latest:]

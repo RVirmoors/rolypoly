@@ -296,10 +296,10 @@ public:
   queue<> perform_threaded { this,
     MIN_FUNCTION {
       if (m_compute_thread && m_compute_thread->joinable()) {
-        if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
+        //if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
         //if (DEBUG) cout << m_compute_thread->get_id() << endl;
         m_compute_thread->join();
-        if (DEBUG) cout << "joined at " << playhead_ms << " ms : " << i_toModel << endl;
+        //if (DEBUG) cout << "joined at " << playhead_ms << " ms : " << i_toModel << endl;
       }
 
       // send midi notes
@@ -708,10 +708,10 @@ void rolypoly::getTauFromModel() {
   while (writeTo < i_toModel && i < modelOut.size(2)) {
     play_notes.emplace_back(std::array<double, OUT_DIM>());
     for (int c = 0; c < modelOut.size(1); c++) {
-      //play_notes[writeTo][c] = modelOut[0][c][i].item<double>();
+      play_notes[writeTo][c] = modelOut[0][c][i].item<double>();
       if (DEBUG && c==TAU) cout << writeTo << " got tau " << play_notes[writeTo][TAU] << endl;
-      writeTo++; i++;
     }
+    writeTo++; i++;
   }
   i_fromModel = writeTo;
 }
