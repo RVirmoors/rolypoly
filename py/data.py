@@ -121,6 +121,8 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor):
     # add tau_guitar to decoder input
     # input: (batch, 5, 1) from cpp host
     # output: (batch, 14, vec_size)
+    if x_dec.shape[2] == 0:
+        return x_dec
     if input[:, 0, 0] != 666:
         return x_dec
     i = x_dec.shape[2] - 1

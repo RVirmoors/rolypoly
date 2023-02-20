@@ -40,6 +40,22 @@
 		"assistshowspatchername" : 0,
 		"boxes" : [ 			{
 				"box" : 				{
+					"fontface" : 0,
+					"fontname" : "Arial",
+					"fontsize" : 12.0,
+					"id" : "obj-61",
+					"maxclass" : "number~",
+					"mode" : 2,
+					"numinlets" : 2,
+					"numoutlets" : 2,
+					"outlettype" : [ "signal", "float" ],
+					"patching_rect" : [ 534.0, 146.0, 56.0, 22.0 ],
+					"sig" : 0.0
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-12",
 					"maxclass" : "meter~",
 					"numinlets" : 1,
@@ -790,7 +806,7 @@
 					"numoutlets" : 14,
 					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
 					"patching_rect" : [ 107.5, 188.666667640209198, 155.5, 22.0 ],
-					"text" : "rolypoly~ roly baron"
+					"text" : "rolypoly~ roly s120"
 				}
 
 			}
@@ -976,6 +992,13 @@
 					"destination" : [ "obj-5", 0 ],
 					"order" : 2,
 					"source" : [ "obj-1", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-61", 0 ],
+					"source" : [ "obj-1", 13 ]
 				}
 
 			}

@@ -24,15 +24,18 @@ class Swing(nn.Module):
         # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
         # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
         super(Swing, self).__init__()
+        torch.set_printoptions(precision=2, sci_mode=False)
         self.in_channels = in_channels
         self.out_channels = out_channels
 
-    def forward(self, x):
+    def forward(self, _, x):
         for i in range(x.shape[-1]):
-            if data.upbeat(x[0, 11, i]):
-                # if we're on an upbeat, nudge the note forward
-                nudge = data.bartime_to_ms(0.05, x[0, :, i])
-                x[0, 12, i] = nudge
+            # if data.upbeat(x[0, 11, i]):
+            #     # if we're on an upbeat, nudge the note forward
+            #     nudge = data.bartime_to_ms(0.05, x[0, :, i])
+            #     x[0, 12, i] = nudge
+            if i % 2 == 0:
+                x[0, 12, i] = 155
         return x + 0.01
 
 class Transformer(nn.Module):
@@ -40,6 +43,7 @@ class Transformer(nn.Module):
         # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
         # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
         super(Transformer, self).__init__()
+        torch.set_printoptions(precision=2, sci_mode=False)
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.transformer_model = nn.Transformer(d_model=14, nhead=14)

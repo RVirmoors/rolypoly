@@ -298,7 +298,6 @@ public:
     MIN_FUNCTION {
       if (m_compute_thread && m_compute_thread->joinable()) {
         //if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
-        //if (DEBUG) cout << m_compute_thread->get_id() << endl;
         m_compute_thread->join();
         //if (DEBUG) cout << "joined at " << playhead_ms << " ms : " << i_toModel << endl;
       }
@@ -381,7 +380,7 @@ rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr), score_size(0),
       m_read(false), m_play(false), m_generate(false),
       m_buffer_size(64), m_method("forward"),
-      m_use_thread(true), lookahead_ms(200) {
+      m_use_thread(true), lookahead_ms(500) {
 
   m_model = Backend();
 
@@ -596,7 +595,7 @@ bool rolypoly::midiNotesToModel() {
       barStart = barEnd;
       barEnd += 240 / tempo_map[current_tempo_index].second * timesig_map[current_timesig_index].second;
       //cout << "EOB" << endl;
-    }    
+    }
     double pos_in_bar = std::max(0., midifile[1][i].seconds - barStart) / (barEnd - barStart);
 
     if (DEBUG) cout << midifile[1][i].seconds
@@ -695,13 +694,14 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
       std::cerr << e.what() << std::endl;
     }
   }
-  cout << "output:" << modelOut << endl;
+  cout << "output:    " << modelOut << endl;
 }
 
 void rolypoly::getTauFromModel() {
   // populate play_notes[...i_toModel][TAU]
   if (modelOut[0][9][0].item<double>() < 0.1) {
     cout << "zero bpm from model" << endl;
+    // TODO: not ready to play yet (THIS SHOULD NEVER HAPPEN)
     return;
   }
   long writeTo = i_fromModel;
@@ -793,7 +793,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   //cout << "input: " << input_tensor << endl;
   // send the onset to the model
   auto output = m_model.get_model().forward({input_tensor}).toTensor();
-  cout << "output: " << output << endl;
+  cout << "ONSET output: " << output << endl;
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
@@ -810,7 +810,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
   // INPUT
   if (m_play) {
-    //processLiveOnsets(input);
+    processLiveOnsets(input);
   }
 
   // OUTPUT

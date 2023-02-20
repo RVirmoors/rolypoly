@@ -91,8 +91,8 @@ class ExportRoly(nn_tilde.Module):
                 if self.x_dec.shape[2] == 0:
                     return torch.zeros(1, 14, 1) # can't modify x_dec yet!
                 # update x_dec[:,:,14] with realised tau_guitar
-                #self.x_dec = data.readLiveOnset(input, self.x_dec)
-                return self.x_dec   
+                self.x_dec = data.readLiveOnset(input, self.x_dec)
+                return self.x_dec
             else: # full buffer = receiving drum hits
                 print("full buffer")
                 # add latest hits to x_dec
@@ -100,8 +100,8 @@ class ExportRoly(nn_tilde.Module):
                 self.x_dec = data.readScoreLive(input, self.x_dec)
                 latest = self.x_dec.shape[-1] - before
                 # get predictions
-                preds = self.x_dec # self.pretrained(self.x_enc, self.x_dec)
-                preds[:, -2, -1] = before # set tau_drums to latest             
+                preds = self.pretrained(self.x_enc, self.x_dec)
+                # preds[:, -2, -1] = before # set tau_drums to latest             
                 # update y_hat with latest predictions
                 self.y_hat = torch.cat((self.y_hat, preds[:,:,-latest:]), dim=-1) 
                 return self.y_hat[:, :, -latest:]
@@ -112,7 +112,7 @@ class ExportRoly(nn_tilde.Module):
 if __name__ == '__main__':
     test = False
 
-    pretrained = model.Transformer()
+    pretrained = model.Swing()
     pretrained.eval()
     m = ExportRoly(pretrained=pretrained)
     if not test:
@@ -122,13 +122,13 @@ if __name__ == '__main__':
         score = torch.tensor([[[42, 36, 38, 42, 36],
                           [70, 60, 111, 105, 101],
                           [120, 120, 140, 140, 140],
-                          [1, 1, 1, 1.5, 1.5],
+                          [1, 1, 1.5, 1.5, 1.5],
                           [0, 0.5, 0.33, 0.33, 0.66]]])
-        live_drums = torch.tensor([[[42, 36, 38, 0, 0],
-                            [70, 60, 111, 0, 0],
-                            [120, 120, 140, 0, 0],
-                            [1, 1, 1, 0, 0],
-                            [0, 0.5, 0.33, 0, 0]]])
+        live_drums = torch.tensor([[[42, 36],
+                            [70, 60],
+                            [120, 120],
+                            [1, 1],
+                            [0, 0.5]]])
         guit = torch.tensor([[[666],[0.6],[120],[1],[0]]])
         m.set_read(True)
         out = m.forward(score)
@@ -139,6 +139,6 @@ if __name__ == '__main__':
         #out = m.forward(live_drums)
         #print("drums -> y_hat: ", out[:,:,-1], out.shape)
         out = m.forward(live_drums)
-        print("drums2 > y_hat: ", out[:,:,-1], out.shape)
+        print("drums2 > y_hat: ", out, out.shape)
         out = m.forward(guit)
         print("guit -> dec: ", out, out.shape)
