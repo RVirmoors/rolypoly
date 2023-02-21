@@ -230,10 +230,11 @@ public:
           duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
           if (DEBUG) cout << "step " << i+1 << "/7: " << duration.count() / 1000. << " ms" << endl;
       }
+      cout << "Done. A model run lasts around " << int(duration.count() / 1000.) << " ms." << endl;
       // if the model is too slow, we need to increase the lookahead
       if (duration.count() / 1000. > lookahead_ms / 4) {
         lookahead_ms = duration.count() / 1000. * 4 + 50;
-        cout << "Model too slow. Increasing lookahead to " << lookahead_ms << " ms." << endl;
+        cout << "That's too slow. Increasing lookahead to " << lookahead_ms << " ms." << endl;
       }
       return {};
     }
@@ -282,7 +283,7 @@ public:
       model_perform();
 
       if (done_reading && reading_midi) {
-        if (DEBUG) cout << "done reading" << endl;
+        cout << "Done reading the score." << endl;
         reading_midi = 0;
         attr = "read"; attr_value = "false"; set_attr();
         m_read = false;
@@ -640,7 +641,7 @@ void rolypoly::playMidiIntoVector() {
   // populate vector of arrays with notes that don't have a tau yet
   // taking all the notes in the upcoming lookahead_ms
   double start_ms = playhead_ms; //score[TIME_MS][i_toModel];
-  cout << "== MID2VEC == looking ahead from " << start_ms << " ms" << endl;
+  if (DEBUG) cout << "== MID2VEC == looking ahead from " << start_ms << " ms" << endl;
   in_notes.clear();
   in_notes.reserve(lookahead_ms / 100); // 10 notes per second
   if (!m_generate) {
@@ -683,7 +684,7 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
       input_tensor[0][c][i] = v[i][c];
     }
   }
-  cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
+  if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
   // send the notes to the model
   if (m_model.is_loaded()) {
     try {
@@ -692,7 +693,7 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
       std::cerr << e.what() << std::endl;
     }
   }
-  cout << "== VEC2MOD == output  :  " << modelOut << endl;
+  if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
   getTauFromModel();
 }
 
@@ -700,7 +701,7 @@ void rolypoly::getTauFromModel() {
   // populate play_notes[...i_toModel][TAU]
   if (modelOut[0][9][0].item<double>() < 0.1) {
     // not ready to play yet (THIS SHOULD NEVER HAPPEN)
-    cout << "== TAUfromMOD == zero bpm from model" << endl;
+    if (DEBUG) cout << "== TAUfromMOD == zero bpm from model" << endl;
     return;
   }
   long writeTo = i_fromModel;
@@ -756,7 +757,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   double onset_time_ms = playhead_ms + 
     lib::math::samples_to_milliseconds(location - latency, samplerate());
   
-  cout << "-> ONSET at " << onset_time_ms << " ms" << endl;
+  if (DEBUG) cout << "== ONSET == at " << onset_time_ms << " ms" << endl;
 
   // find the closest note in the score
   int closest_note = 0;
@@ -780,7 +781,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   double tau_guitar = onset_time_ms - closest_note_time;
   if (abs(tau_guitar) < closest_note_duration/3) {
     // if so, then we have a hit
-    cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
+    if (DEBUG) cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
   } else return;
 
   torch::Tensor input_tensor = torch::zeros({1, IN_DIM, 1});
@@ -791,8 +792,12 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   }
   //cout << "input: " << input_tensor << endl;
   // send the onset to the model
-  auto output = m_model.get_model().forward({input_tensor}).toTensor();
-  cout << "ONSET output: " << output << endl;
+  if (DEBUG) {
+    auto output = m_model.get_model().forward({input_tensor}).toTensor();
+    cout << "ONSET output: " << output << endl;
+  } else {
+    m_model.get_model().forward({input_tensor}).toTensor();
+  }
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
@@ -850,9 +855,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       timer_mode = TIMER::INACTIVE;
       m_timer.stop();
       if (m_compute_thread && m_compute_thread->joinable()) {
-        cout << "==END==JOINING THREAD" << endl;
+        if (DEBUG) cout << "== END == JOINING THREAD" << endl;
         m_compute_thread->join();
-        cout << "==END==JOINED THREAD" << endl;
+        if (DEBUG) cout << "== END == JOINED THREAD" << endl;
       }
     }
   } else {
