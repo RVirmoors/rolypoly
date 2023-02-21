@@ -112,7 +112,7 @@ class ExportRoly(nn_tilde.Module):
 if __name__ == '__main__':
     test = False
 
-    pretrained = model.Swing()
+    pretrained = model.Transformer()
     pretrained.eval()
     m = ExportRoly(pretrained=pretrained)
     if not test:
