@@ -65,7 +65,7 @@ public:
   long i_toModel; // next timestep to be sent to the model
   long t_score; // next timestep to be played from score
   long score_size;
-  int reading_midi;  
+  int reading_midi;
   int skip; // used to skip everything but NoteOn events
   bool done_reading;
 
@@ -233,14 +233,14 @@ public:
       // if the model is too slow, we need to increase the lookahead
       if (duration.count() / 1000. > lookahead_ms / 4) {
         lookahead_ms = duration.count() / 1000. * 4 + 50;
-        if (DEBUG) cout << "increasing lookahead to " << lookahead_ms << " ms" << endl;
+        cout << "Model too slow. Increasing lookahead to " << lookahead_ms << " ms." << endl;
       }
       return {};
     }
   };
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
-    cout << "t_score and size ============  " << t_score << "    <<<<  " << score_size << endl;
+    if (DEBUG) cout << "== M_TIMER == play_ms | t_score | size  :  " << playhead_ms << " | " << t_score << " | " << score_size << endl;
     if (timer_mode == TIMER::READ) {
       //cout << "timer read" << endl;
       read_deferred.set();
@@ -298,8 +298,9 @@ public:
     MIN_FUNCTION {
       if (m_compute_thread && m_compute_thread->joinable()) {
         //if (DEBUG) cout << "joining - performing " << playhead_ms << endl;
+        // get any available model outputs from the previous run
         m_compute_thread->join();
-        //if (DEBUG) cout << "joined at " << playhead_ms << " ms : " << i_toModel << endl;
+        if (DEBUG) cout << "joined at " << playhead_ms << " ms"<< endl;
       }
 
       // send midi notes
@@ -307,11 +308,8 @@ public:
       if (!done_playing)
         playMidiIntoVector();
 
-      // get any available model outputs from the previous run
-      getTauFromModel();
-      
       // run the model on the in_notes buffer
-      if (m_use_thread && !done_playing) {
+      if (m_use_thread && !done_playing && in_notes.size()) {
         m_compute_thread = std::make_unique<std::thread>(&rolypoly::vectorToModel, this, in_notes);
         //if (DEBUG) cout << "started thread" << endl;
       }
@@ -642,7 +640,7 @@ void rolypoly::playMidiIntoVector() {
   // populate vector of arrays with notes that don't have a tau yet
   // taking all the notes in the upcoming lookahead_ms
   double start_ms = playhead_ms; //score[TIME_MS][i_toModel];
-  //cout << "taking new notes looking ahead from " << start_ms << " ms" << endl;
+  cout << "== MID2VEC == looking ahead from " << start_ms << " ms" << endl;
   in_notes.clear();
   in_notes.reserve(lookahead_ms / 100); // 10 notes per second
   if (!m_generate) {
@@ -655,7 +653,7 @@ void rolypoly::playMidiIntoVector() {
       }
       in_notes.push_back(note);
       i_toModel++;
-      if (DEBUG) cout << "added timestep " << i_toModel << " at " << timestep_ms << " ms" << endl;    
+      if (DEBUG) cout << "== MID2VEC == score_i_toModel | score_ms  :  " << i_toModel << " | " << timestep_ms << " ms" << endl;
       timestep_ms = score[TIME_MS][i_toModel];
     }
   } // TODO: "generate" == "true" -> play latest note from play_notes
@@ -676,7 +674,7 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
     cout << "HUH WHAT" << endl;
     return;    
   }
-  cout << "first bpm: " << v[0][2] << " | in_notes size: " << length << endl;
+  //cout << "== VEC2MOD == first bpm, in_notes size  :  " << v[0][2] << " | " << length << endl;
 
   // create a tensor from the vector
   torch::Tensor input_tensor = torch::zeros({1, IN_DIM, length});
@@ -685,7 +683,7 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
       input_tensor[0][c][i] = v[i][c];
     }
   }
-  cout << "input_tensor:" << input_tensor << endl;
+  cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
   // send the notes to the model
   if (m_model.is_loaded()) {
     try {
@@ -694,25 +692,26 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
       std::cerr << e.what() << std::endl;
     }
   }
-  cout << "output:    " << modelOut << endl;
+  cout << "== VEC2MOD == output  :  " << modelOut << endl;
+  getTauFromModel();
 }
 
 void rolypoly::getTauFromModel() {
   // populate play_notes[...i_toModel][TAU]
   if (modelOut[0][9][0].item<double>() < 0.1) {
-    cout << "zero bpm from model" << endl;
-    // TODO: not ready to play yet (THIS SHOULD NEVER HAPPEN)
+    // not ready to play yet (THIS SHOULD NEVER HAPPEN)
+    cout << "== TAUfromMOD == zero bpm from model" << endl;
     return;
   }
   long writeTo = i_fromModel;
   int i = 0;
-  cout << "notes from model: " << modelOut.size(2) << " | toModel: " << i_toModel-i_fromModel << endl;
-  cout << "play_notes: " << play_notes.size() << " | writeTo: " << writeTo << endl;
+  if (DEBUG) cout << "== TAUfromMOD == notes from model: " << modelOut.size(2) << " | having received: " << i_toModel-i_fromModel << endl;
+  //out << "== TAUfromMOD == play_notes: " << play_notes.size() << " | writeTo: " << writeTo << endl;
   while (writeTo < i_toModel && i < modelOut.size(2)) {
     play_notes.emplace_back(std::array<double, OUT_DIM>());
     for (int c = 0; c < modelOut.size(1); c++) {
       play_notes[writeTo][c] = modelOut[0][c][i].item<double>();
-      if (DEBUG && c==TAU) cout << writeTo << " got tau " << play_notes[writeTo][TAU] << endl;
+      if (DEBUG && c==TAU) cout << "== TAUfromMOD == play_note " << writeTo << " got tau: " << play_notes[writeTo][TAU] << endl;
     }
     writeTo++; i++;
   }
@@ -735,7 +734,7 @@ double rolypoly::computeNextNoteTimeMs() {
 void rolypoly::incrementPlayIndexes() {
   // increment t_score and t_play
   double current_time_ms = score[TIME_MS][t_score];
-  if (DEBUG) cout << "current note time: " << current_time_ms << endl;
+  if (DEBUG) cout << "== PERFORM == just played: " << current_time_ms << " ms" << endl;
   while (score[TIME_MS][t_score] == current_time_ms) {
     t_score++;
   }
