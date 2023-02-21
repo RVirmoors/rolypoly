@@ -56,6 +56,9 @@ class Transformer(nn.Module):
         y = self.transformer_model(x_enc, x_dec)
         y = y.permute(1, 2, 0)
         return y
+
+    def loss(self, x, y):
+        return torch.mean((x - y) ** 2)
         
 
 

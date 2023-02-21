@@ -7,7 +7,6 @@ export the model to a .ts file, loadable by the rolypoly~ Max object
 
 import torch, torch.nn as nn
 import nn_tilde
-from typing import List, Tuple
 
 import data # data helper methods
 import model
@@ -116,8 +115,8 @@ if __name__ == '__main__':
     pretrained.eval()
     m = ExportRoly(pretrained=pretrained)
     if not test:
-        m.export_to_ts('../help/roly.ts')
-        print("exported to ../help/roly.ts")
+        m.export_to_ts('../help/roly.ts') # TODO: make this a command line argument
+        print("Exported model to ../help/roly.ts")
     else:
         score = torch.tensor([[[42, 36, 38, 42, 36],
                           [70, 60, 111, 105, 101],
