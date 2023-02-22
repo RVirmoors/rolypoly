@@ -15,7 +15,7 @@ clone into `Max 8/Packages`, fetching submodules:
 - `python -m venv venv`
 
 you need the following Python modules:
-- pytorch (I use `ltt` to get it, but you can go [the clasic way](https://pytorch.org/get-started/locally/)):
+- pytorch (I use `ltt` to get it, but you can go [the classic way](https://pytorch.org/get-started/locally/)):
 ```
 python -m pip install light-the-torch
 ltt install torch

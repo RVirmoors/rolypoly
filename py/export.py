@@ -117,8 +117,7 @@ class ExportRoly(nn_tilde.Module):
                 return self.y_hat[:, :, -latest:]
 
         elif self.finetune[0]:
-            out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
-            return out
+            return self.y_hat
 
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)

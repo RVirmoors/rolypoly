@@ -39,6 +39,34 @@ unsigned power_ceil(unsigned x) {
   return power;
 }
 
+c74::min::path get_latest_model(std::string model_path) {
+  if (model_path.substr(model_path.length() - 3) != ".ts")
+    model_path = model_path + ".ts";
+  // namespace max = c74::max;
+  // char          m_filename[max::MAX_PATH_CHARS];
+  // max::t_fourcc m_type;
+  // short         m_path;
+  // strncpy(m_filename, model_path.c_str(), max::MAX_PATH_CHARS);
+  // auto err = max::locatefile_extended(m_filename, &m_path, &m_type, NULL, 0);
+  return path(model_path);
+}
+
+// function to read a tensor and return a csv string
+std::string tensor_to_csv(at::Tensor tensor) {
+  // in: tensor of shape (in_dim, length)
+  // out: csv string of shape (length, in_dim)
+  std::string csv = "";
+  for (int i = 0; i < tensor.size(1); i++) {
+    for (int j = 0; j < tensor.size(0); j++) {
+      csv += std::to_string(tensor[j][i].item<double>());
+      if (j < tensor.size(0) - 1)
+        csv += ",";
+    }
+    csv += "\n";
+  }
+  return csv;
+}
+
 class rolypoly : public object<rolypoly>, public vector_operator<> {
 public:
 	MIN_DESCRIPTION {"Expressive Drum Machine: read MIDI file, listen to audio, output drums"};
@@ -330,6 +358,12 @@ public:
         torch::Tensor input_tensor = torch::ones({1, IN_DIM, 1});
         auto output = m_model.get_model().forward({input_tensor}).toTensor();
         if (DEBUG) cout << "TRAIN output: " << output << endl;
+        // write output as csv file
+        std::ofstream csvFile;
+        csvFile.open("run.csv");
+        csvFile << "kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n";
+        csvFile << tensor_to_csv(output[0]);
+        csvFile.close();
         // reset the training flag
         m_train = false;
         attr = "finetune"; attr_value = "false"; set_attr();
@@ -424,9 +458,7 @@ rolypoly::rolypoly(const atoms &args)
   }
   if (args.size() > 0) { // ONE ARGUMENT IS GIVEN
     auto model_path = std::string(args[0]);
-    if (model_path.substr(model_path.length() - 3) != ".ts")
-      model_path = model_path + ".ts";
-    m_path = path(model_path);
+    m_path = get_latest_model(model_path);
   }
   if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
     auto midi_path = std::string(args[1]);
