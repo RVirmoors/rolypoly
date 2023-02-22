@@ -24,6 +24,8 @@ class ExportRoly(nn_tilde.Module):
         self.register_attribute('play', True)
         # generate: trigger notes irrespective of score
         self.register_attribute('generate', False)
+        # finetune: train the model based on the just ended performance
+        self.register_attribute('finetune', False)
 
         # REGISTER BUFFERS
         self.register_buffer('x_enc', torch.zeros(1, 12, 0))
@@ -57,6 +59,10 @@ class ExportRoly(nn_tilde.Module):
     def get_generate(self) -> bool:
         return self.generate[0]
 
+    @torch.jit.export
+    def get_finetune(self) -> bool:
+        return self.finetune[0]
+
     # defining attribute setters
     @torch.jit.export
     def set_play(self, value: bool):
@@ -71,6 +77,11 @@ class ExportRoly(nn_tilde.Module):
     @torch.jit.export
     def set_generate(self, value: bool):
         self.generate = (value,)
+        return 0
+
+    @torch.jit.export
+    def set_finetune(self, value: bool):
+        self.finetune = (value,)
         return 0
 
     # definition of the main method
@@ -104,6 +115,11 @@ class ExportRoly(nn_tilde.Module):
                 # update y_hat with latest predictions
                 self.y_hat = torch.cat((self.y_hat, preds[:,:,-latest:]), dim=-1) 
                 return self.y_hat[:, :, -latest:]
+
+        elif self.finetune[0]:
+            out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
+            return out
+
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
             return out

@@ -57,6 +57,7 @@ public:
   bool m_read;
   bool m_play;
   bool m_generate;
+  bool m_train;
 
   // MIDI RELATED MEMBERS
   MidiFile midifile;
@@ -80,7 +81,7 @@ public:
   bool done_playing;
   int lookahead_ms; // in ms
   short timer_mode; // 0 inactive, 1 read, 2 play
-  enum TIMER {INACTIVE, READ, PLAY};
+  enum TIMER {INACTIVE, READ, PLAY, TRAIN};
 
   std::vector<std::pair<long, double>> tempo_map;
   int current_tempo_index;
@@ -251,7 +252,10 @@ public:
       if (!done_playing) {
         m_timer.delay(lookahead_ms / 2);
       }
-    } 
+    } else if (timer_mode == TIMER::TRAIN) {
+      //cout << "timer train" << endl;
+      train_deferred.set();
+    }
     return {};
   }};
 
@@ -318,6 +322,22 @@ public:
     }
   };
 
+  queue<> train_deferred {this, 
+    MIN_FUNCTION {
+      if (DEBUG) cout << "train_deferred" << endl;
+      if (m_train) {
+        // train the model
+        torch::Tensor input_tensor = torch::ones({1, IN_DIM, 1});
+        auto output = m_model.get_model().forward({input_tensor}).toTensor();
+        if (DEBUG) cout << "TRAIN output: " << output << endl;
+        // reset the training flag
+        m_train = false;
+        attr = "finetune"; attr_value = "false"; set_attr();
+      }
+      return {};
+    }
+  };
+
   message<> read {this, "read", "Load score",
     MIN_FUNCTION {
       done_reading = false;
@@ -341,6 +361,21 @@ public:
       m_play = true;
       timer_mode = TIMER::PLAY;
       m_timer.delay(0);
+      
+      return {};
+    }
+  };
+
+  message<> train {this, "train", "Finetune the model based on the latest run",
+    MIN_FUNCTION {
+      if (!score_size) {
+        cerr << "no score loaded, can't train yet!" << endl;
+        return {};
+      }
+      attr = "finetune"; attr_value = "true"; set_attr();
+      m_train = true;
+      timer_mode = TIMER::TRAIN;
+      m_timer.delay(50);
       
       return {};
     }
@@ -849,6 +884,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     }
     if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score_size) {
       if (DEBUG) cout << "reached end of midifile" << endl;
+      cout << "Done playing. To finetune the model based on this run, send the 'train' message to this object." << endl;
       attr = "play"; attr_value = "false"; set_attr();
       m_play = false;
       done_playing = true;

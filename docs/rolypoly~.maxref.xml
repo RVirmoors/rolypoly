@@ -46,6 +46,11 @@
 
 	<methodlist>
 
+		<method name='train'>
+			<digest>Finetune the model based on the latest run </digest>
+			<description>Finetune the model based on the latest run </description>
+		</method>
+
 		<method name='start'>
 			<digest>Start playing </digest>
 			<description>Start playing </description>
