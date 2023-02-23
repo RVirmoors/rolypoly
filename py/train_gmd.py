@@ -120,6 +120,8 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
     return X_dec
 
 
+
+
 # === MAIN ===
 
 def main(argv):
@@ -127,10 +129,18 @@ def main(argv):
     for idx in range(len(meta)):
         file_name = os.path.join(FLAGS.root_dir,
                                         meta.iloc[idx]['midi_filename'])
-        xd = midifileToXdec(file_name)
         csv_filename = file_name[:-3] + 'csv'
-        rows = data.saveXdecToCSV(xd, filename=csv_filename)
-        print("Saved", csv_filename, ": ", rows, "rows.")
+        if FLAGS.source == 'midi':
+            xd = midifileToXdec(file_name)
+            rows = data.saveXdecToCSV(xd, filename=csv_filename)
+            print("Saved", csv_filename, ": ", rows, "rows.")
+        elif FLAGS.source == 'csv':
+            xd = data.loadXdecFromCSV(csv_filename)
+            print("Loaded", csv_filename, ": ", xd.shape[0], "rows.")
+            # if xd.shape[0] < FLAGS.window_size:
+            #     print("Skipping file, too short.")
+            #     continue
+
 
 if __name__ == '__main__':
     app.run(main)
