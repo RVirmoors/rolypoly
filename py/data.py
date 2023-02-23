@@ -6,6 +6,7 @@ data preprocessing methods
 """
 
 import torch
+import numpy as np
 
 X_ENCODER_CHANNELS = 12 # 9 drum channel velocities + bpm, tsig, pos_in_bar
 X_DECODER_CHANNELS = 14 # above + tau_drum, tau_guitar
@@ -57,7 +58,6 @@ def ms_to_bartime(ms: float, featVec):
     barDiff = ms / 1000 * 60 / tempo / timeSig
     return barDiff
 
-
 def bartime_to_ms(bartime: float, featVec):
     """
     Convert a bar-relative time difference to a ms interval.
@@ -88,6 +88,94 @@ def upbeat(bartime: torch.Tensor) -> bool:
     if torch.isclose(bartime, torch.tensor(1.), atol=0.05):
         return False
     return True
+
+# === PRETTY MIDI SCORE PARSING ===
+
+def score_tempo(drumtrack, tempo_changes):
+    """
+    Assign BPM values to every note.
+    """
+    note_tempos = np.ones(len(drumtrack.notes))
+    times = tempo_changes[0]
+    tempos = tempo_changes[1]
+    for index, note in enumerate(drumtrack.notes):
+        atTime = note.start
+        # get index of tempo
+        here = np.searchsorted(times, atTime + 0.01)
+        if here:
+            here -= 1
+        # the found tempo is assigned to the current note
+        note_tempos[index] = tempos[here]
+    return note_tempos
+
+def score_timesig(drumtrack, timesig_changes):
+    """
+    Assign timesig to every note.
+    """
+    timesigs = np.full((len(drumtrack.notes), 2), 4)  # init all as [4 4]
+    for index, note in enumerate(drumtrack.notes):
+        atTime = note.start
+        for i in timesig_changes:
+            if i.time < atTime or np.isclose(i.time, atTime):
+                here = i
+            else:
+                break
+        timesigs[index] = (here.numerator, here.denominator)
+    return timesigs
+
+def score_pos_in_bar(drumtrack, timesig_changes, tempos, timesigs):
+    """
+    Return np.list of positions in bar for every note in track
+    """
+    positions_in_bar = np.zeros(len(drumtrack.notes))
+    first_timesig = timesig_changes[0]
+    barStart = atTime = 0
+    barEnd = 240 / tempos[0] * \
+        first_timesig.numerator / first_timesig.denominator
+    for index, note in enumerate(drumtrack.notes):
+        if note.start >= atTime:
+            atTime = note.start
+        if np.isclose(atTime, barEnd) or atTime > barEnd:
+            # reached the end of the bar, compute the next one
+            barStart = barEnd
+            barEnd = barEnd + 240 / tempos[index] * \
+                timesigs[index][0] / timesigs[index][1]
+            # print("EOB", barStart, barEnd)
+        # pos in bar is always in [0, 1)
+        cur_pos = (atTime - barStart) / (barEnd - barStart)
+        positions_in_bar[index] = cur_pos
+        #print(atTime, cur_pos)
+    return positions_in_bar
+
+# === FILE I/O ===
+
+def saveXdecToCSV(X_dec, filename: str) -> int:
+    """
+    Save X_dec tensor to csv file.
+    input: X_dec (len, feat_vec_size), filename
+    output: number of rows written
+    """
+    with open(filename, 'w') as f:
+        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n")
+        rows = X_dec.shape[0]
+        for row in range(rows):
+            f.write(', '.join([str(x) for x in X_dec[row].tolist()]) + '\n')
+    return rows
+
+def loadXdecFromCSV(filename: str) -> torch.Tensor:
+    """
+    Load X_dec tensor from csv file.
+    input: filename
+    output: X_dec (len, feat_vec_size)
+    """
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        rows = len(lines) - 1
+        cols = len(lines[1].split(', '))
+        X_dec = torch.zeros(rows, cols)
+        for row in range(rows):
+            X_dec[row] = torch.tensor([float(x) for x in lines[row + 1].split(', ')])
+    return X_dec
 
 # === DATA PROCESSING ===
 
@@ -142,8 +230,8 @@ def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
     x_dec = torch.cat((x_dec, live_notes), dim=2)
     return x_dec
 
-
 # === TESTS ===
+
 if __name__ == '__main__':
     #print(upbeat(0.05), upbeat(0.24))
     test = torch.tensor([[[0, 42, 36, 38, 42, 36],
