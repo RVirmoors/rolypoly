@@ -180,67 +180,68 @@ def loadXdecFromCSV(filename: str) -> torch.Tensor:
 # === DATA PROCESSING ===
 
 def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
-    # input: (batch, 5, vec_size) from cpp host
-    # output: (batch, 12, vec_size)
+    # input: (batch, score_size, 5) from cpp host
+    # output: (batch, score_size, m_enc_dim = 12)
     pitch_class_map = classes_to_map()
-    X_score = torch.zeros(input.shape[0], m_enc_dim, input.shape[2])
+    X_score = torch.zeros(input.shape[0], input.shape[1], m_enc_dim)
     k = 0 # write index
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
-        for j in range(input.shape[2]):
-            if input[i, 0, j] != 0 and input[i, 0, j] != 666:
-                hits = pitch_class_map[int(input[i, 0, j])]
-                X_score[i, hits, k] = input[i, 1, j]
+        for j in range(input.shape[1]):
+            if input[i, j, 0] != 0 and input[i, j, 0] != 666:
+                hits = pitch_class_map[int(input[i, j, 0])]
+                X_score[i, k, hits] = input[i, j, 1]
                 # next 3 values are tempo, tsig, pos_in_bar
-                X_score[:, 9:12, k] = input[:, 2:5, j]
-                if j < input.shape[2] - 1:
-                    if input[:, 2, j] != input[:, 2, j + 1] or input[:, 3, j] != input[:, 3, j + 1] or input[:, 4, j] != input[:, 4, j + 1]:
+                X_score[:, k, 9:12] = input[:, j, 2:5]
+                if j < input.shape[1] - 1:
+                    if input[:, j, 2] != input[:, j+1, 2] or input[:, j, 3] != input[:, j+1, 3] or input[:, j, 4] != input[:, j+1, 4]:
                         # next timestep
                         k += 1
     # remove all rows with only zeros
-    mask = ~torch.all(X_score == 0, dim=1).squeeze()
+    mask = ~torch.all(X_score == 0, dim=2).squeeze()
     print("mask:", mask.dim(), mask.shape, mask)
     if mask.dim() == 0:
         return X_score
-    X_score = X_score[:, :, mask]
+    X_score = X_score[:, mask, :]
     return X_score
 
 def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor):
     # add tau_guitar to decoder input
-    # input: (batch, 5, 1) from cpp host
-    # output: (batch, 14, vec_size)
-    if x_dec.shape[2] == 0:
+    # input: (batch, 1, 5) from cpp host
+    # output: (batch, vec_size, 14)
+    if x_dec.shape[1] == 0:
         return x_dec
     if input[:, 0, 0] != 666:
         return x_dec
-    i = x_dec.shape[2] - 1
+    i = x_dec.shape[1] - 1
     while i >= 0:
-        if input[:, 2:5, 0].all() == x_dec[:, 9:12, i].all():
-            x_dec[:, 13, i] = input[:, 1, 0]
+        if torch.allclose(input[:, 0, 2:5], x_dec[:, i, 9:12]):
+            x_dec[:, i, 13] = input[:, 0, 1]    # tau_guitar
             return x_dec
         i -= 1
     return x_dec
 
 def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
-    # input: (batch, 5, vec_size) from cpp host
-    # output: (batch, 14, vec_size)
-    live_notes = readScore(input) # (batch, 12, vec_size)
+    # input: (batch, vec_size, 5) from cpp host
+    # output: (batch, vec_size, 14)
+    live_notes = readScore(input) # (batch, vec_size, 12)
     live_notes = torch.cat((live_notes, torch.zeros(
-        live_notes.shape[0], 2, live_notes.shape[2])), dim=1) # (batch, 14, vec_size)
-    x_dec = torch.cat((x_dec, live_notes), dim=2)
+        live_notes.shape[0], live_notes.shape[1], 2)), dim=2) # (batch, vec_size, 14)
+    x_dec = torch.cat((x_dec, live_notes), dim=1)
     return x_dec
 
 # === TESTS ===
 
 if __name__ == '__main__':
     #print(upbeat(0.05), upbeat(0.24))
-    test = torch.tensor([[[0, 42, 36, 38, 42, 36],
-                          [0, 70, 60, 111, 105, 101],
-                          [0, 120, 120, 140, 140, 140],
-                          [0, 1, 1, 1.5, 1.5, 1.5],
-                          [0, 0, 0.5, 0.33, 0.33, 0.66]]])
-    test0 = torch.tensor([[[0],[0],[0],[0],[0]]])
-    test1 = torch.tensor([[[38],[95],[150],[1],[0.25]]])
+    test = torch.tensor([[  [0, 0, 0, 0, 0],
+                            [42, 70, 120, 1, 0],
+                            [36, 60, 120, 1, 0.5],
+                            [38, 111, 140, 1.5, 0.33],
+                            [42, 105, 140, 1.5, 0.33],
+                            [36, 101, 140, 1.5, 0.66]]])
+    test0 = torch.tensor([[[0, 0, 0, 0, 0]]])
+    test1 = torch.tensor([[[36, 60, 120, 1, 0.5]]])
     x = readScore(test)
     print("readScore shape =", x.shape)
     feat = x.squeeze(0)

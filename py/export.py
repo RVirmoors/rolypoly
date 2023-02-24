@@ -28,9 +28,9 @@ class ExportRoly(nn_tilde.Module):
         self.register_attribute('finetune', False)
 
         # REGISTER BUFFERS
-        self.register_buffer('x_enc', torch.zeros(1, 12, 0))
-        self.register_buffer('x_dec', torch.zeros(1, 14, 0)) # actuals
-        self.register_buffer('y_hat', torch.zeros(1, 14, 0)) # predictions
+        self.register_buffer('x_enc', torch.zeros(1, 0, 12)) # score
+        self.register_buffer('x_dec', torch.zeros(1, 0, 14)) # actuals
+        self.register_buffer('y_hat', torch.zeros(1, 0, 14)) # predictions
 
         # REGISTER METHODS
         self.register_method(
@@ -87,40 +87,41 @@ class ExportRoly(nn_tilde.Module):
     # definition of the main method
     @torch.jit.export
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        m_buf_size = input.shape[-1]
+        # input: tensor (batch, m_buf_size, 5 chans)
+        # output: tensor (batch, time, 14 chans)
+        m_buf_size = input.shape[1]
 
         if self.read[0]:
             self.x_enc = data.readScore(input)
-            out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
+            out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
             return out
 
         if self.play[0]:
-            #return torch.zeros(1, 14, 1)
-            if m_buf_size == 1 and input[:, 0, 0] == 666: # just one onset
+            if m_buf_size == 1 and input[0, 0, 0] == 666: # just one onset
                 print("one onset")
-                if self.x_dec.shape[2] == 0:
-                    return torch.zeros(1, 14, 1) # can't modify x_dec yet!
+                if self.x_dec.shape[1] == 0:
+                    return torch.zeros(1, 1, 14) # can't modify x_dec yet!
                 # update x_dec[:,:,14] with realised tau_guitar
                 self.x_dec = data.readLiveOnset(input, self.x_dec)
                 return self.x_dec
             else: # full buffer = receiving drum hits
                 print("full buffer")
                 # add latest hits to x_dec
-                before = self.x_dec.shape[-1]
+                before = self.x_dec.shape[1]
                 self.x_dec = data.readScoreLive(input, self.x_dec)
-                latest = self.x_dec.shape[-1] - before
+                latest = self.x_dec.shape[1] - before
                 # get predictions
                 preds = self.pretrained(self.x_enc, self.x_dec)
                 # preds[:, -2, -1] = before # set tau_drums to latest             
                 # update y_hat with latest predictions
-                self.y_hat = torch.cat((self.y_hat, preds[:,:,-latest:]), dim=-1) 
-                return self.y_hat[:, :, -latest:]
+                self.y_hat = torch.cat((self.y_hat, preds[:, -latest:, :]), dim=1) 
+                return self.y_hat[:, -latest:, :]
 
         elif self.finetune[0]:
             return self.y_hat
 
         else:
-            out = torch.cat((self.x_enc, torch.zeros(1, 2, self.x_enc.shape[2])), dim=1)
+            out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
             return out
 
 if __name__ == '__main__':
@@ -133,17 +134,15 @@ if __name__ == '__main__':
         m.export_to_ts('../help/roly.ts') # TODO: make this a command line argument
         print("Exported model to ../help/roly.ts")
     else:
-        score = torch.tensor([[[42, 36, 38, 42, 36],
-                          [70, 60, 111, 105, 101],
-                          [120, 120, 140, 140, 140],
-                          [1, 1, 1.5, 1.5, 1.5],
-                          [0, 0.5, 0.33, 0.33, 0.66]]])
-        live_drums = torch.tensor([[[42, 36],
-                            [70, 60],
-                            [120, 120],
-                            [1, 1],
-                            [0, 0.5]]])
-        guit = torch.tensor([[[666],[0.6],[120],[1],[0]]])
+        score = torch.tensor([[[42, 70, 120, 1, 0],
+                            [36, 60, 120, 1, 0.5],
+                            [38, 111, 140, 1.5, 0.33],
+                            [42, 105, 140, 1.5, 0.33],
+                            [36, 101, 140, 1.5, 0.66]]])
+        live_drums = torch.tensor([[[42, 70, 120, 1, 0],
+                            [36, 60, 120, 1, 0.5]]])
+        guit = torch.tensor([[[666, 0.6, 120, 1, 0]]])
+
         m.set_read(True)
         out = m.forward(score)
         print("read -> enc: ", out[:,:,-1], out.shape)

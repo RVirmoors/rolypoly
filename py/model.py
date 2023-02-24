@@ -80,20 +80,21 @@ class Transformer(nn.Module):
 
 # === TESTS ===
 if __name__ == '__main__':
-    test = torch.tensor([[[42, 36, 38, 42, 36],
-                          [70, 60, 111, 105, 101],
-                          [120, 120, 140, 140, 140],
-                          [1, 1, 1, 1.5, 1.5],
-                          [0, 0.5, 0, 0.33, 0.66]]])
+    test = torch.tensor([[  [0, 0, 0, 0, 0],
+                            [42, 70, 120, 1, 0],
+                            [36, 60, 120, 1, 0.5],
+                            [38, 111, 140, 1.5, 0.33],
+                            [42, 105, 140, 1.5, 0.33],
+                            [36, 101, 140, 1.5, 0.66]]])
     #print(data.readScore(test).shape)
     #print(readScore(test)[:, :10, :])
     x_enc = data.readScore(test)
-    x_dec = torch.zeros(1, 14, 0)
-    x_dec = data.readScoreLive(test[:,:,:2], x_dec)
-    print(x_dec[:,:,0])
+    x_dec = torch.zeros(1, 0, 14)
+    x_dec = data.readScoreLive(test[:,:2,:], x_dec)
+    print(x_dec[:,0,:])
     #feat = x.squeeze(0)
     
     s = Transformer()
     start = time.time()
-    print(s(x_enc, x_dec)[:,:,0])
+    print(s(x_enc, x_dec)[:,0,:])
     print(time.time() - start, "s")
