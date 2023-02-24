@@ -94,6 +94,7 @@ class ExportRoly(nn_tilde.Module):
         if self.read[0]:
             self.x_enc = data.readScore(input)
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
+            self.x_dec = torch.zeros(1, 0, 14) # reset x_dec
             return out
 
         if self.play[0]:
@@ -118,7 +119,9 @@ class ExportRoly(nn_tilde.Module):
                 return self.y_hat[:, -latest:, :]
 
         elif self.finetune[0]:
-            return self.y_hat
+            if input[0,0,0] == 0:
+                return self.x_dec
+            return self.y_hat # else, for input = 1
 
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
@@ -141,16 +144,14 @@ if __name__ == '__main__':
                             [36, 101, 140, 1.5, 0.66]]])
         live_drums = torch.tensor([[[42, 70, 120, 1, 0],
                             [36, 60, 120, 1, 0.5]]])
-        guit = torch.tensor([[[666, 0.6, 120, 1, 0]]])
+        guit = torch.tensor([[[666, 0.666, 120, 1, 0]]])
 
         m.set_read(True)
         out = m.forward(score)
-        print("read -> enc: ", out[:,:,-1], out.shape)
+        print("read -> enc: ", out[:,-1,:], out.shape)
         m.set_read(False)
         print("=====================")
         m.set_play(True)
-        #out = m.forward(live_drums)
-        #print("drums -> y_hat: ", out[:,:,-1], out.shape)
         out = m.forward(live_drums)
         print("drums2 > y_hat: ", out, out.shape)
         out = m.forward(guit)

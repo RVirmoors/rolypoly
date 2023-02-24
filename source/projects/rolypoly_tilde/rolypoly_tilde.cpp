@@ -52,13 +52,13 @@ c74::min::path get_latest_model(std::string model_path) {
 
 // function to read a tensor and return a csv string
 std::string tensor_to_csv(at::Tensor tensor) {
-  // in: tensor of shape (in_dim, length)
-  // out: csv string of shape (length, in_dim)
+  // in: tensor of shape (length, channels)
+  // out: csv string of shape (length, channels)
   std::string csv = "";
-  for (int i = 0; i < tensor.size(1); i++) {
-    for (int j = 0; j < tensor.size(0); j++) {
-      csv += std::to_string(tensor[j][i].item<double>());
-      if (j < tensor.size(0) - 1)
+  for (int i = 0; i < tensor.size(0); i++) {
+    for (int j = 0; j < tensor.size(1); j++) {
+      csv += std::to_string(tensor[i][j].item<double>());
+      if (j < tensor.size(1) - 1)
         csv += ",";
     }
     csv += "\n";
@@ -338,13 +338,21 @@ public:
     MIN_FUNCTION {
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
-        // train the model
-        torch::Tensor input_tensor = torch::ones({1, IN_DIM, 1});
-        auto output = m_model.get_model().forward({input_tensor}).toTensor();
-        if (DEBUG) cout << "TRAIN output: " << output << endl;
-        // write output as csv file
+        // write train data to csv files
         std::ofstream csvFile;
-        csvFile.open("run.csv");
+        // send ones to get Y_hat
+        torch::Tensor input_tensor = torch::ones({1, 1, IN_DIM});
+        auto output = m_model.get_model().forward({input_tensor}).toTensor();
+        if (DEBUG) cout << "TRAIN output Y_hat: " << output << endl;
+        csvFile.open("runYhat.csv");
+        csvFile << "kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n";
+        csvFile << tensor_to_csv(output[0]);
+        csvFile.close();
+        // send zeros to get X_dec
+        input_tensor = torch::zeros({1, 1, IN_DIM});
+        output = m_model.get_model().forward({input_tensor}).toTensor();
+        if (DEBUG) cout << "TRAIN output X_dec: " << output << endl;
+        csvFile.open("runXdec.csv");
         csvFile << "kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n";
         csvFile << tensor_to_csv(output[0]);
         csvFile.close();
@@ -542,17 +550,6 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
   }
 }
 
-// void rolypoly::resetInputBuffer() {
-//   if(!m_in_buffer[0].empty() && !reading_midi && !done_reading) {
-//     if (DEBUG) cout << "resettin" << endl;
-//     // if the buffer isn't empty, reset it
-//     for (int c(0); c < IN_DIM; c++)
-//       m_in_buffer[c].reset();
-//     done_reading = false;
-//     if (DEBUG) cout << "starting to read" << endl;
-//   }
-// }
-
 bool rolypoly::midiNotesToModel() {
   // populates score with midi data: hit, vel, tempo, timesig, pos_in_bar
 
@@ -624,7 +621,7 @@ void rolypoly::prepareToPlay() {
   play_notes.clear();
   play_notes.reserve(score.size());
   
-  modelOut = torch::zeros({1, OUT_DIM, 1});
+  modelOut = torch::zeros({1, 1, OUT_DIM});
 }
 
 void rolypoly::playMidiIntoVector() {
@@ -653,25 +650,25 @@ void rolypoly::playMidiIntoVector() {
 
 void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
   // in: vector v (1, len, IN_DIM=5)
-  // out: tensor modelOut (1, OUT_DIM=14, len)
+  // out: tensor modelOut (1, len, OUT_DIM=14)
   int length = v.size();
   if (!length) {
-    modelOut = torch::zeros({1, OUT_DIM, 1});
+    modelOut = torch::zeros({1, 1, OUT_DIM});
     return;
   }
   
   if (v[0][2] < 1) { // note with BPM is zero (should never happen)
-    modelOut = torch::zeros({1, OUT_DIM, 1});
+    modelOut = torch::zeros({1, 1, OUT_DIM});
     cout << "HUH WHAT" << endl;
     return;    
   }
   //cout << "== VEC2MOD == first bpm, in_notes size  :  " << v[0][2] << " | " << length << endl;
 
   // create a tensor from the vector
-  torch::Tensor input_tensor = torch::zeros({1, IN_DIM, length});
+  torch::Tensor input_tensor = torch::zeros({1, length, IN_DIM});
   for (int c = 0; c < IN_DIM; c++) {
     for (int i = 0; i < length; i++) {
-      input_tensor[0][c][i] = v[i][c];
+      input_tensor[0][i][c] = v[i][c];
     }
   }
   if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
@@ -689,19 +686,19 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
 
 void rolypoly::getTauFromModel() {
   // populate play_notes[...i_toModel][TAU]
-  if (modelOut[0][9][0].item<double>() < 0.1) {
+  if (modelOut[0][0][9].item<double>() < 0.1) {
     // not ready to play yet (THIS SHOULD NEVER HAPPEN)
     if (DEBUG) cout << "== TAUfromMOD == zero bpm from model" << endl;
     return;
   }
   long writeTo = i_fromModel;
   int i = 0;
-  if (DEBUG) cout << "== TAUfromMOD == notes from model: " << modelOut.size(2) << " | having received: " << i_toModel-i_fromModel << endl;
+  if (DEBUG) cout << "== TAUfromMOD == notes from model: " << modelOut.size(1) << " | having received: " << i_toModel-i_fromModel << endl;
   //out << "== TAUfromMOD == play_notes: " << play_notes.size() << " | writeTo: " << writeTo << endl;
-  while (writeTo < i_toModel && i < modelOut.size(2)) {
+  while (writeTo < i_toModel && i < modelOut.size(1)) {
     play_notes.emplace_back(std::array<double, OUT_DIM>());
-    for (int c = 0; c < modelOut.size(1); c++) {
-      play_notes[writeTo][c] = modelOut[0][c][i].item<double>();
+    for (int c = 0; c < modelOut.size(2); c++) {
+      play_notes[writeTo][c] = modelOut[0][i][c].item<double>();
       if (DEBUG && c==TAU) cout << "== TAUfromMOD == play_note " << writeTo << " got tau: " << play_notes[writeTo][TAU] << endl;
     }
     writeTo++; i++;
