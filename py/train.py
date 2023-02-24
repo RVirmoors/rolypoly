@@ -12,6 +12,8 @@ from typing import List, Tuple
 import data # data helper methods
 import model
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 model = model.Transformer()
 # model.load_state_dict(torch.load('model.pt'))
 # Sprint(model)

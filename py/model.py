@@ -1,12 +1,18 @@
 """
 Rolypoly timing model
 2023 rvirmoors
+
+Very much inspired by A Karpathy's nanoGPT: https://github.com/karpathy/nanoGPT
 """
 
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
+
 import data
 import time
+
+# === TEST / TOY MODELS ===
 
 class Basic(nn.Module):
     def __init__(self, in_channels=14, out_channels=14):
@@ -30,35 +36,44 @@ class Swing(nn.Module):
 
     def forward(self, _, x):
         for i in range(x.shape[-1]):
-            # if data.upbeat(x[0, 11, i]):
-            #     # if we're on an upbeat, nudge the note forward
-            #     nudge = data.bartime_to_ms(0.05, x[0, :, i])
-            #     x[0, 12, i] = nudge
-            if i % 2 == 0:
-                x[0, 12, i] = 155
-        return x + 0.01
+            if data.upbeat(x[0, 11, i]):
+                # if we're on an upbeat, nudge the note forward
+                nudge = data.bartime_to_ms(0.05, x[0, :, i])
+                x[0, 12, i] = nudge
+        return x
+
+# === HELPER CLASSES FOR TRANSFORMER ===
+
+class LayerNorm(nn.Module):
+    """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False 
+    - from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
+
+    def __init__(self, ndim, bias):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(ndim))
+        self.bias = nn.Parameter(torch.zeros(ndim)) if bias else None
+
+    def forward(self, input):
+        return F.layer_norm(input, self.weight.shape, self.weight, self.bias, 1e-5)
+
+class CausalSelfAttention(nn.Module):
+    """ input: x input (batch, seq_len, channels)
+        output: y projection (batch, seq_len, channels)
+    - adapted from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
+
+
+
+
+
+# === TRANSFORMER CLASS ===
 
 class Transformer(nn.Module):
-    def __init__(self, in_channels=14, out_channels=14):
-        # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
-        # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
-        super(Transformer, self).__init__()
-        torch.set_printoptions(precision=2, sci_mode=False)
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.transformer_model = nn.Transformer(d_model=14, nhead=14)
+    def __init__(self):
+        super().__init__()
 
     def forward(self, x_enc, x_dec):
-        # https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
-        x_enc = torch.cat((x_enc, torch.zeros(1, 2, x_enc.shape[2])), dim=1)
-        x_enc = x_enc.permute(2, 0, 1)
-        x_dec = x_dec.permute(2, 0, 1)
-        y = self.transformer_model(x_enc, x_dec)
-        y = y.permute(1, 2, 0)
-        return y
+        return x_dec + 0.01
 
-    def loss(self, x, y):
-        return torch.mean((x - y) ** 2)
         
 
 
