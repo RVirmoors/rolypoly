@@ -199,7 +199,7 @@ def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
                         k += 1
     # remove all rows with only zeros
     mask = ~torch.all(X_score == 0, dim=2).squeeze()
-    print("mask:", mask.dim(), mask.shape, mask)
+    #print("mask:", mask.dim(), mask.shape, mask)
     if mask.dim() == 0:
         return X_score
     X_score = X_score[:, mask, :]
