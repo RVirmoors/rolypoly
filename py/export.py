@@ -147,6 +147,7 @@ if __name__ == '__main__':
         config = checkpoint['config']
         pretrained = model.Transformer(config)
         pretrained.load_state_dict(torch.load('out/model_best.pt'))
+        print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
     else:
         config = model.Config()
         pretrained = model.Transformer(config)
