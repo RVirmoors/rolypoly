@@ -43,6 +43,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 compile = False # use PyTorch 2.0 to compile the model to be faster
 gradient_accumulation_steps = 5 # how many steps to accumulate gradients over before performing a step
 
+print("Using device:", device)
+
 # learning rate decay scheduler (cosine with warmup)
 def get_lr(it):
     # 1) linear warmup for warmup_iters steps
@@ -143,16 +145,16 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
             if losses['val'] < best_val_loss:
                 best_val_loss = losses['val']
                 torch.save(model.state_dict(), f'{out_dir}/model_best.pt')
-            if iter_num > 0:
-                checkpoint = {
-                    'model': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'iter_num': iter_num,
-                    'best_val_loss': best_val_loss,
-                    'config': config
-                }
-                print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+                if iter_num > 0:
+                    checkpoint = {
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'iter_num': iter_num,
+                        'best_val_loss': best_val_loss,
+                        'config': config
+                    }
+                    print(f"saving checkpoint to {out_dir}")
+                    torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
