@@ -12,6 +12,7 @@ import numpy as np
 import math
 import time
 import os
+torch.set_printoptions(sci_mode=False)
 
 import data # data helper methods
 
@@ -21,8 +22,6 @@ eval_interval = 25
 log_interval = 10
 eval_iters = 10 # 200
 eval_only = False # if True, script exits right after the first eval
-init_from = 'scratch' # 'scratch' or 'resume'
-
 os.makedirs(out_dir, exist_ok=True)
 
 # learning rate decay settings
@@ -96,6 +95,15 @@ def estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe=None
         for k in range(eval_iters):
             X_enc, X_dec, Y = getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
             y_hat = model(X_enc, X_dec)
+            if torch.all(Y[:, :, 13] == -1.0):
+                y_hat[:, :, 13] = -1.0 # remove guitar from loss
+            # print("=====================================")
+            # _yh = y_hat.clone().detach()
+            # _y = Y.clone().detach()
+            # data.dataScaleUp(_yh)
+            # data.dataScaleUp(_y)
+            # print(_yh[0,0, 9:])
+            # print(_y[0,0, 9:])
             loss = model.loss(y_hat, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
@@ -104,6 +112,9 @@ def estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe=None
 
 def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train_xe=None, val_xe=None):
     block_size = config.block_size
+
+    iter_num = 0
+    best_val_loss = 1e10
 
     if load_model and not os.path.isfile(load_model):
         print("No model found at", load_model, "-- starting from scratch...")
@@ -126,9 +137,6 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
         print("compiling the model... (takes ~a minute)")
         unoptimized_model = m
         m = torch.compile(m) # requires PyTorch 2.0
-
-    iter_num = 0
-    best_val_loss = 1e10
     
     scaler = torch.cuda.amp.GradScaler(enabled = (dtype == 'float16'))
 
@@ -164,6 +172,8 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
         # and using the GradScaler if data type is float16
         for micro_step in range(gradient_accumulation_steps):
             Y_hat = model(X_enc, X_dec)
+            if torch.all(Y[:, :, 13] == -1.0):
+                Y_hat[:, :, 13] = -1.0 # remove guitar from loss
             loss = model.loss(Y_hat, Y)
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
             X_enc, X_dec, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe)

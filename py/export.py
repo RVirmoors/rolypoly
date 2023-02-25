@@ -136,7 +136,7 @@ class ExportRoly(nn_tilde.Module):
             return out
 
 if __name__ == '__main__':
-    test = False
+    test = True
     pretrain = True
 
     if pretrain:

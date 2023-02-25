@@ -816,7 +816,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 
-    if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
+    //if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
 
     if (playhead_ms >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note
@@ -828,7 +828,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         for (int i = 0; i < output.frame_count(); i++) {
           out[i] = 0.;
         }
-        out[micro_index] = play_notes[t_play][c];
+        out[micro_index] = play_notes[t_play][c] / 127.;
       }
       incrementPlayIndexes();
     } else {
