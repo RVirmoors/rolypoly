@@ -385,3 +385,5 @@ tmp
 .DS_Store
 .vs
 package-info.json
+py/out/ckpt.pt
+py/out/model_best.pt
