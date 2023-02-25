@@ -112,16 +112,17 @@ class ExportRoly(nn_tilde.Module):
                 self.x_dec = data.readScoreLive(input, self.x_dec)
                 latest = self.x_dec.shape[1] - before
                 # get predictions
-                preds = self.pretrained(self.x_enc, self.x_dec)
-                # preds[:, -2, -1] = before # set tau_drums to latest             
+                xe = data.dataScaleDown(self.x_enc)
+                xd = data.dataScaleDown(self.x_dec)
+                preds = self.pretrained(xe, xd)
                 # update y_hat with latest predictions
                 self.y_hat = torch.cat((self.y_hat, preds[:, -latest:, :]), dim=1) 
-                return self.y_hat[:, -latest:, :]
+                return data.dataScaleUp(self.y_hat[:, -latest:, :])
 
         elif self.finetune[0]:
             if input[0,0,0] == 0:
-                return self.x_dec
-            return self.y_hat # else, for input = 1
+                return self.x_dec # normal scale
+            return self.y_hat # scaled down to [-1, 1]
 
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)

@@ -13,6 +13,8 @@ import math
 import time
 import os
 
+import data # data helper methods
+
 # I/O
 out_dir = 'out'
 eval_interval = 25
@@ -55,40 +57,44 @@ def get_lr(it):
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
     return min_lr + coeff * (learning_rate - min_lr)
 
-def getBatch(split, train_data, val_data, batch_size, block_size):
-    takes = train_data if split == 'train' else val_data
+def getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe=None, val_xe=None):
+    xd = train_xd if split == 'train' else val_xd
+    if train_xe is None:
+        xe = xd
+    else:
+        xe = train_xe if split == 'train' else val_xe
 
-    take_i = np.random.randint(0, len(takes), (batch_size))
-    ix = [np.random.randint(0, takes[i].shape[0] - block_size) for i in take_i]
-    # for i, j in enumerate(ix):
-    #     print(i, " -- ", j, " -- ", take_i[i], " -- ", takes[take_i[i]].shape[0] - block_size)
-    x = torch.stack([takes[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
-    y = torch.stack([takes[take_i[i]][ix[i]+1:ix[i]+block_size+1] for i in take_i])
+    take_i = np.random.randint(0, len(xd), (batch_size))
+    ix = [np.random.randint(0, xd[i].shape[0] - block_size) for i in take_i]
+    x_dec = torch.stack([xd[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
+    x_enc = torch.stack([xe[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
+    y = torch.stack([xd[take_i[i]][ix[i]+1:ix[i]+block_size+1] for i in take_i])
 
     if 'cuda' in device:
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-        x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
+        x_enc, x_dec, y = x_enc.pin_memory().to(device, non_blocking=True), x_dec.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
     else:
-        x, y = x.to(device), y.to(device)
-    return x, y
+        x_enc, x_dec, y = x_enc.to(device), x_dec.to(device), y.to(device)
+    return x_enc, x_dec, y
 
 # helps estimate an arbitrarily accurate loss over either split using many batches
 @torch.no_grad()
-def estimate_loss(model, train_data, val_data, batch_size, block_size):
+def estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe=None, val_xe=None):
     out = {}
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
-            X, Y = getBatch(split, train_data, val_data, batch_size, block_size)
-            y_hat = model(X, Y)
+            X_enc, X_dec, Y = getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
+            X_enc, X_dec, Y = data.dataScaleDown(X_enc), data.dataScaleDown(X_dec), data.dataScaleDown(Y)
+            y_hat = model(X_enc, X_dec)
             loss = model.loss(y_hat, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
     model.train()
     return out
 
-def train(model, config, load_model, epochs, train_data, val_data, batch_size):
+def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train_xe=None, val_xe=None):
     block_size = config.block_size
 
     if load_model:
@@ -115,7 +121,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
     scaler = torch.cuda.amp.GradScaler(enabled = (dtype == 'float16'))
 
     # training loop
-    X, Y = getBatch('train', train_data, val_data, batch_size, block_size) # get first batch
+    X, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe) # get first batch
     t0 = time.time()
     local_iter_num = 0 # number of iterations in the lifetime of this process
     #for epoch in range(epochs):
@@ -126,7 +132,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
             param_group['lr'] = lr
         
         if iter_num % eval_interval == 0:
-            losses = estimate_loss(model, train_data, val_data, batch_size, block_size)
+            losses = estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
             print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
             if losses['val'] < best_val_loss:
                 best_val_loss = losses['val']
@@ -148,7 +154,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
             Y_hat = model(X, Y)
             loss = model.loss(Y_hat, Y)
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
-            X, Y = getBatch('train', train_data, val_data, batch_size, block_size)
+            X, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
             if dtype == 'float16':
                 scaler.scale(loss).backward()
             else:

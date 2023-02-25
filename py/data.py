@@ -252,11 +252,12 @@ def dataScaleDown(input: torch.Tensor):
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
     """
-    input[:, :, 12:14] = ms_to_bartime(input[:, :, 12:14], input)
+    if input.shape[2] == 14:
+        input[:, :, 12:14] = ms_to_bartime(input[:, :, 12:14], input)
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
     input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
     input[:, :, 10] = input[:, :, 10] - 1
-    input[:, :, 11:14] = input[:, :, 11:14] * 2 - 1 # pos_in_bar, tau_d, tau_g are bartimes
+    input[:, :, 11:] = input[:, :, 11:] * 2 - 1 # pos_in_bar, tau_d, tau_g are bartimes
 
     return input
 
@@ -277,8 +278,9 @@ def dataScaleUp(input: torch.Tensor):
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
     input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
     input[:, :, 10] = input[:, :, 10] + 1
-    input[:, :, 11:14] = (input[:, :, 11:14] + 1) / 2
-    input[:, :, 12:14] = bartime_to_ms(input[:, :, 12:14], input)
+    input[:, :, 11:] = (input[:, :, 11:] + 1) / 2
+    if input.shape[2] == 14:
+        input[:, :, 12:14] = bartime_to_ms(input[:, :, 12:14], input)
 
     return input
 

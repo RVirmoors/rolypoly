@@ -777,11 +777,10 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   for (int c = 2; c < IN_DIM; c++) {
     input_tensor[0][0][c] = score[closest_note][c]; // bpm, tsig, pos_in_bar
   }
-  //cout << "input: " << input_tensor << endl;
   // send the onset to the model
   if (DEBUG) {
     auto output = m_model.get_model().forward({input_tensor}).toTensor();
-    cout << "ONSET output: " << output << endl;
+    cout << "ONSET x_dec scaled down:\n" << output << endl;
   } else {
     m_model.get_model().forward({input_tensor}).toTensor();
   }
