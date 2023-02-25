@@ -46,28 +46,37 @@ def classes_to_map():
             class_map[pitch] = cls
     return class_map
 
-def ms_to_bartime(ms: float, featVec):
+def ms_to_bartime(ms, featVec):
     """
     Convert a ms time difference to a bar-relative diff.
     input:
-        ms = time to be converted
-        featVec = feature of the note we relate to
+        ms = time(s) to be converted [batch, seq_len, times_to_compute]
+        featVec = feature of the note we relate to 
     """
-    tempo = featVec[9]
-    timeSig = featVec[10]
+    if len(ms.shape) == 2:
+        ms = ms.unsqueeze(2)
+    tempo = featVec[:,:,9].unsqueeze(2)
+    timeSig = featVec[:,:,10].unsqueeze(2)
     barDiff = ms / 1000 * 60 / tempo / timeSig
+    if barDiff.shape[2] == 1:
+        barDiff = barDiff.view(ms.shape[0], ms.shape[1])
+
     return barDiff
 
-def bartime_to_ms(bartime: float, featVec):
+def bartime_to_ms(bartime, featVec):
     """
     Convert a bar-relative time difference to a ms interval.
     input:
-        bartime = time to be converted
+        bartime = time(s) to be converted [batch, seq_len, times_to_compute]
         featVec = feature of the note we relate to
     """
-    tempo = featVec[9]
-    timeSig = featVec[10]
+    if len(bartime.shape) == 2:
+        bartime = bartime.unsqueeze(2)
+    tempo = featVec[:, :, 9].unsqueeze(2)
+    timeSig = featVec[:, :, 10].unsqueeze(2)
     ms = bartime * 1000 / 60 * tempo * timeSig
+    if ms.shape[2] == 1:
+        ms = ms.view(bartime.shape[0], bartime.shape[1])
     return ms
 
 def upbeat(bartime: torch.Tensor) -> bool:
@@ -230,6 +239,51 @@ def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
     x_dec = torch.cat((x_dec, live_notes), dim=1)
     return x_dec
 
+def dataScaleDown(input: torch.Tensor):
+    """
+    Scale the input data to range [-1, 1].
+
+    tau_d, tau_g from ms to bartime
+    9 velocities from [0, 127]
+    bpm from [40, 240]
+    tsig from [0.5, 1.5]
+    pos_in_bar from [0, 1]
+
+    input: (batch, vec_size, 14)
+    output: (batch, vec_size, 14)
+    """
+    input[:, :, 12:14] = ms_to_bartime(input[:, :, 12:14], input)
+    input[:, :, :9] = input[:, :, :9] / 63.5 - 1
+    input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
+    input[:, :, 10] = input[:, :, 10] - 1
+    input[:, :, 11:14] = input[:, :, 11:14] * 2 - 1 # pos_in_bar, tau_d, tau_g are bartimes
+
+    return input
+
+def dataScaleUp(input: torch.Tensor):
+    """
+    Scale the input data back up from [-1, 1].
+
+    9 velocities from [0, 127]
+    bpm from [40, 240]
+    tsig from [0.5, 1.5]
+    pos_in_bar from [0, 1]
+    tau_d, tau_g from bartime to ms
+
+    input: (batch, vec_size, 14)
+    output: (batch, vec_size, 14)
+    """
+    
+    input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
+    input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
+    input[:, :, 10] = input[:, :, 10] + 1
+    input[:, :, 11:14] = (input[:, :, 11:14] + 1) / 2
+    input[:, :, 12:14] = bartime_to_ms(input[:, :, 12:14], input)
+
+    return input
+
+
+
 # === TESTS ===
 
 if __name__ == '__main__':
@@ -244,5 +298,8 @@ if __name__ == '__main__':
     test1 = torch.tensor([[[36, 60, 120, 1, 0.5]]])
     x = readScore(test)
     print("readScore shape =", x.shape)
+    x = torch.cat((x, torch.randn(x.shape[0], x.shape[1], 2)), dim=2)
+    x_scaled = dataScaleUp(dataScaleDown(x))
+    assert torch.allclose(x, x_scaled)
     feat = x.squeeze(0)
     print(feat)
