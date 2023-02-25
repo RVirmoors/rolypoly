@@ -49,7 +49,7 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     n_layers = 4 # number of block layers
-    block_size = 32 # number of hits in a block
+    block_size = 256 # number of hits in a block
     dropout = 0.1
 
 # === HELPER CLASSES FOR TRANSFORMER ===
@@ -229,6 +229,11 @@ class Transformer(nn.Module):
 
         return y_hat
 
+    def loss(self, y_hat, y):
+        hit_loss = F.mse_loss(y_hat[:, :, :12], y[:, :, :12]) # hits
+        timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
+        return F.mse_loss(hit_loss, timing_loss)
+
     def from_pretrained(self, path):
         self.load_state_dict(torch.load(path))
 
@@ -267,7 +272,7 @@ class Transformer(nn.Module):
         # will only return the first occurence, key'd by 'transformer.wte.weight', below.
         # so let's manually remove 'lm_head.weight' from decay set. This will include
         # this tensor into optimization via transformer.wte.weight only, and not decayed.
-        decay.remove('lm_head.weight')
+        # decay.remove('lm_head.weight')
 
         # validate that we considered every parameter
         param_dict = {pn: p for pn, p in self.named_parameters()}

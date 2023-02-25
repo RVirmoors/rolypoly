@@ -3,6 +3,8 @@
 
 Train network using Groove MIDI Dataset (GMD) from Magenta:
 https://magenta.tensorflow.org/datasets/groove
+
+Code heavily inspired by https://github.com/karpathy/nanoGPT/blob/master/train.py
 """
 
 import torch
@@ -29,15 +31,28 @@ flags.DEFINE_string("meta", 'info.csv',
 flags.DEFINE_enum("source", 'csv', ['csv', 'midi'], "Source data files.")
 flags.DEFINE_string("load_model", None, "Load pre-trained model from file.")
 flags.DEFINE_integer("batch_size", 512, 
-    "Batch size: how many files to process at a time.")
-flags.DEFINE_integer("window_size", 32,
-    "Window / minibatch size: how many notes to train on.")
+    "Batch size: how many minibatches to process at a time.")
+flags.DEFINE_integer("block_size", 16,
+    "Block / minibatch size: how many notes to look at.")
 flags.DEFINE_integer("epochs", 100, "Number of epochs to train.")
 flags.DEFINE_bool("final", False, "Final training, using all data.")
 
+
+# === GLOBALS ===
 feat_vec_size = data.X_DECODER_CHANNELS
+train_data = [] # lists of tensors
+val_data = []
 
 # === DATASET FUNCTIONS ===
+
+def removeShortTakes(meta, min_dur=5):
+    print("Filtering out samples shorter than", min_dur, "seconds...")
+    old = len(meta)
+    (meta).drop([i for i in range(len(meta))
+                        if meta.iloc[i]['duration'] <= min_dur],
+                        inplace=True)
+    print("Dropped", old - len(meta), "short samples.")
+    return meta
 
 def midifileToXdec(filename: str) -> torch.Tensor:
     """
@@ -120,12 +135,12 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
     return X_dec
 
 
-
-
 # === MAIN ===
 
 def main(argv):
     meta = pd.read_csv(os.path.join(FLAGS.root_dir, FLAGS.meta))
+    meta = removeShortTakes(meta)
+
     for idx in range(len(meta)):
         file_name = os.path.join(FLAGS.root_dir,
                                         meta.iloc[idx]['midi_filename'])
@@ -137,9 +152,19 @@ def main(argv):
         elif FLAGS.source == 'csv':
             xd = data.loadXdecFromCSV(csv_filename)
             print("Loaded", csv_filename, ": ", xd.shape[0], "rows.")
-            # if xd.shape[0] < FLAGS.window_size:
-            #     print("Skipping file, too short.")
-            #     continue
+            if (xd.shape[0] <= FLAGS.block_size):
+                print("Skipping", csv_filename, "because it's too short.")
+                continue
+            if FLAGS.final or meta.iloc[idx]['split'] == 'train':
+                train_data.append(xd)
+            else:
+                val_data.append(xd)
+
+    config = model.Config()
+    config.block_size = FLAGS.block_size
+    m = model.Transformer(config)
+
+    train.train(m, config, FLAGS.load_model, FLAGS.epochs, train_data, val_data, FLAGS.batch_size)
 
 
 if __name__ == '__main__':
