@@ -95,7 +95,10 @@ class ExportRoly(nn_tilde.Module):
         if self.read[0]:
             self.x_enc = data.readScore(input)
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
-            self.x_dec = torch.randn(1, 1, 14) # reset x_dec
+            # initialise x_dec and y_hat
+            self.x_dec = self.x_enc[0, 0, :].unsqueeze(0).unsqueeze(0).clone().detach()
+            self.x_dec = torch.cat((self.x_dec, torch.zeros(1, 1, 2)), dim=2)
+            self.y_hat = torch.zeros(1, 0, 14)
             return out
 
         if self.play[0]:
@@ -118,6 +121,8 @@ class ExportRoly(nn_tilde.Module):
                 data.dataScaleUp(self.x_dec)
                 # update y_hat and x_dec with latest predictions
                 self.y_hat = torch.cat((self.y_hat, self.x_dec[:, -num_samples:, :]), dim=1)
+                # reset x_dec[13] to 0, waiting for live tau_guitar
+                self.x_dec[:, -num_samples:, 13] = 0
                 # return predictions
                 return self.y_hat[:, -num_samples:, :]
 
@@ -135,9 +140,17 @@ class ExportRoly(nn_tilde.Module):
 
 if __name__ == '__main__':
     test = False
+    pretrain = True
 
-    config = model.Config()
-    pretrained = model.Transformer(config)
+    if pretrain:
+        checkpoint = torch.load('out/ckpt.pt')
+        config = checkpoint['config']
+        pretrained = model.Transformer(config)
+        pretrained.load_state_dict(torch.load('out/model_best.pt'))
+    else:
+        config = model.Config()
+        pretrained = model.Transformer(config)
+
     #pretrained = model.Basic()
     pretrained.eval()
     m = ExportRoly(pretrained=pretrained)

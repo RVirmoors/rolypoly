@@ -57,7 +57,7 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     n_layers = 4 # number of block layers
-    block_size = 256 # number of hits in a block
+    block_size = 16 # number of hits in a block
     dropout = 0.1
 
 # === HELPER CLASSES FOR TRANSFORMER ===
@@ -240,8 +240,8 @@ class Transformer(nn.Module):
     def loss(self, y_hat, y):
         hit_loss = F.mse_loss(y_hat[:, :, :12], y[:, :, :12]) # hits
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
-        return F.mse_loss(hit_loss, timing_loss)
-
+        return hit_loss + timing_loss
+        
     def from_pretrained(self, path):
         self.load_state_dict(torch.load(path))
 

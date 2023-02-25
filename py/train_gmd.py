@@ -29,7 +29,7 @@ flags.DEFINE_string("root_dir", 'data/groove', "Root directory for dataset.")
 flags.DEFINE_string("meta", 'info.csv', 
     "Meta data file: csv list of samples for datset.")
 flags.DEFINE_enum("source", 'csv', ['csv', 'midi'], "Source data files.")
-flags.DEFINE_string("load_model", None, "Load pre-trained model from file.")
+flags.DEFINE_string("load_model", "out/ckpt.pt", "Load pre-trained model from file.")
 flags.DEFINE_integer("batch_size", 512, 
     "Batch size: how many minibatches to process at a time.")
 flags.DEFINE_integer("block_size", 16,

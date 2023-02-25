@@ -105,18 +105,22 @@ def estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe=None
 def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train_xe=None, val_xe=None):
     block_size = config.block_size
 
+    if load_model and not os.path.isfile(load_model):
+        print("No model found at", load_model, "-- starting from scratch...")
+        load_model = None
+
     if load_model:
         print("Resuming training from", load_model, "...")
         checkpoint = torch.load(load_model, map_location=device)
         iter_num = checkpoint['iter_num']
         best_val_loss = checkpoint['best_val_loss']
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model'])
 
     model.to(device)
     
     optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device)
     if load_model:
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
 
     if compile:
         print("compiling the model... (takes ~a minute)")
