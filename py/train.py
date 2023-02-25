@@ -67,8 +67,6 @@ def getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe=None, val
     if len(xd) == 0:
         raise Exception("No data found in %s" % split)
 
-
-
     take_i = np.random.randint(0, len(xd), (batch_size))
     ix = [np.random.randint(0, xd[i].shape[0] - block_size) for i in take_i]
     x_dec = torch.stack([xd[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
