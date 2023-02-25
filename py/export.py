@@ -127,12 +127,9 @@ class ExportRoly(nn_tilde.Module):
                 return self.y_hat[:, -num_samples:, :]
 
         elif self.finetune[0]:
-            y_hat = self.y_hat.clone().detach()
-            data.dataScaleUp(y_hat)
-
             if input[0,0,0] == 0:
                 return self.x_dec
-            return y_hat
+            return self.y_hat
 
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
