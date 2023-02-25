@@ -25,8 +25,16 @@ class Basic(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
 
-    def forward(self, x):
-        return x + 0.66
+    def forward(self, _, x):
+        return x + 1/127
+
+    def generate(self, _, x, num_samples:int=1):
+        out = x
+        for steps in range(num_samples):
+            x = self.forward(_, x)
+            x = x[:, -1:, :]
+            out = torch.cat((out, x), dim=1)
+        return out
 
 class Swing(nn.Module):
     def __init__(self, in_channels=14, out_channels=14):
@@ -82,7 +90,7 @@ class SelfAttention(nn.Module):
             # flash attention make GPU go brrrrr but support is only in PyTorch nightly and still a bit scary
             self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention') and self.dropout == 0.0
             if not self.flash:
-                print("WARNING: using slow attention. Flash Attention atm needs PyTorch nightly and dropout=0.0")
+                #print("WARNING: using slow attention. Flash Attention atm needs PyTorch nightly and dropout=0.0")
                 # causal mask to ensure that attention is only applied to the left in the input sequence
                 self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                                             .view(1, 1, config.block_size, config.block_size))
@@ -296,13 +304,15 @@ class Transformer(nn.Module):
         return optimizer
 
     @torch.no_grad()
-    def generate(self, x_enc, x_dec):
-        # greedy decoding
-        #x_dec = x_dec if x_dec.size(1) < config.block_size else x_dec[:, -config.block_size:]
-        #x_enc = x_enc if x_enc.size(1) < config.block_size else x_enc[:, -config.block_size:]
-        y_hat = self(x_enc, x_dec)
-        y_hat = y_hat[:, -1, :] # (b, n_chans)
-        return y_hat
+    def generate(self, x_enc, x_dec, num_samples: int = 1):
+        # generate predictions and append them to x_dec
+        for _ in range(num_samples):
+            x_dec = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
+            x_enc = x_enc if x_enc.size(1) < self.block_size else x_enc[:, -self.block_size:]
+            y_hat = self(x_enc, x_dec)
+            y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
+            x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
+        return x_dec
   
 
 
@@ -318,12 +328,13 @@ if __name__ == '__main__':
     #print(data.readScore(test).shape)
     #print(readScore(test)[:, :10, :])
     x_enc = data.readScore(test)
-    x_dec = torch.zeros(1, 0, 14)
-    x_dec = data.readScoreLive(test[:,:3,:], x_dec)
+    x_dec = torch.randn(1, 1, 14)
+    notes = data.readScoreLive(test[:,:3,:])
     #feat = x.squeeze(0)
     
     config = Config()
     m = Transformer(config)
     start = time.time()
     print("MODEL OUT:", m(x_enc, x_dec), m(x_enc, x_dec).shape)
+    print("GENERATE:", m.generate(x_enc, x_dec, notes.shape[1]), m.generate(x_enc, x_dec, notes.shape[1]).shape)
     print(time.time() - start, "s")

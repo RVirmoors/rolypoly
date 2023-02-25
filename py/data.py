@@ -214,7 +214,7 @@ def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
     X_score = X_score[:, mask, :]
     return X_score
 
-def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor):
+def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_enc: torch.Tensor):
     # add tau_guitar to decoder input
     # input: (batch, 1, 5) from cpp host
     # output: (batch, vec_size, 14)
@@ -224,20 +224,21 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor):
         return x_dec
     i = x_dec.shape[1] - 1
     while i >= 0:
-        if torch.allclose(input[:, 0, 2:5], x_dec[:, i, 9:12]):
+        print("LOOKING FOR MATCH", input[:, 0, 2:5], x_enc[:, i, 9:12])
+        if torch.allclose(input[:, 0, 2:5], x_enc[:, i, 9:12]):
             x_dec[:, i, 13] = input[:, 0, 1]    # tau_guitar
+            print("FOUND MATCH")
             return x_dec
         i -= 1
     return x_dec
 
-def readScoreLive(input: torch.Tensor, x_dec: torch.Tensor):
+def readScoreLive(input: torch.Tensor):
     # input: (batch, vec_size, 5) from cpp host
     # output: (batch, vec_size, 14)
     live_notes = readScore(input) # (batch, vec_size, 12)
     live_notes = torch.cat((live_notes, torch.zeros(
         live_notes.shape[0], live_notes.shape[1], 2)), dim=2) # (batch, vec_size, 14)
-    x_dec = torch.cat((x_dec, live_notes), dim=1)
-    return x_dec
+    return live_notes
 
 def dataScaleDown(input: torch.Tensor):
     """
@@ -301,6 +302,7 @@ if __name__ == '__main__':
     x = readScore(test)
     print("readScore shape =", x.shape)
     x = torch.cat((x, torch.randn(x.shape[0], x.shape[1], 2)), dim=2)
+
     x_scaled = dataScaleUp(dataScaleDown(x))
     assert torch.allclose(x, x_scaled)
     feat = x.squeeze(0)

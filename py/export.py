@@ -10,6 +10,7 @@ import nn_tilde
 
 import data # data helper methods
 import model
+torch.set_printoptions(sci_mode=False)
 
 class ExportRoly(nn_tilde.Module):
 
@@ -29,7 +30,7 @@ class ExportRoly(nn_tilde.Module):
 
         # REGISTER BUFFERS
         self.register_buffer('x_enc', torch.zeros(1, 0, 12)) # score
-        self.register_buffer('x_dec', torch.zeros(1, 0, 14)) # actuals
+        self.register_buffer('x_dec', torch.randn(1, 1, 14)) # actuals
         self.register_buffer('y_hat', torch.zeros(1, 0, 14)) # predictions
 
         # REGISTER METHODS
@@ -94,35 +95,39 @@ class ExportRoly(nn_tilde.Module):
         if self.read[0]:
             self.x_enc = data.readScore(input)
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
-            self.x_dec = torch.zeros(1, 0, 14) # reset x_dec
+            self.x_dec = torch.randn(1, 1, 14) # reset x_dec
             return out
 
         if self.play[0]:
             if m_buf_size == 1 and input[0, 0, 0] == 666: # just one onset
                 print("one onset")
-                if self.x_dec.shape[1] == 0:
+                if self.x_dec.shape[1] <= 1:
                     return torch.zeros(1, 1, 14) # can't modify x_dec yet!
                 # update x_dec[:,:,14] with realised tau_guitar
-                self.x_dec = data.readLiveOnset(input, self.x_dec)
+                self.x_dec = data.readLiveOnset(input, self.x_dec, self.x_enc)
                 return self.x_dec
-            else: # full buffer = receiving drum hits
-                print("full buffer")
-                # add latest hits to x_dec
-                before = self.x_dec.shape[1]
-                self.x_dec = data.readScoreLive(input, self.x_dec)
-                latest = self.x_dec.shape[1] - before
+            else: # receiving drum hits
+                next_notes = data.readScoreLive(input)
+                num_samples = next_notes.shape[1]
                 # get predictions
-                xe = data.dataScaleDown(self.x_enc)
-                xd = data.dataScaleDown(self.x_dec)
-                preds = self.pretrained(xe, xd)
-                # update y_hat with latest predictions
-                self.y_hat = torch.cat((self.y_hat, preds[:, -latest:, :]), dim=1) 
-                return data.dataScaleUp(self.y_hat[:, -latest:, :])
+                xe = self.x_enc.clone().detach()
+                xd = self.x_dec.clone().detach()
+                data.dataScaleDown(xe)
+                data.dataScaleDown(xd)
+                self.x_dec = self.pretrained.generate(xe, xd, num_samples)
+                data.dataScaleUp(self.x_dec)
+                # update y_hat and x_dec with latest predictions
+                self.y_hat = torch.cat((self.y_hat, self.x_dec[:, -num_samples:, :]), dim=1)
+                # return predictions
+                return self.y_hat[:, -num_samples:, :]
 
         elif self.finetune[0]:
+            y_hat = self.y_hat.clone().detach()
+            data.dataScaleUp(y_hat)
+
             if input[0,0,0] == 0:
-                return self.x_dec # normal scale
-            return self.y_hat # scaled down to [-1, 1]
+                return self.x_dec
+            return y_hat
 
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
@@ -133,6 +138,7 @@ if __name__ == '__main__':
 
     config = model.Config()
     pretrained = model.Transformer(config)
+    #pretrained = model.Basic()
     pretrained.eval()
     m = ExportRoly(pretrained=pretrained)
     if not test:
