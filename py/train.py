@@ -64,16 +64,20 @@ def getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe=None, val
     else:
         xe = train_xe if split == 'train' else val_xe
 
-    xd = xd.clone().detach().to(device)
-    xe = xe.clone().detach().to(device)
-    data.dataScaleDown(xd)
-    data.dataScaleDown(xe)
+    if len(xd) == 0:
+        raise Exception("No data found in %s" % split)
+
+
 
     take_i = np.random.randint(0, len(xd), (batch_size))
     ix = [np.random.randint(0, xd[i].shape[0] - block_size) for i in take_i]
     x_dec = torch.stack([xd[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
     x_enc = torch.stack([xe[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
     y = torch.stack([xd[take_i[i]][ix[i]+1:ix[i]+block_size+1] for i in take_i])
+
+    data.dataScaleDown(x_enc)
+    data.dataScaleDown(x_dec)
+    data.dataScaleDown(y)
 
     if 'cuda' in device:
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
@@ -91,7 +95,6 @@ def estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe=None
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
             X_enc, X_dec, Y = getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
-            X_enc, X_dec, Y = data.dataScaleDown(X_enc), data.dataScaleDown(X_dec), data.dataScaleDown(Y)
             y_hat = model(X_enc, X_dec)
             loss = model.loss(y_hat, Y)
             losses[k] = loss.item()
@@ -126,7 +129,7 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
     scaler = torch.cuda.amp.GradScaler(enabled = (dtype == 'float16'))
 
     # training loop
-    X, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe) # get first batch
+    X_enc, X_dec, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe) # get first batch
     t0 = time.time()
     local_iter_num = 0 # number of iterations in the lifetime of this process
     #for epoch in range(epochs):
@@ -138,7 +141,7 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
         
         if iter_num % eval_interval == 0:
             losses = estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
-            print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+            print(f"step {iter_num}: train loss {losses['train']:.6f}, val loss {losses['val']:.6f}")
             if losses['val'] < best_val_loss:
                 best_val_loss = losses['val']
                 torch.save(model.state_dict(), f'{out_dir}/model_best.pt')
@@ -156,10 +159,10 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
         for micro_step in range(gradient_accumulation_steps):
-            Y_hat = model(X, Y)
+            Y_hat = model(X_enc, X_dec)
             loss = model.loss(Y_hat, Y)
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
-            X, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
+            X_enc, X_dec, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
             if dtype == 'float16':
                 scaler.scale(loss).backward()
             else:
@@ -184,7 +187,7 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
         t0 = t1
         if iter_num % log_interval == 0:
             lossf = loss.item()
-            print(f"step {iter_num}: train loss {lossf:.4f}, lr {lr:.4f}, {dt:.2f}s")
+            print(f"step {iter_num}: train loss {lossf:.6f}, lr {lr:.6f}, {dt:.2f}s")
 
         iter_num += 1
         local_iter_num += 1

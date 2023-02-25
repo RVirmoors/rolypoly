@@ -46,20 +46,16 @@ def classes_to_map():
             class_map[pitch] = cls
     return class_map
 
-def ms_to_bartime(ms, featVec):
+def ms_to_bartime(ms: float, featVec):
     """
     Convert a ms time difference to a bar-relative diff.
     input:
         ms = time(s) to be converted [batch, seq_len, times_to_compute]
         featVec = feature of the note we relate to 
     """
-    if len(ms.shape) == 2:
-        ms = ms.unsqueeze(2)
-    tempo = featVec[:,:,9].unsqueeze(2)
-    timeSig = featVec[:,:,10].unsqueeze(2)
+    tempo = featVec[9]
+    timeSig = featVec[10]
     barDiff = ms / 1000. * 60. / tempo / timeSig
-    if barDiff.shape[2] == 1:
-        barDiff = barDiff.view(ms.shape[0], ms.shape[1])
 
     return barDiff
 
@@ -226,8 +222,8 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_enc: torch.Tensor)
     while i >= 0:
         print("LOOKING FOR MATCH", input[:, 0, 2:5], x_enc[:, i, 9:12])
         if torch.allclose(input[:, 0, 2:5], x_enc[:, i, 9:12]):
-            x_dec[:, i, 13] = input[:, 0, 1]    # tau_guitar
-            print("FOUND MATCH")
+            x_dec[:, i, 13] = ms_to_bartime(input[:, 0, 1], x_enc[:, i].squeeze())   # tau_guitar
+            print("FOUND MATCH", x_dec[:, i, 13])
             return x_dec
         i -= 1
     return x_dec
@@ -244,17 +240,14 @@ def dataScaleDown(input: torch.Tensor):
     """
     Scale the input data to range [-1, 1].
 
-    tau_d, tau_g from ms to bartime
     9 velocities from [0, 127]
     bpm from [40, 240]
     tsig from [0.5, 1.5]
-    pos_in_bar from [0, 1]
+    pos_in_bar, tau_d, tau_g from [0, 1]
 
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
-    """
-    if input.shape[2] == 14:
-        input[:, :, 12:14] = ms_to_bartime(input[:, :, 12:14], input)
+    """       
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
     input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
     input[:, :, 10] = input[:, :, 10] - 1
@@ -286,7 +279,6 @@ def dataScaleUp(input: torch.Tensor):
     return input
 
 
-
 # === TESTS ===
 
 if __name__ == '__main__':
@@ -309,6 +301,6 @@ if __name__ == '__main__':
     print(x_original, x)
     tolerance = 1e-3
     assert torch.allclose(x, x_original, atol=tolerance)
-    
+
     feat = x.squeeze(0)
     print(feat)
