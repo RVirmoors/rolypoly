@@ -311,7 +311,10 @@ class Transformer(nn.Module):
             x_enc = x_enc if x_enc.size(1) < self.block_size else x_enc[:, -self.block_size:]
             y_hat = self(x_enc, x_dec)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
-            x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
+            if x_dec.size(1) == 1 and x_dec[0, 0, 12] == -1.0: # first prediction
+                x_dec = y_hat.unsqueeze(1) # (b, 1, n_chans)
+            else:
+                x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
         return x_dec
   
 
