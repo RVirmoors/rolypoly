@@ -64,6 +64,11 @@ def getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe=None, val
     else:
         xe = train_xe if split == 'train' else val_xe
 
+    xd = xd.clone().detach().to(device)
+    xe = xe.clone().detach().to(device)
+    data.dataScaleDown(xd)
+    data.dataScaleDown(xe)
+
     take_i = np.random.randint(0, len(xd), (batch_size))
     ix = [np.random.randint(0, xd[i].shape[0] - block_size) for i in take_i]
     x_dec = torch.stack([xd[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])

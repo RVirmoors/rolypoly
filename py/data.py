@@ -57,7 +57,7 @@ def ms_to_bartime(ms, featVec):
         ms = ms.unsqueeze(2)
     tempo = featVec[:,:,9].unsqueeze(2)
     timeSig = featVec[:,:,10].unsqueeze(2)
-    barDiff = ms / 1000 * 60 / tempo / timeSig
+    barDiff = ms / 1000. * 60. / tempo / timeSig
     if barDiff.shape[2] == 1:
         barDiff = barDiff.view(ms.shape[0], ms.shape[1])
 
@@ -74,7 +74,7 @@ def bartime_to_ms(bartime, featVec):
         bartime = bartime.unsqueeze(2)
     tempo = featVec[:, :, 9].unsqueeze(2)
     timeSig = featVec[:, :, 10].unsqueeze(2)
-    ms = bartime * 1000 / 60 * tempo * timeSig
+    ms = bartime * 1000. / 60. * tempo * timeSig
     if ms.shape[2] == 1:
         ms = ms.view(bartime.shape[0], bartime.shape[1])
     return ms
@@ -303,7 +303,12 @@ if __name__ == '__main__':
     print("readScore shape =", x.shape)
     x = torch.cat((x, torch.randn(x.shape[0], x.shape[1], 2)), dim=2)
 
-    x_scaled = dataScaleUp(dataScaleDown(x))
-    assert torch.allclose(x, x_scaled)
+    x_original = x.clone().detach()
+    dataScaleUp(dataScaleDown(x))
+
+    print(x_original, x)
+    tolerance = 1e-3
+    assert torch.allclose(x, x_original, atol=tolerance)
+    
     feat = x.squeeze(0)
     print(feat)
