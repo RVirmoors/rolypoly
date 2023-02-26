@@ -154,7 +154,7 @@ def score_pos_in_bar(drumtrack, timesig_changes, tempos, timesigs):
 
 # === FILE I/O ===
 
-def saveXdecToCSV(X_dec, filename: str) -> int:
+def saveYtoCSV(X_dec, filename: str) -> int:
     """
     Save X_dec tensor to csv file.
     input: X_dec (len, feat_vec_size), filename
@@ -167,7 +167,7 @@ def saveXdecToCSV(X_dec, filename: str) -> int:
             f.write(', '.join([str(x) for x in X_dec[row].tolist()]) + '\n')
     return rows
 
-def loadXdecFromCSV(filename: str) -> torch.Tensor:
+def loadYFromCSV(filename: str) -> torch.Tensor:
     """
     Load X_dec tensor from csv file.
     input: filename

@@ -40,8 +40,14 @@ flags.DEFINE_bool("final", False, "Final training, using all data.")
 
 # === GLOBALS ===
 feat_vec_size = data.X_DECODER_CHANNELS
-train_data = [] # lists of tensors
-val_data = []
+train_data = {}
+val_data = {}
+train_data['X_dec'] = [] # lists of tensors
+train_data['X_enc'] = []
+train_data['Y'] = []
+val_data['X_dec'] = []
+val_data['X_enc'] = []
+val_data['Y'] = []
 
 # === DATASET FUNCTIONS ===
 
@@ -54,7 +60,7 @@ def removeShortTakes(meta, min_dur=5):
     print("Dropped", old - len(meta), "short samples.")
     return meta
 
-def midifileToXdec(filename: str) -> torch.Tensor:
+def smidifileToY(filename: str) -> torch.Tensor:
     """
     Convert a midi file to a tensor of X_decoder feature vectors.
     input: path to midi file
@@ -146,19 +152,20 @@ def main(argv):
                                         meta.iloc[idx]['midi_filename'])
         csv_filename = file_name[:-3] + 'csv'
         if FLAGS.source == 'midi':
-            xd = midifileToXdec(file_name)
-            rows = data.saveXdecToCSV(xd, filename=csv_filename)
+            y = smidifileToY(file_name)
+            rows = data.saveYtoCSV(y, filename=csv_filename)
             print("Saved", csv_filename, ": ", rows, "rows.")
         elif FLAGS.source == 'csv':
-            xd = data.loadXdecFromCSV(csv_filename)
-            print("Loaded", csv_filename, ": ", xd.shape[0], "rows.")
-            if (xd.shape[0] <= FLAGS.block_size):
+            y = data.loadYFromCSV(csv_filename)
+            print("Loaded", csv_filename, ": ", y.shape[0], "rows.")
+            if (y.shape[0] <= FLAGS.block_size):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
+            xd, xe = getXforTrainFromY(y, FLAGS.block_size)
             if FLAGS.final or meta.iloc[idx]['split'] == 'train':
-                train_data.append(xd)
+                train_data['Y'].append(y)
             else:
-                val_data.append(xd)
+                val_data['Y'].append(y)
 
     config = model.Config()
     config.block_size = FLAGS.block_size

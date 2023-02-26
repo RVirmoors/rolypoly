@@ -58,12 +58,10 @@ def get_lr(it):
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
     return min_lr + coeff * (learning_rate - min_lr)
 
-def getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe=None, val_xe=None):
-    xd = train_xd if split == 'train' else val_xd
-    if train_xe is None:
-        xe = xd
-    else:
-        xe = train_xe if split == 'train' else val_xe
+def getBatch(split, train_data, val_data, batch_size, block_size):
+    xd = train_data['X_dec'] if split == 'train' else val_data['X_dec']
+    xe = train_data['X_enc'] if split == 'train' else val_data['X_enc']
+    ys = train_data['Y'] if split == 'train' else val_data['Y']
 
     if len(xd) == 0:
         raise Exception("No data found in %s" % split)
@@ -72,7 +70,7 @@ def getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe=None, val
     ix = [np.random.randint(0, xd[i].shape[0] - block_size) for i in take_i]
     x_dec = torch.stack([xd[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
     x_enc = torch.stack([xe[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
-    y = torch.stack([xd[take_i[i]][ix[i]+1:ix[i]+block_size+1] for i in take_i])
+    y =     torch.stack([ys[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
 
     data.dataScaleDown(x_enc)
     data.dataScaleDown(x_dec)
@@ -87,13 +85,13 @@ def getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe=None, val
 
 # helps estimate an arbitrarily accurate loss over either split using many batches
 @torch.no_grad()
-def estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe=None, val_xe=None):
+def estimate_loss(model, train_data, val_data, batch_size, block_size):
     out = {}
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
-            X_enc, X_dec, Y = getBatch(split, train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
+            X_enc, X_dec, Y = getBatch(split, train_data, val_data, batch_size, block_size)
             y_hat = model(X_enc, X_dec)
             if torch.all(Y[:, :, 13] == -1.0):
                 y_hat[:, :, 13] = -1.0 # remove guitar from loss
@@ -110,7 +108,7 @@ def estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe=None
     model.train()
     return out
 
-def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train_xe=None, val_xe=None):
+def train(model, config, load_model, epochs, train_data, val_data, batch_size):
     block_size = config.block_size
 
     iter_num = 0
@@ -141,7 +139,7 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
     scaler = torch.cuda.amp.GradScaler(enabled = (dtype == 'float16'))
 
     # training loop
-    X_enc, X_dec, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe) # get first batch
+    X_enc, X_dec, Y = getBatch('train', train_data, val_data, batch_size, block_size) # get first batch
     t0 = time.time()
     local_iter_num = 0 # number of iterations in the lifetime of this process
     #for epoch in range(epochs):
@@ -152,7 +150,7 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
             param_group['lr'] = lr
         
         if iter_num % eval_interval == 0:
-            losses = estimate_loss(model, train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
+            losses = estimate_loss(model, train_data, val_data, batch_size, block_size)
             print(f"step {iter_num}: train loss {losses['train']:.6f}, val loss {losses['val']:.6f}")
             if losses['val'] < best_val_loss:
                 best_val_loss = losses['val']
@@ -176,7 +174,7 @@ def train(model, config, load_model, epochs, train_xd, val_xd, batch_size, train
                 Y_hat[:, :, 13] = -1.0 # remove guitar from loss
             loss = model.loss(Y_hat, Y)
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
-            X_enc, X_dec, Y = getBatch('train', train_xd, val_xd, batch_size, block_size, train_xe, val_xe)
+            X_enc, X_dec, Y = getBatch('train', train_data, val_data, batch_size, block_size)
             if dtype == 'float16':
                 scaler.scale(loss).backward()
             else:
