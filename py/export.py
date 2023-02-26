@@ -11,6 +11,8 @@ import nn_tilde
 import data # data helper methods
 import model
 torch.set_printoptions(sci_mode=False)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print("Using device:", device)
 
 # ============== MAIN EXPORT CLASS ==============
 
@@ -189,10 +191,10 @@ if __name__ == '__main__':
     pretrain = True
 
     if pretrain:
-        checkpoint = torch.load('out/ckpt.pt')
+        checkpoint = torch.load('out/ckpt.pt', map_location=device)
         config = checkpoint['config']
         pretrained = model.Transformer(config)
-        pretrained.load_state_dict(torch.load('out/model_best.pt'))
+        pretrained.load_state_dict(torch.load('out/model_best.pt', map_location=device))
         print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
     else:
         config = model.Config()

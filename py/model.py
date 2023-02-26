@@ -85,16 +85,16 @@ class SelfAttention(nn.Module):
         self.dropout = config.dropout
         self.block_size = config.block_size
         self.causal = causal
+        self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention') and self.dropout == 0.0
+        # causal mask to ensure that attention is only applied to the left in the input sequence
+        self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
+                                            .view(1, 1, config.block_size, config.block_size))
         if self.causal:
             self.n_chans = data.X_DECODER_CHANNELS      # 14
-            self.n_heads = data.X_DECODER_CHANNELS // 2 # 7
+            self.n_heads = data.X_DECODER_CHANNELS // 2 # 7            
             # flash attention make GPU go brrrrr but support is only in PyTorch nightly and still a bit scary
-            self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention') and self.dropout == 0.0
-            if not self.flash:
-                #print("WARNING: using slow attention. Flash Attention atm needs PyTorch nightly and dropout=0.0")
-                # causal mask to ensure that attention is only applied to the left in the input sequence
-                self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
-                                            .view(1, 1, config.block_size, config.block_size))
+            # if not self.flash:
+                # print("WARNING: using slow attention. Flash Attention atm needs PyTorch nightly and dropout=0.0")
         else:
             self.n_chans = data.X_ENCODER_CHANNELS      # 12
             self.n_heads = data.X_ENCODER_CHANNELS // 3 # 4
@@ -224,6 +224,7 @@ class DecoderBlock(nn.Module):
     def __init__(self, config):
         super().__init__()
         n_chans = data.X_DECODER_CHANNELS
+        self.arch = config.arch
         self.ln_1 = LayerNorm(n_chans, bias=False)
         self.attn = SelfAttention(config, causal=True)
         self.ln_2 = LayerNorm(n_chans, bias=False)
@@ -233,7 +234,7 @@ class DecoderBlock(nn.Module):
 
     def forward(self, x, enc_out):
         x = x + self.attn(self.ln_1(x))
-        if enc_out is not None: # 'ed' architecture
+        if self.arch == 'ed': # encoder-decoder attention
             x = x + self.cross_attn(self.ln_2(x), enc_out)
         x = x + self.mlp(self.ln_3(x))
         return x
@@ -303,7 +304,6 @@ class Transformer(nn.Module):
                 nn.init.zeros_(m.weight[m.padding_idx])
 
     def forward(self, x_enc, x_dec):
-        enc_out = None # will be overwritten if 'ed' architecture
         device = x_dec.device
         b, t = x_dec.shape[:2]
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
@@ -332,6 +332,8 @@ class Transformer(nn.Module):
             for block in self.transformer.h_enc:
                 x_enc = block(x_enc)
             enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
+        else:
+            enc_out = torch.zeros((b, t, data.X_DECODER_CHANNELS), device=device)
 
         # transformer blocks (DECODER)
         for block in self.transformer.h_dec:
