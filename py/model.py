@@ -56,6 +56,7 @@ class Swing(nn.Module):
 # === TRANSFORMER HYPERPARAMETERS ===
 @dataclass
 class Config:
+    arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
     n_layers = 4 # number of block layers
     block_size = 16 # number of hits in a block
     dropout = 0.1
@@ -104,9 +105,6 @@ class SelfAttention(nn.Module):
         # regularization
         self.attn_drop = nn.Dropout(0.1)
         self.resid_drop = nn.Dropout(0.1)
-        # layer norm
-        self.ln_1 = LayerNorm(self.n_chans, bias=False)
-        self.ln_2 = LayerNorm(self.n_chans, bias=False)
 
     def forward(self, x):
         B, T, C = x.shape # batch, seq_len, channels
@@ -147,12 +145,68 @@ class SelfAttention(nn.Module):
 
         return y
 
+class CrossAttention(nn.Module):
+    """ inputs: dec prev. layer & enc output, (batch, seq_len, channels) each
+        output: y projection (batch, seq_len, channels)
+
+    http://nlp.seas.harvard.edu/annotated-transformer/
+    In “encoder-decoder attention” layers, the queries come from the previous decoder layer, and the memory keys and values come from the output of the encoder. This allows every position in the decoder to attend over all positions in the input sequence.
+
+    - adapted from SelfAttention above"""
+
+    def __init__(self, config) -> None:
+        super().__init__()
+        self.dropout = config.dropout
+        self.block_size = config.block_size
+        self.n_chans = data.X_DECODER_CHANNELS      # 14
+        self.n_heads = data.X_DECODER_CHANNELS // 2 # 7
+
+        # query, key, value projections for all heads, but in a batch
+        # query is from previous decoder layer, key and value are from encoder output
+        self.attnQ = nn.Linear(self.n_chans, self.n_chans, bias=False)
+        self.attnKV = nn.Linear(self.n_chans, 2 * self.n_chans, bias=False)
+        # output projection
+        self.proj = nn.Linear(self.n_chans, self.n_chans, bias=False)
+        # regularization
+        self.attn_drop = nn.Dropout(0.1)
+        self.resid_drop = nn.Dropout(0.1)
+
+    def forward(self, x, enc_out):
+        B, T, C = x.shape # batch, seq_len, channels
+        Be, Te, Ce = enc_out.shape # batch, seq_len, channels
+        assert Be == B, "batch size of encoder output must match decoder input"
+        assert Ce == C, "channel size of encoder output must match decoder input"
+
+        # compute query, key, value for all heads in batch
+        q = self.attnQ(x) # (B, T, C)
+        k, v = self.attnKV(enc_out).chunk(2, dim=-1) # (B, T, C) each
+        q = q.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2) # (B, n_heads, T, C // n_heads)
+        k = k.view(B, Te, self.n_heads, C // self.n_heads).transpose(1, 2) # (B, n_heads, T, C // n_heads)
+        v = v.view(B, Te, self.n_heads, C // self.n_heads).transpose(1, 2) # (B, n_heads, T, C // n_heads)
+
+        # scale query
+        q = q * (C // self.n_heads) ** -0.5 # TODO check if this is correct
+
+        # attention
+        attn = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.shape[-1]))
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        y = attn @ v # (B, n_heads, T, C // n_heads)
+
+        # combine heads
+        y = y.transpose(1, 2).contiguous().view(B, T, C) # (B, T, C)
+
+        # output projection
+        y = self.proj(y)
+        y = self.resid_drop(y)
+
+        return y
+
 class FeedForward(nn.Module):
     """ adapted from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
 
     def __init__(self, n_chans) -> None:
         super().__init__()
-        self.n_chans = n_chans
         self.c_fc = nn.Linear(n_chans, 4 * n_chans, bias=False)
         self.c_proj = nn.Linear(4 * n_chans, n_chans, bias=False)
         self.dropout = nn.Dropout(0.1)
@@ -173,33 +227,63 @@ class DecoderBlock(nn.Module):
         self.ln_1 = LayerNorm(n_chans, bias=False)
         self.attn = SelfAttention(config, causal=True)
         self.ln_2 = LayerNorm(n_chans, bias=False)
-        # self.cross_attn = CrossAttention(n_chans, causal=False)
+        self.cross_attn = CrossAttention(config)
+        self.ln_3 = LayerNorm(n_chans, bias=False)
+        self.mlp = FeedForward(n_chans)
+
+    def forward(self, x, enc_out):
+        x = x + self.attn(self.ln_1(x))
+        if enc_out is not None: # 'ed' architecture
+            x = x + self.cross_attn(self.ln_2(x), enc_out)
+        x = x + self.mlp(self.ln_3(x))
+        return x
+
+class EncoderBlock(nn.Module):
+    """ adapted from DecoderBlock above"""
+    
+    def __init__(self, config):
+        super().__init__()
+        n_chans = data.X_ENCODER_CHANNELS
+        self.ln_1 = LayerNorm(n_chans, bias=False)
+        self.attn = SelfAttention(config, causal=False)
+        self.ln_2 = LayerNorm(n_chans, bias=False)
         self.mlp = FeedForward(n_chans)
 
     def forward(self, x):
         x = x + self.attn(self.ln_1(x))
-        # x = x + self.cross_attn(self.ln_2(x), x)
         x = x + self.mlp(self.ln_2(x))
         return x
 
 
-# === TRANSFORMER CLASSES ===
+# === TRANSFORMER CLASS ===
 
-class TransformerD(nn.Module):
-    """ 
-    D stands for Decoder-only (GPT style)
-    adapted from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
+class Transformer(nn.Module):
+    """adapted from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
 
     def __init__(self, config):
         super().__init__()
         self.block_size = config.block_size
-        self.transformer = nn.ModuleDict(dict(
-            in_mlp = FeedForward(data.X_DECODER_CHANNELS),
-            wpe = nn.Embedding(config.block_size, data.X_DECODER_CHANNELS), # positional embedding
-            drop = nn.Dropout(0.1),
-            h = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
-            ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
-        ))
+        self.arch = config.arch
+        if self.arch == 'd':
+            self.transformer = nn.ModuleDict(dict(
+                #in_mlp = FeedForward(data.X_DECODER_CHANNELS),
+                wpe_dec = nn.Embedding(config.block_size, data.X_DECODER_CHANNELS), # positional embedding
+                drop_dec = nn.Dropout(0.1),
+                h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
+                ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
+            ))
+        elif self.arch == 'ed':
+            self.transformer = nn.ModuleDict(dict(
+                wpe_enc = nn.Embedding(config.block_size, data.X_ENCODER_CHANNELS), # positional embedding
+                drop_enc = nn.Dropout(0.1),
+                h_enc = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_layers)]),
+                proj_enc = nn.Linear(data.X_ENCODER_CHANNELS, data.X_DECODER_CHANNELS),
+
+                wpe_dec = nn.Embedding(config.block_size, data.X_DECODER_CHANNELS), # positional embedding
+                drop_dec = nn.Dropout(0.1),
+                h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
+                ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
+            ))
 
         # initialize weights
         self.apply(self._init_weights)
@@ -219,23 +303,40 @@ class TransformerD(nn.Module):
                 nn.init.zeros_(m.weight[m.padding_idx])
 
     def forward(self, x_enc, x_dec):
+        enc_out = None # will be overwritten if 'ed' architecture
         device = x_dec.device
         b, t = x_dec.shape[:2]
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
 
-        # input MLP (for scaling bpm etc)
-        x = self.transformer['in_mlp'](x_dec) 
+        # input MLP (for embedding)
+        # x = self.transformer['in_mlp'](x_dec) 
 
-        # add position embedding
-        pos = torch.arange(t, device=device).unsqueeze(0).repeat(b, 1) # (b, t)
-        pos_emb = self.transformer['wpe'](pos) # (b, t, n_chans)
-        x = x + pos_emb
-        x = self.transformer['drop'](x)
+        # add position embedding (ENCODER)
+        if self.arch == 'ed':
+            if x_enc.shape[1] == 0: # error handling for empty encoder input
+                x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
+            b_enc, t_enc = x_enc.shape[:2]               
+            pos_enc = torch.arange(t_enc, device=device).unsqueeze(0).repeat(b_enc, 1)
+            pos_emb_enc = self.transformer.wpe_enc(pos_enc)
+            x_enc = x_enc + pos_emb_enc
+            x_enc = self.transformer.drop_enc(x_enc)
+
+        # add position embedding (DECODER)
+        pos_dec = torch.arange(t, device=device).unsqueeze(0).repeat(b, 1) # (b, t)
+        pos_emb_dec = self.transformer.wpe_dec(pos_dec) # (b, t, n_chans)
+        x_dec = x_dec + pos_emb_dec
+        x_dec = self.transformer.drop_dec(x_dec)
         
-        # transformer blocks
-        for block in self.transformer['h']:
-            x = block(x)
-        y_hat = self.transformer['ln_f'](x)
+        # transformer blocks (ENCODER)
+        if self.arch == 'ed':
+            for block in self.transformer.h_enc:
+                x_enc = block(x_enc)
+            enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
+
+        # transformer blocks (DECODER)
+        for block in self.transformer.h_dec:
+            x_dec = block(x_dec, enc_out)
+        y_hat = self.transformer.ln_f(x_dec)
 
         return y_hat
 
@@ -308,15 +409,27 @@ class TransformerD(nn.Module):
     @torch.no_grad()
     def generate(self, x_enc, x_dec, num_samples: int = 1):
         # generate predictions and append them to x_dec
+
         for _ in range(num_samples):
+            # crop inputs to block size
             x_dec = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
-            x_enc = x_enc if x_enc.size(1) < self.block_size else x_enc[:, -self.block_size:]
+            t = x_dec.size(1) if x_dec[0, 0, 12] != -1.0 else 0 # current time step
+            if x_enc.size(1) > self.block_size:
+                if t + self.block_size > x_enc.size(1):
+                    x_enc = x_enc[:, -self.block_size:]
+                else:
+                    x_enc = x_enc[:, t:t+self.block_size]
+            
+            # generate prediction
             y_hat = self(x_enc, x_dec)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
+
+            # append prediction to x_dec
             if x_dec.size(1) == 1 and x_dec[0, 0, 12] == -1.0: # first prediction
                 x_dec = y_hat.unsqueeze(1) # (b, 1, n_chans)
             else:
                 x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
+
         return x_dec
   
 
