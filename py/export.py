@@ -165,7 +165,7 @@ def test_toy(m):
     print("guit -> dec: ", out, out.shape)
 
 def test_gmd(m):
-    hits = data.loadXdecFromCSV('gmd.csv')
+    hits = data.loadYFromCSV('gmd.csv')
     x_dec = hits[0].unsqueeze(0).unsqueeze(0).clone().detach()
     print("first x_dec: ", x_dec)
     y_hat = torch.zeros(1, 0, 14)
@@ -187,7 +187,7 @@ def test_gmd(m):
 # ==================== MAIN =====================
 
 if __name__ == '__main__':
-    test = False
+    test = True
     pretrain = True
 
     if pretrain:
@@ -207,5 +207,5 @@ if __name__ == '__main__':
         m.export_to_ts('../help/roly.ts') # TODO: make this a command line argument
         print("Exported model to ../help/roly.ts")
     else:
-        test_toy(m)
+        test_gmd(m)
 
