@@ -12,6 +12,8 @@ import data # data helper methods
 import model
 torch.set_printoptions(sci_mode=False)
 
+# ============== MAIN EXPORT CLASS ==============
+
 class ExportRoly(nn_tilde.Module):
 
     def __init__(self, pretrained):
@@ -124,7 +126,9 @@ class ExportRoly(nn_tilde.Module):
                 # reset x_dec[13] to 0, waiting for live tau_guitar
                 self.x_dec[:, -num_samples:, 13] = 0
                 # return predictions
-                return self.y_hat[:, -num_samples:, :]
+                out = self.y_hat[:, -num_samples:, :].clone().detach()
+                out[:, :, 12:] = data.bartime_to_ms(out[:, :, 12:], out)
+                return out
 
         elif self.finetune[0]:
             if input[0,0,0] == 0:
@@ -135,19 +139,64 @@ class ExportRoly(nn_tilde.Module):
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
             return out
 
+# ==================== TESTS ====================
+
+def test_toy(m):
+    score = torch.tensor([[[42, 70, 120, 1, 0],
+                        [36, 60, 120, 1, 0.5],
+                        [38, 111, 140, 1.5, 0.33],
+                        [42, 105, 140, 1.5, 0.33],
+                        [36, 101, 140, 1.5, 0.66]]])
+    live_drums = torch.tensor([[[42, 70, 120, 1, 0],
+                        [36, 60, 120, 1, 0.5]]])
+    guit = torch.tensor([[[666, 0.666, 120, 1, 0]]])
+
+    m.set_read(True)
+    out = m.forward(score)
+    print("read -> enc: ", out[:,-1,:], out.shape)
+    m.set_read(False)
+    print("=====================")
+    m.set_play(True)
+    out = m.forward(live_drums)
+    print("drums2 > y_hat: ", out, out.shape)
+    out = m.forward(guit)
+    print("guit -> dec: ", out, out.shape)
+
+def test_gmd(m):
+    hits = data.loadXdecFromCSV('gmd.csv')
+    x_dec = hits[0].unsqueeze(0).unsqueeze(0).clone().detach()
+    print("first x_dec: ", x_dec)
+    y_hat = torch.zeros(1, 0, 14)
+
+    for i in range(5):#hits.shape[1]):
+        print(i, "::::::: input:\n", x_dec[:,:,i])
+        xd = x_dec.clone().detach()
+        data.dataScaleDown(xd)
+        x_dec = m.pretrained.generate(xd, xd, 1)
+        data.dataScaleUp(x_dec)
+        y_hat = torch.cat((y_hat, x_dec[:, -1:, :]), dim=1)
+        # print("y_hat: ", y_hat)
+        x_dec[:, -1:, 13] = 0
+
+        xd = x_dec.clone().detach()
+        xd[:, :, 12:14] = data.bartime_to_ms(xd[:, :, 12:14], xd)
+        print("x_dec: ", xd, xd.shape)
+
+# ==================== MAIN =====================
+
 if __name__ == '__main__':
-    test = True
+    test = False
     pretrain = True
 
     if pretrain:
         checkpoint = torch.load('out/ckpt.pt')
         config = checkpoint['config']
-        pretrained = model.Transformer(config)
+        pretrained = model.TransformerD(config)
         pretrained.load_state_dict(torch.load('out/model_best.pt'))
         print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
     else:
         config = model.Config()
-        pretrained = model.Transformer(config)
+        pretrained = model.TransformerD(config)
 
     #pretrained = model.Basic()
     pretrained.eval()
@@ -156,22 +205,5 @@ if __name__ == '__main__':
         m.export_to_ts('../help/roly.ts') # TODO: make this a command line argument
         print("Exported model to ../help/roly.ts")
     else:
-        score = torch.tensor([[[42, 70, 120, 1, 0],
-                            [36, 60, 120, 1, 0.5],
-                            [38, 111, 140, 1.5, 0.33],
-                            [42, 105, 140, 1.5, 0.33],
-                            [36, 101, 140, 1.5, 0.66]]])
-        live_drums = torch.tensor([[[42, 70, 120, 1, 0],
-                            [36, 60, 120, 1, 0.5]]])
-        guit = torch.tensor([[[666, 0.666, 120, 1, 0]]])
+        test_toy(m)
 
-        m.set_read(True)
-        out = m.forward(score)
-        print("read -> enc: ", out[:,-1,:], out.shape)
-        m.set_read(False)
-        print("=====================")
-        m.set_play(True)
-        out = m.forward(live_drums)
-        print("drums2 > y_hat: ", out, out.shape)
-        out = m.forward(guit)
-        print("guit -> dec: ", out, out.shape)

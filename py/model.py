@@ -183,10 +183,12 @@ class DecoderBlock(nn.Module):
         return x
 
 
-# === TRANSFORMER CLASS ===
+# === TRANSFORMER CLASSES ===
 
-class Transformer(nn.Module):
-    """ adapted from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
+class TransformerD(nn.Module):
+    """ 
+    D stands for Decoder-only (GPT style)
+    adapted from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
 
     def __init__(self, config):
         super().__init__()

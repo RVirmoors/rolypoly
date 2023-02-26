@@ -263,7 +263,6 @@ def dataScaleUp(input: torch.Tensor):
     bpm from [40, 240]
     tsig from [0.5, 1.5]
     pos_in_bar from [0, 1]
-    tau_d, tau_g from bartime to ms
 
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
@@ -273,8 +272,6 @@ def dataScaleUp(input: torch.Tensor):
     input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
     input[:, :, 10] = input[:, :, 10] + 1
     input[:, :, 11:] = (input[:, :, 11:] + 1) / 2
-    if input.shape[2] == 14:
-        input[:, :, 12:14] = bartime_to_ms(input[:, :, 12:14], input)
 
     return input
 
