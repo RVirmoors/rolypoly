@@ -60,7 +60,7 @@ def removeShortTakes(meta, min_dur=5):
     print("Dropped", old - len(meta), "short samples.")
     return meta
 
-def smidifileToY(filename: str) -> torch.Tensor:
+def midifileToY(filename: str) -> torch.Tensor:
     """
     Convert a midi file to a tensor of X_decoder feature vectors.
     input: path to midi file
@@ -122,7 +122,7 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
             duration = H[index + 1] - H[index]
             if duration < 0: # if at end of bar, then add barlength
                 duration += timesigs[index][0] / timesigs[index][1]
-        hit[pitch_class_map[note.pitch]] = note.velocity / 127
+        hit[pitch_class_map[note.pitch]] = note.velocity
         if duration:
             # done adding notes at this timestep, process it
             hit[9] = tempos[hit_index]
@@ -140,6 +140,23 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
             duration = 0
     return X_dec
 
+def getTrainDataFromY(Y: torch.Tensor):
+    """
+    input: Y (len, feat_vec_size)
+    output: X_dec (len, feat_vec_size), X_enc (len, feat_vec_size)
+    """
+    X_enc = Y[:, :data.X_ENCODER_CHANNELS].clone().detach() # lose tau info
+    # lose velocity info
+    sum_non_zero = torch.sum(X_enc, dim=0)
+    non_zero = torch.count_nonzero(X_enc, dim=0)
+    mean = sum_non_zero / non_zero
+    # replace non-zero notes with the mean velocity for that note
+    X_enc = torch.where(X_enc > 0, mean, X_enc)
+
+    X_dec = Y
+    Y = torch.roll(Y, -1, dims=0)
+
+    return X_dec, X_enc
 
 # === MAIN ===
 
@@ -147,12 +164,12 @@ def main(argv):
     meta = pd.read_csv(os.path.join(FLAGS.root_dir, FLAGS.meta))
     meta = removeShortTakes(meta)
 
-    for idx in range(15):#len(meta)):
+    for idx in range(len(meta)):
         file_name = os.path.join(FLAGS.root_dir,
                                         meta.iloc[idx]['midi_filename'])
         csv_filename = file_name[:-3] + 'csv'
         if FLAGS.source == 'midi':
-            y = smidifileToY(file_name)
+            y = midifileToY(file_name)
             rows = data.saveYtoCSV(y, filename=csv_filename)
             print("Saved", csv_filename, ": ", rows, "rows.")
         elif FLAGS.source == 'csv':
@@ -161,10 +178,14 @@ def main(argv):
             if (y.shape[0] <= FLAGS.block_size):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
-            xd, xe = getXforTrainFromY(y, FLAGS.block_size)
+            xd, xe= getTrainDataFromY(y)
             if FLAGS.final or meta.iloc[idx]['split'] == 'train':
+                train_data['X_dec'].append(xd)
+                train_data['X_enc'].append(xe)
                 train_data['Y'].append(y)
             else:
+                val_data['X_dec'].append(xd)
+                val_data['X_enc'].append(xe)
                 val_data['Y'].append(y)
 
     config = model.Config()
