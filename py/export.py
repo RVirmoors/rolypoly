@@ -9,8 +9,9 @@ import torch, torch.nn as nn
 import nn_tilde
 
 import data # data helper methods
+import train_gmd # for testing GMD
 import model
-torch.set_printoptions(sci_mode=False)
+torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using device:", device)
 
@@ -165,16 +166,21 @@ def test_toy(m):
     print("guit -> dec: ", out, out.shape)
 
 def test_gmd(m):
-    hits = data.loadYFromCSV('gmd.csv')
-    x_dec = hits[0].unsqueeze(0).unsqueeze(0).clone().detach()
-    print("first x_dec: ", x_dec)
+    y = data.loadYFromCSV('gmd.csv')
+    x_dec, x_enc= train_gmd.getTrainDataFromY(y)
+    x_dec = x_dec.unsqueeze(0)
+    x_enc = x_enc.unsqueeze(0)
+    print("first x_dec:\n", x_dec[0, :3], x_dec.shape)
+    print("first x_enc:\n", x_enc[0, :3], x_enc.shape)
     y_hat = torch.zeros(1, 0, 14)
 
-    for i in range(5):#hits.shape[1]):
+    for i in range(1):#hits.shape[1]):
         print(i, "::::::: input:\n", x_dec[:,:,i])
         xd = x_dec.clone().detach()
+        xe = x_enc.clone().detach()
         data.dataScaleDown(xd)
-        x_dec = m.pretrained.generate(xd, xd, 1)
+        data.dataScaleDown(xe)
+        x_dec = m.pretrained.generate(xe, xd, 1)
         data.dataScaleUp(x_dec)
         y_hat = torch.cat((y_hat, x_dec[:, -1:, :]), dim=1)
         # print("y_hat: ", y_hat)
@@ -182,7 +188,7 @@ def test_gmd(m):
 
         xd = x_dec.clone().detach()
         xd[:, :, 12:14] = data.bartime_to_ms(xd[:, :, 12:14], xd)
-        print("x_dec: ", xd, xd.shape)
+        print("x_dec out:\n", xd, xd.shape)
 
 # ==================== MAIN =====================
 

@@ -154,33 +154,33 @@ def score_pos_in_bar(drumtrack, timesig_changes, tempos, timesigs):
 
 # === FILE I/O ===
 
-def saveYtoCSV(X_dec, filename: str) -> int:
+def saveYtoCSV(Y, filename: str) -> int:
     """
-    Save X_dec tensor to csv file.
-    input: X_dec (len, feat_vec_size), filename
+    Save Y tensor to csv file.
+    input: Y (len, feat_vec_size), filename
     output: number of rows written
     """
     with open(filename, 'w') as f:
         f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n")
-        rows = X_dec.shape[0]
+        rows = Y.shape[0]
         for row in range(rows):
-            f.write(', '.join([str(x) for x in X_dec[row].tolist()]) + '\n')
+            f.write(', '.join([str(x) for x in Y[row].tolist()]) + '\n')
     return rows
 
 def loadYFromCSV(filename: str) -> torch.Tensor:
     """
-    Load X_dec tensor from csv file.
+    Load Y tensor from csv file.
     input: filename
-    output: X_dec (len, feat_vec_size)
+    output: Y (len, feat_vec_size)
     """
     with open(filename, 'r') as f:
         lines = f.readlines()
         rows = len(lines) - 1
         cols = len(lines[1].split(', '))
-        X_dec = torch.zeros(rows, cols)
+        Y = torch.zeros(rows, cols)
         for row in range(rows):
-            X_dec[row] = torch.tensor([float(x) for x in lines[row + 1].split(', ')])
-    return X_dec
+            Y[row] = torch.tensor([float(x) for x in lines[row + 1].split(', ')])
+    return Y
 
 # === DATA PROCESSING ===
 

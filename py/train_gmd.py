@@ -147,11 +147,11 @@ def getTrainDataFromY(Y: torch.Tensor):
     """
     X_enc = Y[:, :data.X_ENCODER_CHANNELS].clone().detach() # lose tau info
     # lose velocity info
-    sum_non_zero = torch.sum(X_enc, dim=0)
-    non_zero = torch.count_nonzero(X_enc, dim=0)
+    sum_non_zero = torch.sum(X_enc[:,:9], dim=0)
+    non_zero = torch.count_nonzero(X_enc[:,:9], dim=0)
     mean = sum_non_zero / non_zero
     # replace non-zero notes with the mean velocity for that note
-    X_enc = torch.where(X_enc > 0, mean, X_enc)
+    X_enc[:,:9] = torch.where(X_enc[:,:9] > 0, mean, X_enc[:,:9])
 
     X_dec = Y
     Y = torch.roll(Y, -1, dims=0)
