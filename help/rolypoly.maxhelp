@@ -1993,7 +1993,6 @@
 						"style" : "",
 						"subpatcher_template" : "",
 						"assistshowspatchername" : 0,
-						"visible" : 1,
 						"boxes" : [ 							{
 								"box" : 								{
 									"id" : "obj-2",
@@ -2745,7 +2744,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 177.0, 127.0, 32.0, 22.0 ],
+					"patching_rect" : [ 181.0, 128.0, 32.0, 22.0 ],
 					"text" : "train"
 				}
 

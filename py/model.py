@@ -423,13 +423,13 @@ class Transformer(nn.Module):
                 else:
                     x_enc = x_enc[:, t:t+self.block_size]
             
-            xe = x_enc.clone().detach()
-            data.dataScaleUp(xe)
-            print("x_enc:\n", xe[0, :3, 11], xe.shape)
+            # xe = x_enc.clone().detach()
+            # data.dataScaleUp(xe)
+            # print("x_enc:\n", xe[0, :3, 11], xe.shape)
 
-            xd = x_dec.clone().detach()
-            data.dataScaleUp(xd)
-            print("x_dec:\n", xd[0, :3, 11], xd.shape)
+            # xd = x_dec.clone().detach()
+            # data.dataScaleUp(xd)
+            # print("x_dec:\n", xd[0, :3, 11], xd.shape)
 
             # generate prediction
             y_hat = self(x_enc, x_dec)

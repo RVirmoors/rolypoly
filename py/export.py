@@ -168,7 +168,7 @@ def test_toy(m):
 
 def test_gmd(m):
     y = data.loadYFromCSV('gmd.csv')
-    _, x_enc= train_gmd.getTrainDataFromY(y)
+    _, x_enc, _= train_gmd.getTrainDataFromY(y)
     x_dec = torch.cat((x_enc[0, :].unsqueeze(0).unsqueeze(0).clone().detach(), torch.zeros(1, 1, 2)), dim=2)
     x_enc = x_enc.unsqueeze(0)
     print("first x_dec:\n", x_dec[0, :3, 11], x_dec.shape)
@@ -192,7 +192,7 @@ def test_gmd(m):
 # ==================== MAIN =====================
 
 if __name__ == '__main__':
-    test = True
+    test = False
     pretrain = True
 
     if pretrain:
