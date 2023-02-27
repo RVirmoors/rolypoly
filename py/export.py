@@ -101,8 +101,9 @@ class ExportRoly(nn_tilde.Module):
             self.x_enc = data.readScore(input)
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
             # initialise x_dec and y_hat
-            self.x_dec = self.x_enc[0, 0, :].unsqueeze(0).unsqueeze(0).clone().detach()
-            self.x_dec = torch.cat((self.x_dec, torch.zeros(1, 1, 2)), dim=2)
+            # self.x_dec = self.x_enc[0, 0, :].unsqueeze(0).unsqueeze(0).clone().detach()
+            # self.x_dec = torch.cat((self.x_dec, torch.zeros(1, 1, 2)), dim=2)
+            self.x_dec = torch.zeros(1, 1, 14)
             self.y_hat = torch.zeros(1, 0, 14)
             return out
 
@@ -167,15 +168,14 @@ def test_toy(m):
 
 def test_gmd(m):
     y = data.loadYFromCSV('gmd.csv')
-    x_dec, x_enc= train_gmd.getTrainDataFromY(y)
-    x_dec = x_dec.unsqueeze(0)
+    _, x_enc= train_gmd.getTrainDataFromY(y)
+    x_dec = torch.cat((x_enc[0, :].unsqueeze(0).unsqueeze(0).clone().detach(), torch.zeros(1, 1, 2)), dim=2)
     x_enc = x_enc.unsqueeze(0)
-    print("first x_dec:\n", x_dec[0, :3], x_dec.shape)
-    print("first x_enc:\n", x_enc[0, :3], x_enc.shape)
+    print("first x_dec:\n", x_dec[0, :3, 11], x_dec.shape)
+    print("first x_enc:\n", x_enc[0, :3, 11], x_enc.shape)
     y_hat = torch.zeros(1, 0, 14)
 
-    for i in range(1):#hits.shape[1]):
-        print(i, "::::::: input:\n", x_dec[:,:,i])
+    for i in range(5):#hits.shape[1]):
         xd = x_dec.clone().detach()
         xe = x_enc.clone().detach()
         data.dataScaleDown(xd)
@@ -183,17 +183,16 @@ def test_gmd(m):
         x_dec = m.pretrained.generate(xe, xd, 1)
         data.dataScaleUp(x_dec)
         y_hat = torch.cat((y_hat, x_dec[:, -1:, :]), dim=1)
-        # print("y_hat: ", y_hat)
         x_dec[:, -1:, 13] = 0
 
         xd = x_dec.clone().detach()
         xd[:, :, 12:14] = data.bartime_to_ms(xd[:, :, 12:14], xd)
-        print("x_dec out:\n", xd, xd.shape)
+        print("x_dec final out:\n", xd[:,:,11], xd.shape)
 
 # ==================== MAIN =====================
 
 if __name__ == '__main__':
-    test = False
+    test = True
     pretrain = True
 
     if pretrain:

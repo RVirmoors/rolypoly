@@ -156,7 +156,7 @@ def getTrainDataFromY(Y: torch.Tensor):
     X_dec = Y
     Y = torch.roll(Y, -1, dims=0)
 
-    return X_dec, X_enc
+    return X_dec, X_enc, Y
 
 # === MAIN ===
 
@@ -164,7 +164,7 @@ def main(argv):
     meta = pd.read_csv(os.path.join(FLAGS.root_dir, FLAGS.meta))
     meta = removeShortTakes(meta)
 
-    for idx in range(len(meta)):
+    for idx in range(15):#(len(meta)):
         file_name = os.path.join(FLAGS.root_dir,
                                         meta.iloc[idx]['midi_filename'])
         csv_filename = file_name[:-3] + 'csv'
@@ -178,7 +178,10 @@ def main(argv):
             if (y.shape[0] <= FLAGS.block_size):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
-            xd, xe= getTrainDataFromY(y)
+            xd, xe, y= getTrainDataFromY(y)
+            print("X_enc:\n", xe[:3, 11], xe.shape)
+            print("x_dec:\n", xd[:3, 11], xd.shape)
+            print("Y:\n", y[:3, 11], y.shape)
             if FLAGS.final or meta.iloc[idx]['split'] == 'train':
                 train_data['X_dec'].append(xd)
                 train_data['X_enc'].append(xe)

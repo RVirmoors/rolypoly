@@ -334,7 +334,7 @@ class Transformer(nn.Module):
             enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
         else:
             enc_out = torch.zeros((b, t, data.X_DECODER_CHANNELS), device=device)
-
+        
         # transformer blocks (DECODER)
         for block in self.transformer.h_dec:
             x_dec = block(x_dec, enc_out)
@@ -415,13 +415,22 @@ class Transformer(nn.Module):
         for _ in range(num_samples):
             # crop inputs to block size
             x_dec = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
-            t = x_dec.size(1) if x_dec[0, 0, 12] != -1.0 else 0 # current time step
+            t = x_dec.size(1) - 1 #if x_dec[0, 0, 12] != -1.0 else 0 # current time step
+            print("==current time step: ", t, "==")
             if x_enc.size(1) > self.block_size:
                 if t + self.block_size > x_enc.size(1):
                     x_enc = x_enc[:, -self.block_size:]
                 else:
                     x_enc = x_enc[:, t:t+self.block_size]
             
+            xe = x_enc.clone().detach()
+            data.dataScaleUp(xe)
+            print("x_enc:\n", xe[0, :3, 11], xe.shape)
+
+            xd = x_dec.clone().detach()
+            data.dataScaleUp(xd)
+            print("x_dec:\n", xd[0, :3, 11], xd.shape)
+
             # generate prediction
             y_hat = self(x_enc, x_dec)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
