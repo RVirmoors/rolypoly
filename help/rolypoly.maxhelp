@@ -1993,6 +1993,7 @@
 						"style" : "",
 						"subpatcher_template" : "",
 						"assistshowspatchername" : 0,
+						"visible" : 1,
 						"boxes" : [ 							{
 								"box" : 								{
 									"id" : "obj-2",
@@ -2001,7 +2002,7 @@
 									"numoutlets" : 1,
 									"outlettype" : [ "signal" ],
 									"patching_rect" : [ 210.666672945022583, 188.66667228937149, 82.0, 22.0 ],
-									"text" : "onepole~ 600"
+									"text" : "onepole~ 350"
 								}
 
 							}

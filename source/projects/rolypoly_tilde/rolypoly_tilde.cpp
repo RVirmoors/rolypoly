@@ -828,7 +828,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         for (int i = 0; i < output.frame_count(); i++) {
           out[i] = 0.;
         }
-        out[micro_index] = play_notes[t_play][c] / 127.;
+        double note = play_notes[t_play][c];
+        if (note > 5)
+          out[micro_index] = note / 127.;
       }
       incrementPlayIndexes();
     } else {

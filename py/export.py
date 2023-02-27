@@ -193,7 +193,7 @@ def test_gmd(m):
 # ==================== MAIN =====================
 
 if __name__ == '__main__':
-    test = True
+    test = False
     pretrain = True
 
     if pretrain:
