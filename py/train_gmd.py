@@ -179,9 +179,9 @@ def main(argv):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
             xd, xe, y= getTrainDataFromY(y)
-            print("X_enc:\n", xe[:3, 11], xe.shape)
-            print("x_dec:\n", xd[:3, 11], xd.shape)
-            print("Y:\n", y[:3, 11], y.shape)
+            # print("X_enc:\n", xe[:3, 11], xe.shape)
+            # print("x_dec:\n", xd[:3, 11], xd.shape)
+            # print("Y:\n", y[:3, 11], y.shape)
             if FLAGS.final or meta.iloc[idx]['split'] == 'train':
                 train_data['X_dec'].append(xd)
                 train_data['X_enc'].append(xe)
