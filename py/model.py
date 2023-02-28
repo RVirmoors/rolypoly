@@ -320,8 +320,8 @@ class Transformer(nn.Module):
             b_enc, t_enc = x_enc.shape[:2]               
             pos_enc = torch.arange(t_enc, device=device).unsqueeze(0).repeat(b_enc, 1)
             pos_emb_enc = self.transformer.wpe_enc(pos_enc)
-            x_enc = x_enc + pos_emb_enc
             x_enc_res = x_enc.roll(-1, dims=1) # for residual connection
+            x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
