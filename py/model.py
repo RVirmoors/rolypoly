@@ -343,9 +343,9 @@ class Transformer(nn.Module):
             x_dec = block(x_dec, enc_out)
         y_hat = self.transformer.ln_f(x_dec)
         y_hat = torch.cat((y_hat, x_enc_res[:,:,9:12]), dim=-1)
-        print("y_hat pre", y_hat[:,:5, -3:], y_hat.shape)
+        #print("y_hat pre", y_hat[:,:5, -3:], y_hat.shape)
         y_hat = self.transformer.head(y_hat)
-        print("y_hat post", y_hat[:,:5, 9:12], y_hat.shape)
+        #print("y_hat post", y_hat[:,:5, 9:12], y_hat.shape)
 
         return y_hat
 
