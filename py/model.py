@@ -284,6 +284,8 @@ class Transformer(nn.Module):
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
+
+                head = nn.Linear(data.X_DECODER_CHANNELS + 3, data.X_DECODER_CHANNELS),
             ))
 
         # initialize weights
@@ -319,6 +321,7 @@ class Transformer(nn.Module):
             pos_enc = torch.arange(t_enc, device=device).unsqueeze(0).repeat(b_enc, 1)
             pos_emb_enc = self.transformer.wpe_enc(pos_enc)
             x_enc = x_enc + pos_emb_enc
+            x_enc_res = x_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
@@ -339,6 +342,8 @@ class Transformer(nn.Module):
         for block in self.transformer.h_dec:
             x_dec = block(x_dec, enc_out)
         y_hat = self.transformer.ln_f(x_dec)
+        y_hat = torch.cat((y_hat, x_enc_res[:,:,9:12]), dim=-1)
+        y_hat = self.transformer.head(y_hat)
 
         return y_hat
 

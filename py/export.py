@@ -193,7 +193,7 @@ def test_gmd(m):
 
 if __name__ == '__main__':
     test = True
-    pretrain = True
+    pretrain = False
 
     if pretrain:
         checkpoint = torch.load('out/ckpt.pt', map_location=device)
