@@ -321,7 +321,7 @@ class Transformer(nn.Module):
             pos_enc = torch.arange(t_enc, device=device).unsqueeze(0).repeat(b_enc, 1)
             pos_emb_enc = self.transformer.wpe_enc(pos_enc)
             x_enc = x_enc + pos_emb_enc
-            x_enc_res = x_enc
+            x_enc_res = x_enc.roll(-1, dims=1) # for residual connection
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
@@ -343,7 +343,9 @@ class Transformer(nn.Module):
             x_dec = block(x_dec, enc_out)
         y_hat = self.transformer.ln_f(x_dec)
         y_hat = torch.cat((y_hat, x_enc_res[:,:,9:12]), dim=-1)
+        print("y_hat pre", y_hat[:,:5, -3:], y_hat.shape)
         y_hat = self.transformer.head(y_hat)
+        print("y_hat post", y_hat[:,:5, 9:12], y_hat.shape)
 
         return y_hat
 
