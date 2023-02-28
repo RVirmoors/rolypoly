@@ -175,7 +175,7 @@ def test_gmd(m):
     print("first x_enc:\n", x_enc[0, :3, 11], x_enc.shape)
     y_hat = torch.zeros(1, 0, 14)
 
-    for i in range(5):#hits.shape[1]):
+    for i in range(x_enc.shape[1]):
         xd = x_dec.clone().detach()
         xe = x_enc.clone().detach()
         data.dataScaleDown(xd)
@@ -192,7 +192,7 @@ def test_gmd(m):
 # ==================== MAIN =====================
 
 if __name__ == '__main__':
-    test = False
+    test = True
     pretrain = True
 
     if pretrain:

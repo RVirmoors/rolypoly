@@ -414,32 +414,31 @@ class Transformer(nn.Module):
 
         for _ in range(num_samples):
             # crop inputs to block size
-            x_dec = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
             t = x_dec.size(1) - 1 #if x_dec[0, 0, 12] != -1.0 else 0 # current time step
+            xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
             print("==current time step: ", t, "==")
-            if x_enc.size(1) > self.block_size:
-                if t + self.block_size > x_enc.size(1):
-                    x_enc = x_enc[:, -self.block_size:]
-                else:
-                    x_enc = x_enc[:, t:t+self.block_size]
+            if t - self.block_size >= 0:
+                xe = x_enc[:, t-self.block_size+1 : t+1]
+            else:
+                xe = x_enc[:, :t+1]
             
-            # xe = x_enc.clone().detach()
-            # data.dataScaleUp(xe)
-            # print("x_enc:\n", xe[0, :3, 11], xe.shape)
+            _xe = xe.clone().detach()
+            data.dataScaleUp(_xe)
+            print("x_enc:\n", _xe[0, :t+2, 11], _xe.shape)
 
-            # xd = x_dec.clone().detach()
-            # data.dataScaleUp(xd)
-            # print("x_dec:\n", xd[0, :3, 11], xd.shape)
+            _xd = xd.clone().detach()
+            data.dataScaleUp(_xd)
+            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
 
             # generate prediction
-            y_hat = self(x_enc, x_dec)
+            y_hat = self(xe, xd)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
 
             # append prediction to x_dec
-            if x_dec.size(1) == 1 and x_dec[0, 0, 12] == -1.0: # first prediction
-                x_dec = y_hat.unsqueeze(1) # (b, 1, n_chans)
-            else:
-                x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
+            # if x_dec.size(1) == 1 and x_dec[0, 0, 12] == -1.0: # first prediction
+            #     x_dec = y_hat.unsqueeze(1) # (b, 1, n_chans)
+            # else:
+            x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
 
         return x_dec
   
