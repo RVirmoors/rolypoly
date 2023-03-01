@@ -156,7 +156,8 @@ def getTrainDataFromY(Y: torch.Tensor):
     X_dec = Y
     Y = torch.roll(Y, -1, dims=0)
 
-    return X_dec, X_enc, Y
+    # ignore the last timestep (no next timestep to predict)
+    return X_dec[:-1], X_enc[:-1], Y[:-1]
 
 # === MAIN ===
 
