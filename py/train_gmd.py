@@ -176,7 +176,7 @@ def main(argv):
         elif FLAGS.source == 'csv':
             y = data.loadYFromCSV(csv_filename)
             print("Loaded", csv_filename, ": ", y.shape[0], "rows.")
-            if (y.shape[0] <= FLAGS.block_size):
+            if (y.shape[0] <= FLAGS.block_size + 1):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
             xd, xe, y= getTrainDataFromY(y)
