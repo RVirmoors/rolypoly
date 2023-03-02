@@ -60,8 +60,28 @@ class Config:
     n_layers = 4 # number of block layers
     block_size = 16 # number of hits in a block
     dropout = 0.1
+    max_len = 5000 # maximum number of bars in a take
 
 # === HELPER CLASSES FOR TRANSFORMER ===
+
+class PositionalEncoding(nn.Module):
+    """ Positional Encoding """
+    def __init__(self, config):
+        super().__init__()
+        self.max_len = config.max_len
+
+    def forward(self, x):
+        # add positional encoding
+        #print("x", x[:,:,11], x.shape)
+        dim_model = x.shape[-1]
+        pe = torch.zeros_like(x)
+        position = x[:, :, 11].unsqueeze(-1)
+        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(10000.0) / dim_model))
+        pe[:, :, 0::2] = torch.sin(position * div_term)
+        pe[:, :, 1::2] = torch.cos(position * div_term)
+        #pe = pe.unsqueeze(0).transpose(0, 1)
+        #print("pe", pe, pe.shape)
+        return pe
 
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False 
@@ -268,7 +288,7 @@ class Transformer(nn.Module):
         if self.arch == 'd':
             self.transformer = nn.ModuleDict(dict(
                 in_dec = FeedForward(data.X_DECODER_CHANNELS),
-                wpe_dec = nn.Embedding(config.block_size, data.X_DECODER_CHANNELS), # positional embedding
+                wpe_dec = PositionalEncoding(config),
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
@@ -277,13 +297,13 @@ class Transformer(nn.Module):
         elif self.arch == 'ed':
             self.transformer = nn.ModuleDict(dict(
                 in_enc = FeedForward(data.X_ENCODER_CHANNELS),
-                wpe_enc = nn.Embedding(config.block_size, data.X_ENCODER_CHANNELS), # positional embedding
+                wpe_enc = PositionalEncoding(config),
                 drop_enc = nn.Dropout(0.1),
                 h_enc = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_layers)]),
                 proj_enc = nn.Linear(data.X_ENCODER_CHANNELS, data.X_DECODER_CHANNELS),
 
                 in_dec = FeedForward(data.X_DECODER_CHANNELS),
-                wpe_dec = nn.Embedding(config.block_size, data.X_DECODER_CHANNELS), # positional embedding
+                wpe_dec = PositionalEncoding(config),
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
@@ -317,17 +337,14 @@ class Transformer(nn.Module):
         if self.arch == 'ed':
             x_enc = self.transformer.in_enc(x_enc)
             if x_enc.shape[1] == 0: # error handling for empty encoder input
-                x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
-            b_enc, t_enc = x_enc.shape[:2]               
-            pos_enc = torch.arange(t_enc, device=device).unsqueeze(0).repeat(b_enc, 1)
-            pos_emb_enc = self.transformer.wpe_enc(pos_enc)
+                x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)            
+            pos_emb_enc = self.transformer.wpe_enc(x_enc)
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_dec = torch.arange(t, device=device).unsqueeze(0).repeat(b, 1) # (b, t)
-        pos_emb_dec = self.transformer.wpe_dec(pos_dec) # (b, t, n_chans)
+        pos_emb_dec = self.transformer.wpe_enc(x_dec)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         

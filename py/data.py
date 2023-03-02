@@ -8,10 +8,10 @@ data preprocessing methods
 import torch
 import numpy as np
 
-X_ENCODER_CHANNELS = 12 # 9 drum channel velocities + bpm, tsig, pos_in_bar
+X_ENCODER_CHANNELS = 12 # 9 drum channel velocities + bpm, tsig, bar_pos
 X_DECODER_CHANNELS = 14 # above + tau_drum, tau_guitar
-IN_DRUM_CHANNELS = 5 # hit, vel, tempo, tsig, pos_in_bar
-IN_ONSET_CHANNELS = 5 # 666, tau_guitar, tempo, tsig, pos_in_bar
+IN_DRUM_CHANNELS = 5 # hit, vel, tempo, tsig, bar_pos
+IN_ONSET_CHANNELS = 5 # 666, tau_guitar, tempo, tsig, bar_pos
 
 # === HELPER FUNCTIONS ===
 
@@ -128,28 +128,30 @@ def score_timesig(drumtrack, timesig_changes):
         timesigs[index] = (here.numerator, here.denominator)
     return timesigs
 
-def score_pos_in_bar(drumtrack, timesig_changes, tempos, timesigs):
+def score_bar_pos(drumtrack, timesig_changes, tempos, timesigs):
     """
     Return np.list of positions in bar for every note in track
     """
     positions_in_bar = np.zeros(len(drumtrack.notes))
     first_timesig = timesig_changes[0]
+    cur_bar = 0 # current bar
     barStart = atTime = 0
     barEnd = 240 / tempos[0] * \
         first_timesig.numerator / first_timesig.denominator
     for index, note in enumerate(drumtrack.notes):
         if note.start >= atTime:
             atTime = note.start
-        if np.isclose(atTime, barEnd) or atTime > barEnd:
+        if np.isclose(atTime, barEnd, atol=0.1) or atTime > barEnd:
             # reached the end of the bar, compute the next one
+            cur_bar += 1
             barStart = barEnd
             barEnd = barEnd + 240 / tempos[index] * \
                 timesigs[index][0] / timesigs[index][1]
             # print("EOB", barStart, barEnd)
-        # pos in bar is always in [0, 1)
+        # cur_pos is always in [0, 1)
         cur_pos = (atTime - barStart) / (barEnd - barStart)
-        positions_in_bar[index] = cur_pos
-        #print(atTime, cur_pos)
+        positions_in_bar[index] = cur_bar + cur_pos
+        #print(atTime, ":", cur_pos + cur_bar)
     return positions_in_bar
 
 # === FILE I/O ===
@@ -161,7 +163,7 @@ def saveYtoCSV(Y, filename: str) -> int:
     output: number of rows written
     """
     with open(filename, 'w') as f:
-        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n")
+        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, bar_pos, tau_d, tau_g\n")
         rows = Y.shape[0]
         for row in range(rows):
             f.write(', '.join([str(x) for x in Y[row].tolist()]) + '\n')
@@ -196,7 +198,7 @@ def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
             if input[i, j, 0] != 0 and input[i, j, 0] != 666:
                 hits = pitch_class_map[int(input[i, j, 0])]
                 X_score[i, k, hits] = input[i, j, 1]
-                # next 3 values are tempo, tsig, pos_in_bar
+                # next 3 values are tempo, tsig, bar_pos
                 X_score[:, k, 9:12] = input[:, j, 2:5]
                 if j < input.shape[1] - 1:
                     if input[:, j, 2] != input[:, j+1, 2] or input[:, j, 3] != input[:, j+1, 3] or input[:, j, 4] != input[:, j+1, 4]:
@@ -243,7 +245,7 @@ def dataScaleDown(input: torch.Tensor):
     9 velocities from [0, 127]
     bpm from [40, 240]
     tsig from [0.5, 1.5]
-    pos_in_bar, tau_d, tau_g from [0, 1]
+    tau_d, tau_g from [0, 1]
 
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
@@ -251,7 +253,7 @@ def dataScaleDown(input: torch.Tensor):
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
     input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
     input[:, :, 10] = input[:, :, 10] - 1
-    input[:, :, 11:] = input[:, :, 11:] * 2 - 1 # pos_in_bar, tau_d, tau_g are bartimes
+    input[:, :, 12:] = input[:, :, 12:] * 2 - 1 # tau_d, tau_g are bartimes
 
     return input
 
@@ -262,7 +264,7 @@ def dataScaleUp(input: torch.Tensor):
     9 velocities from [0, 127]
     bpm from [40, 240]
     tsig from [0.5, 1.5]
-    pos_in_bar from [0, 1]
+    tau_d, tau_g from [0, 1]
 
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
@@ -271,7 +273,7 @@ def dataScaleUp(input: torch.Tensor):
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
     input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
     input[:, :, 10] = input[:, :, 10] + 1
-    input[:, :, 11:] = (input[:, :, 11:] + 1) / 2
+    input[:, :, 12:] = (input[:, :, 12:] + 1) / 2
 
     return input
 

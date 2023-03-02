@@ -83,7 +83,7 @@ def midifileToY(filename: str) -> torch.Tensor:
     pitch_class_map = data.classes_to_map()
     tempos = data.score_tempo(drumtrack, tc)
     timesigs = data.score_timesig(drumtrack, ts)
-    positions_in_bar = data.score_pos_in_bar(drumtrack, ts, tempos, timesigs)
+    positions_in_bar = data.score_bar_pos(drumtrack, ts, tempos, timesigs)
 
     hits, offsets = quantizeDrumTrack(positions_in_bar)
     X_dec = parseHO(drumtrack, pitch_class_map, tempos, timesigs, hits, offsets)
@@ -127,7 +127,7 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
             # done adding notes at this timestep, process it
             hit[9] = tempos[hit_index]
             hit[10] = timesigs[hit_index][0] / timesigs[hit_index][1]
-            hit[11] = H[index] % 1.     # position in bar, 0-1
+            hit[11] = H[index]          # bar position, [0 - # of bars]
             hit[12] = (O[index] + O[hit_index]) / 2 # tau_drums
             # hit[13] remains zero (tau_guitar)
 
