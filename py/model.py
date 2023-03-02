@@ -267,25 +267,28 @@ class Transformer(nn.Module):
         self.arch = config.arch
         if self.arch == 'd':
             self.transformer = nn.ModuleDict(dict(
-                #in_mlp = FeedForward(data.X_DECODER_CHANNELS),
+                in_dec = FeedForward(data.X_DECODER_CHANNELS),
                 wpe_dec = nn.Embedding(config.block_size, data.X_DECODER_CHANNELS), # positional embedding
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
+                head = nn.Linear(data.X_DECODER_CHANNELS, data.X_DECODER_CHANNELS),
             ))
         elif self.arch == 'ed':
             self.transformer = nn.ModuleDict(dict(
+                in_enc = FeedForward(data.X_ENCODER_CHANNELS),
                 wpe_enc = nn.Embedding(config.block_size, data.X_ENCODER_CHANNELS), # positional embedding
                 drop_enc = nn.Dropout(0.1),
                 h_enc = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_layers)]),
                 proj_enc = nn.Linear(data.X_ENCODER_CHANNELS, data.X_DECODER_CHANNELS),
 
+                in_dec = FeedForward(data.X_DECODER_CHANNELS),
                 wpe_dec = nn.Embedding(config.block_size, data.X_DECODER_CHANNELS), # positional embedding
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
 
-                head = nn.Linear(data.X_DECODER_CHANNELS + 3, data.X_DECODER_CHANNELS),
+                head = FeedForward(data.X_DECODER_CHANNELS),
             ))
 
         # initialize weights
@@ -310,21 +313,19 @@ class Transformer(nn.Module):
         b, t = x_dec.shape[:2]
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
 
-        # input MLP (for embedding)
-        # x = self.transformer['in_mlp'](x_dec) 
-
         # add position embedding (ENCODER)
         if self.arch == 'ed':
+            x_enc = self.transformer.in_enc(x_enc)
             if x_enc.shape[1] == 0: # error handling for empty encoder input
                 x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
             b_enc, t_enc = x_enc.shape[:2]               
             pos_enc = torch.arange(t_enc, device=device).unsqueeze(0).repeat(b_enc, 1)
             pos_emb_enc = self.transformer.wpe_enc(pos_enc)
-            x_enc_res = x_enc.roll(-1, dims=1) # for residual connection
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
+        x_dec = self.transformer.in_dec(x_dec)
         pos_dec = torch.arange(t, device=device).unsqueeze(0).repeat(b, 1) # (b, t)
         pos_emb_dec = self.transformer.wpe_dec(pos_dec) # (b, t, n_chans)
         x_dec = x_dec + pos_emb_dec
@@ -342,10 +343,7 @@ class Transformer(nn.Module):
         for block in self.transformer.h_dec:
             x_dec = block(x_dec, enc_out)
         y_hat = self.transformer.ln_f(x_dec)
-        y_hat = torch.cat((y_hat, x_enc_res[:,:,9:12]), dim=-1)
-        #print("y_hat pre", y_hat[:,:5, -3:], y_hat.shape)
         y_hat = self.transformer.head(y_hat)
-        #print("y_hat post", y_hat[:,:5, 9:12], y_hat.shape)
 
         return y_hat
 
