@@ -344,7 +344,7 @@ class Transformer(nn.Module):
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_enc(x_dec)
+        pos_emb_dec = self.transformer.wpe_dec(x_dec)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
