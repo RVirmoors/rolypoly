@@ -253,7 +253,7 @@ def dataScaleDown(input: torch.Tensor):
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
     input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
     input[:, :, 10] = input[:, :, 10] - 1
-    input[:, :, 12:] = input[:, :, 12:] * 2 - 1 # tau_d, tau_g are bartimes
+    # input[:, :, 12:] = input[:, :, 12:] * 2 - 1 # tau_d, tau_g are bartimes
 
     return input
 
@@ -261,10 +261,10 @@ def dataScaleUp(input: torch.Tensor):
     """
     Scale the input data back up from [-1, 1].
 
-    9 velocities from [0, 127]
-    bpm from [40, 240]
-    tsig from [0.5, 1.5]
-    tau_d, tau_g from [0, 1]
+    9 velocities to [0, 127]
+    bpm to [40, 240]
+    tsig to [0.5, 1.5]
+    tau_d, tau_g to [0, 1]
 
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
@@ -273,7 +273,7 @@ def dataScaleUp(input: torch.Tensor):
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
     input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
     input[:, :, 10] = input[:, :, 10] + 1
-    input[:, :, 12:] = (input[:, :, 12:] + 1) / 2
+    # input[:, :, 12:] = (input[:, :, 12:] + 1) / 2
 
     return input
 

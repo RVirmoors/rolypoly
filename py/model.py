@@ -8,6 +8,7 @@ Very much inspired by A Karpathy's nanoGPT: https://github.com/karpathy/nanoGPT
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
 
 import data
 import time
@@ -331,12 +332,20 @@ class Transformer(nn.Module):
         device = x_dec.device
         b, t = x_dec.shape[:2]
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
+        
+        if x_enc.shape[1] == 0: # error handling for empty encoder input
+            x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
+        
+        cur_bar = x_enc[:, :, 11] // 1 # get current bar from encoder input
+        #print ("cur_bar", cur_bar, cur_bar.shape)
+
+        x_enc[:, :, 11] = x_enc[:, :, 11] - cur_bar # subtract current bar from encoder input
+        x_dec[:, :, 11] = x_dec[:, :, 11] - cur_bar # subtract current bar from decoder input
+
 
         # add position embedding (ENCODER)
-        if self.arch == 'ed':
-            x_enc = self.transformer.in_enc(x_enc)
-            if x_enc.shape[1] == 0: # error handling for empty encoder input
-                x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)            
+        if self.arch == 'ed':  
+            x_enc = self.transformer.in_enc(x_enc)       
             pos_emb_enc = self.transformer.wpe_enc(x_enc)
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
@@ -359,13 +368,15 @@ class Transformer(nn.Module):
         for block in self.transformer.h_dec:
             x_dec = block(x_dec, enc_out)
         y_hat = self.transformer.ln_f(x_dec)
-        y_hat = self.transformer.head(y_hat)
 
+        y_hat = self.transformer.head(y_hat)
+        y_hat[:, :, 11] = y_hat[:, :, 11] + cur_bar # add current bar back to output
         return y_hat
 
     def loss(self, y_hat, y):
         hit_loss = F.mse_loss(y_hat[:, :, :12], y[:, :, :12]) # hits
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
+        print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "total", hit_loss + timing_loss)
         return hit_loss + timing_loss
         
     def from_pretrained(self, path):
