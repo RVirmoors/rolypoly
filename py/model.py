@@ -66,7 +66,7 @@ class Config:
 
 class PositionalEncoding(nn.Module):
     """ Positional Encoding """
-    def __init__(self, config):
+    def __init__(self):
         super().__init__()
 
     def forward(self, x):
@@ -79,7 +79,6 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(10000.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * div_term)
         pe[:, :, 1::2] = torch.cos(position * div_term)
-        #pe = pe.unsqueeze(0).transpose(0, 1)
         #print("pe", pe, pe.shape)
         return pe
 
@@ -287,23 +286,23 @@ class Transformer(nn.Module):
         self.arch = config.arch
         if self.arch == 'd':
             self.transformer = nn.ModuleDict(dict(
+                wpe = PositionalEncoding(),
                 in_dec = FeedForward(data.X_DECODER_CHANNELS),
-                wpe_dec = PositionalEncoding(config),
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
                 head = nn.Linear(data.X_DECODER_CHANNELS, data.X_DECODER_CHANNELS),
             ))
         elif self.arch == 'ed':
-            self.transformer = nn.ModuleDict(dict(
+            self.transformer = nn.ModuleDict(dict(                
+                wpe = PositionalEncoding(),
+
                 in_enc = FeedForward(data.X_ENCODER_CHANNELS),
-                wpe_enc = PositionalEncoding(config),
                 drop_enc = nn.Dropout(0.1),
                 h_enc = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_layers)]),
                 proj_enc = nn.Linear(data.X_ENCODER_CHANNELS, data.X_DECODER_CHANNELS),
 
                 in_dec = FeedForward(data.X_DECODER_CHANNELS),
-                wpe_dec = PositionalEncoding(config),
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
@@ -340,19 +339,21 @@ class Transformer(nn.Module):
         #print ("cur_bar", cur_bar, cur_bar.shape)
 
         x_enc[:, :, 11] = x_enc[:, :, 11] - cur_bar # subtract current bar from encoder input
-        x_dec[:, :, 11] = x_dec[:, :, 11] - cur_bar # subtract current bar from decoder input
-
+        if self.arch == 'ed':
+            x_dec[:, :, 11] = x_enc[:, :, 11] # set decoder bar_pos to encoder bar_pos
+        else:
+            x_dec[:, :, 11] = x_dec[:, :, 11] - cur_bar
 
         # add position embedding (ENCODER)
-        if self.arch == 'ed':  
+        if self.arch == 'ed':
+            pos_emb_enc = self.transformer.wpe(x_enc)
             x_enc = self.transformer.in_enc(x_enc)       
-            pos_emb_enc = self.transformer.wpe_enc(x_enc)
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_dec(x_dec)
+        pos_emb_dec = self.transformer.wpe(x_dec)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
