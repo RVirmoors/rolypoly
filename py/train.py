@@ -18,7 +18,7 @@ import data # data helper methods
 
 # I/O
 out_dir = 'out'
-eval_interval = 75
+eval_interval = 66
 log_interval = 20
 eval_iters = 80 # 200
 eval_only = False # if True, script exits right after the first eval
