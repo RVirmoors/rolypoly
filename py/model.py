@@ -76,7 +76,7 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros_like(x).to(x.device)
         position = x[:, :, 11].unsqueeze(-1)
         #print("POS", position, position.shape)
-        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(10000.0) / dim_model)).to(x.device)
+        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(64.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * div_term)
         pe[:, :, 1::2] = torch.cos(position * div_term)
         #print("pe", pe[-1], pe.shape)
@@ -459,11 +459,11 @@ class Transformer(nn.Module):
             
             _xe = xe.clone().detach()
             _xe = data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+2, 0], _xe.shape)
+            print("x_enc:\n", _xe[0, :t+2, 11], _xe.shape)
 
             _xd = xd.clone().detach()
             _xd = data.dataScaleUp(_xd)
-            print("x_dec:\n", _xd[0, :, 0], _xd.shape)
+            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
 
             # generate prediction
             y_hat = self(xe, xd)
@@ -489,6 +489,7 @@ if __name__ == '__main__':
     #print(data.readScore(test).shape)
     #print(readScore(test)[:, :10, :])
     x_enc = data.readScore(test)
+    print("X_ENC:", x_enc, x_enc.shape)
     x_dec = torch.randn(1, 1, 14)
     notes = data.readScoreLive(test[:,:3,:])
     #feat = x.squeeze(0)
@@ -496,6 +497,6 @@ if __name__ == '__main__':
     config = Config()
     m = Transformer(config)
     start = time.time()
-    print("MODEL OUT:", m(x_enc, x_dec), m(x_enc, x_dec).shape)
+    #print("MODEL OUT:", m(x_enc, x_dec), m(x_enc, x_dec).shape)
     print("GENERATE:", m.generate(x_enc, x_dec, notes.shape[1]), m.generate(x_enc, x_dec, notes.shape[1]).shape)
     print(time.time() - start, "s")
