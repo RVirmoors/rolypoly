@@ -288,7 +288,7 @@ class Transformer(nn.Module):
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
 
-                head = FeedForward(data.X_DECODER_CHANNELS),
+                head = nn.Linear(data.X_DECODER_CHANNELS, data.X_DECODER_CHANNELS),
             ))
 
         # initialize weights
@@ -338,13 +338,15 @@ class Transformer(nn.Module):
             enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
         else:
             enc_out = torch.zeros((b, t, data.X_DECODER_CHANNELS), device=device)
+
+        enc_out = enc_out + pos_emb_dec
         
         # transformer blocks (DECODER)
         for block in self.transformer.h_dec:
             x_dec = block(x_dec, enc_out)
         y_hat = self.transformer.ln_f(x_dec)
-        y_hat = self.transformer.head(y_hat)
 
+        y_hat = self.transformer.head(y_hat)
         return y_hat
 
     def loss(self, y_hat, y):
@@ -460,7 +462,6 @@ if __name__ == '__main__':
     x_enc = data.readScore(test)
     x_dec = torch.randn(1, 1, 14)
     notes = data.readScoreLive(test[:,:3,:])
-    #feat = x.squeeze(0)
     
     config = Config()
     m = Transformer(config)
