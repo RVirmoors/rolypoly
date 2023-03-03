@@ -337,7 +337,6 @@ class Transformer(nn.Module):
         
         cur_bar = x_enc[:, :, 11] // 1 # get current bar from encoder input
         #print ("cur_bar", cur_bar, cur_bar.shape)
-
         x_enc[:, :, 11] = x_enc[:, :, 11] - cur_bar # subtract current bar from encoder input
         if self.arch == 'ed':
             x_dec[:, :, 11] = x_enc[:, :, 11] # set decoder bar_pos to encoder bar_pos
@@ -366,6 +365,8 @@ class Transformer(nn.Module):
             enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
         else:
             enc_out = torch.zeros((b, t, data.X_DECODER_CHANNELS), device=device)
+
+        enc_out = enc_out + pos_emb_dec
         
         # transformer blocks (DECODER)
         for block in self.transformer.h_dec:
