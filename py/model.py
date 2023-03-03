@@ -60,7 +60,7 @@ class Config:
     n_layers = 4 # number of block layers
     block_size = 16 # number of hits in a block
     dropout = 0.1
-    max_len = 5000 # maximum number of bars in a take
+    max_len = 1000 # maximum number of bars in a take
 
 # === HELPER CLASSES FOR TRANSFORMER ===
 
@@ -75,7 +75,8 @@ class PositionalEncoding(nn.Module):
         #print("x", x[:,:,11], x.shape)
         dim_model = x.shape[-1]
         pe = torch.zeros_like(x).to(x.device)
-        position = x[:, :, 11].unsqueeze(-1)
+        position = x[:, :, 11].unsqueeze(-1) / self.max_len
+        #print("POS", position, position.shape)
         div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(10000.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * div_term)
         pe[:, :, 1::2] = torch.cos(position * div_term)
@@ -469,9 +470,9 @@ if __name__ == '__main__':
     test = torch.tensor([[  [0, 0, 0, 0, 0],
                             [42, 70, 120, 1, 0],
                             [36, 60, 120, 1, 0.5],
-                            [38, 111, 140, 1.5, 0.33],
-                            [42, 105, 140, 1.5, 0.33],
-                            [36, 101, 140, 1.5, 0.66]]])
+                            [38, 111, 140, 1.5, 1.33],
+                            [42, 105, 140, 1.5, 1.33],
+                            [36, 101, 140, 1.5, 1.66]]])
     #print(data.readScore(test).shape)
     #print(readScore(test)[:, :10, :])
     x_enc = data.readScore(test)

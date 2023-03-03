@@ -163,7 +163,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
                         'best_val_loss': best_val_loss,
                         'config': config
                     }
-                    print(f"saving checkpoint to {out_dir}")
+                    print(f"==== saving checkpoint to {out_dir} =============================")
                     torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
