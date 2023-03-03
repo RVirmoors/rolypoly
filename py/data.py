@@ -251,8 +251,8 @@ def dataScaleDown(input: torch.Tensor):
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
     input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
     input[:, :, 10] = input[:, :, 10] - 1
-    input[:, :, 11:] = torch.sin(input[:, :, 11:] * np.pi / 2)
-
+    input[:, :, 11:] = torch.cos(input[:, :, 11:] * np.pi) * -1
+ 
     return input
 
 def dataScaleUp(input: torch.Tensor):
@@ -271,7 +271,7 @@ def dataScaleUp(input: torch.Tensor):
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
     input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
     input[:, :, 10] = input[:, :, 10] + 1
-    input[:, :, 11:] = torch.asin(input[:, :, 11:]) * 2 / np.pi
+    input[:, :, 11:] = torch.acos(input[:, :, 11:] * -1) / np.pi
 
     return input
 
