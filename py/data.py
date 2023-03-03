@@ -251,7 +251,7 @@ def dataScaleDown(input: torch.Tensor):
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
     input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
     input[:, :, 10] = input[:, :, 10] - 1
-    input[:, :, 11:] = input[:, :, 11:] * 2 - 1 # pos_in_bar, tau_d, tau_g are bartimes
+    input[:, :, 11:] = torch.sin(input[:, :, 11:] * np.pi / 2)
 
     return input
 
@@ -271,7 +271,7 @@ def dataScaleUp(input: torch.Tensor):
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
     input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
     input[:, :, 10] = input[:, :, 10] + 1
-    input[:, :, 11:] = (input[:, :, 11:] + 1) / 2
+    input[:, :, 11:] = torch.asin(input[:, :, 11:]) * 2 / np.pi
 
     return input
 
