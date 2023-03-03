@@ -79,7 +79,7 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(10000.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * div_term)
         pe[:, :, 1::2] = torch.cos(position * div_term)
-        #print("pe", pe, pe.shape)
+        #print("pe", pe[-1], pe.shape)
         return pe
 
 class LayerNorm(nn.Module):
@@ -307,7 +307,7 @@ class Transformer(nn.Module):
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
                 ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
 
-                head = FeedForward(data.X_DECODER_CHANNELS),
+                head = nn.Linear(data.X_DECODER_CHANNELS, data.X_DECODER_CHANNELS),
             ))
 
         # initialize weights
@@ -352,8 +352,10 @@ class Transformer(nn.Module):
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
-        x_dec = self.transformer.in_dec(x_dec)
         pos_emb_dec = self.transformer.wpe(x_dec)
+        #print("pos_emb_enc", pos_emb_enc, pos_emb_enc.shape)
+        #print("pos_emb_dec", pos_emb_dec, pos_emb_dec.shape)
+        x_dec = self.transformer.in_dec(x_dec)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
@@ -377,7 +379,7 @@ class Transformer(nn.Module):
     def loss(self, y_hat, y):
         hit_loss = F.mse_loss(y_hat[:, :, :12], y[:, :, :12]) # hits
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
-        print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "total", hit_loss + timing_loss)
+        #print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "total", hit_loss + timing_loss)
         return hit_loss + timing_loss
         
     def from_pretrained(self, path):
