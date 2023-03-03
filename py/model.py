@@ -458,16 +458,17 @@ class Transformer(nn.Module):
                 xe = x_enc[:, :t+1]
             
             _xe = xe.clone().detach()
-            data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+2, 11], _xe.shape)
+            _xe = data.dataScaleUp(_xe)
+            print("x_enc:\n", _xe[0, :t+2, 0], _xe.shape)
 
             _xd = xd.clone().detach()
-            data.dataScaleUp(_xd)
-            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
+            _xd = data.dataScaleUp(_xd)
+            print("x_dec:\n", _xd[0, :, 0], _xd.shape)
 
             # generate prediction
             y_hat = self(xe, xd)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
+            y_hat[:, 11] = torch.frac(y_hat[:, 11]) # keep only fractional part of bar_pos
 
             # append prediction to x_dec
             x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
