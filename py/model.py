@@ -60,7 +60,6 @@ class Config:
     n_layers = 4 # number of block layers
     block_size = 16 # number of hits in a block
     dropout = 0.1
-    max_len = 1000 # maximum number of bars in a take
 
 # === HELPER CLASSES FOR TRANSFORMER ===
 
@@ -68,14 +67,13 @@ class PositionalEncoding(nn.Module):
     """ Positional Encoding """
     def __init__(self, config):
         super().__init__()
-        self.max_len = config.max_len
 
     def forward(self, x):
         # add positional encoding
         #print("x", x[:,:,11], x.shape)
         dim_model = x.shape[-1]
         pe = torch.zeros_like(x).to(x.device)
-        position = x[:, :, 11].unsqueeze(-1) / self.max_len
+        position = x[:, :, 11].unsqueeze(-1)
         #print("POS", position, position.shape)
         div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(10000.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * div_term)
