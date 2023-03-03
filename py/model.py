@@ -76,7 +76,7 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros_like(x).to(x.device)
         position = x[:, :, 11].unsqueeze(-1)
         #print("POS", position, position.shape)
-        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(64.0) / dim_model)).to(x.device)
+        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * div_term)
         pe[:, :, 1::2] = torch.cos(position * div_term)
         #print("pe", pe[-1], pe.shape)
