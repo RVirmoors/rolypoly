@@ -18,8 +18,8 @@ import data # data helper methods
 
 # I/O
 out_dir = 'out'
-eval_interval = 25
-log_interval = 10
+eval_interval = 75
+log_interval = 20
 eval_iters = 80 # 200
 eval_only = False # if True, script exits right after the first eval
 os.makedirs(out_dir, exist_ok=True)
@@ -163,7 +163,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
                         'best_val_loss': best_val_loss,
                         'config': config
                     }
-                    print(f"saving checkpoint to {out_dir}")
+                    print(f"== saving checkpoint to {out_dir} =============================")
                     torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
