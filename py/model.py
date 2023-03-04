@@ -58,8 +58,8 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
-    n_layers = 10 # number of block layers
-    d_model = 128 # number of channels in the model
+    n_layers = 2 # 10 # number of block layers
+    d_model = 32 # 128 # number of channels in the model
     block_size = 16 # number of hits in a block
     dropout = 0.4 # dropout rate
 
@@ -326,8 +326,8 @@ class Transformer(nn.Module):
         if x_enc.shape[1] == 0: # error handling for empty encoder input
             x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
         
-        x_enc = x_enc.clone().detach()
-        x_dec = x_dec.clone().detach()
+        x_enc = x_enc.clone()
+        x_dec = x_dec.clone()
         bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
         bar_num = bar_pos // 1 # get current bar
         # print ("bar_num", bar_num, bar_num.shape)
