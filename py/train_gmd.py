@@ -38,16 +38,14 @@ flags.DEFINE_bool("final", False, "Final training, using all data.")
 
 
 # === GLOBALS ===
-feat_vec_size = data.X_DECODER_CHANNELS + data.X_POS_CHANNELS
+feat_vec_size = data.X_DECODER_CHANNELS
 train_data = {}
 val_data = {}
 train_data['X_dec'] = [] # lists of tensors
 train_data['X_enc'] = []
-train_data['X_pos'] = []
 train_data['Y'] = []
 val_data['X_dec'] = []
 val_data['X_enc'] = []
-val_data['X_pos'] = []
 val_data['Y'] = []
 
 # === DATASET FUNCTIONS ===
@@ -126,11 +124,11 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
         hit[pitch_class_map[note.pitch]] = note.velocity
         if duration:
             # done adding notes at this timestep, process it
-            hit[9] = (O[index] + O[hit_index]) / 2 # tau_drums
-            # hit[10] remains zero (tau_guitar)
-            hit[11] = tempos[hit_index]
-            hit[12] = timesigs[hit_index][0] / timesigs[hit_index][1]
-            hit[13] = H[index]          # bar position, [0 - # of bars]
+            hit[9] = tempos[hit_index]
+            hit[10] = timesigs[hit_index][0] / timesigs[hit_index][1]
+            hit[11] = H[index]          # bar position, [0 - # of bars]
+            hit[12] = (O[index] + O[hit_index]) / 2 # tau_drums
+            # hit[13] remains zero (tau_guitar)
 
             # add hit to X_take
             if hit_index == 0:
@@ -144,7 +142,7 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
 def getTrainDataFromX_take(X_take: torch.Tensor):
     """
     input: X_take (len, feat_vec_size)
-    output: X_dec, X_enc, X_pos, Y
+    output: X_dec, X_enc, Y
     """
     X_enc = X_take[:, :data.X_ENCODER_CHANNELS].clone().detach() # lose tau info
     # lose velocity info
@@ -154,19 +152,16 @@ def getTrainDataFromX_take(X_take: torch.Tensor):
     # replace non-zero notes with the mean velocity for that note
     X_enc[:,:9] = torch.where(X_enc[:,:9] > 0, mean, X_enc[:,:9])
 
-    X_pos = X_take[:, -data.X_POS_CHANNELS:].clone().detach()
+    X_dec = X_take.clone().detach()
+    Y = torch.roll(X_dec, -1, dims=0) # Y is X_dec shifted by 1 timestep
 
-    X_dec = X_take[:, :data.X_DECODER_CHANNELS].clone().detach()
-    Y = torch.roll(X_take, -1, dims=0)[:, :data.X_DECODER_CHANNELS]
-
-    print("================ from X_take =================")
-    print("X_enc:", X_enc[:3, 0], X_enc.shape)
-    print("X_pos:", X_pos[:3, 2], X_pos.shape)
-    print("X_dec:", X_dec[:3, 0], X_dec.shape)
-    print("Y:    ", Y[:3, 0], Y.shape)
+    # print("================ from X_take =================")
+    # print("X_enc:", X_enc[:3, 0], X_enc.shape)
+    # print("X_dec:", X_dec[:3, 0], X_dec.shape)
+    # print("Y:    ", Y[:3, 0], Y.shape)
 
     # ignore the last timestep (no next timestep to predict)
-    return X_dec[:-1], X_enc[:-1], X_pos[:-1], Y[:-1]
+    return X_dec[:-1], X_enc[:-1], Y[:-1]
 
 # === MAIN ===
 
@@ -184,21 +179,20 @@ def main(argv):
             print("Saved", csv_filename, ": ", rows, "rows.")
         elif FLAGS.source == 'csv':
             x_take = data.loadX_takeFromCSV(csv_filename)
-            print("Loaded", csv_filename, ": ", y.shape[0], "rows.")
-            if (y.shape[0] <= FLAGS.block_size + 1):
+            print("Loaded", csv_filename, ": ", x_take.shape[0], "rows.")
+            if (x_take.shape[0] <= FLAGS.block_size + 1):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
 
-        xd, xe, xp, y= getTrainDataFromX_take(x_take)
+        xd, xe, y= getTrainDataFromX_take(x_take)
+
         if FLAGS.final or meta.iloc[idx]['split'] == 'train':
             train_data['X_dec'].append(xd)
             train_data['X_enc'].append(xe)
-            train_data['X_pos'].append(xp)
             train_data['Y'].append(y)
         else:
             val_data['X_dec'].append(xd)
             val_data['X_enc'].append(xe)
-            val_data['X_pos'].append(xp)
             val_data['Y'].append(y)
 
     config = model.Config()

@@ -72,12 +72,13 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x, position):
         # add positional encoding
-        dim_model = x.shape[-1]
-        # print("DIM", dim_model, x.shape, position.shape)
+        b, seq_len, dim_model = x.shape
+        # print("DIM", x.shape, position.shape)
         pe = torch.zeros_like(x).to(x.device)
-        position = position.view(1, -1, 1) # (1, seq_len, 1)
-        print("POS", position, position.shape)
-        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device).view(1, 1, -1) # (1, 1, dim_model/2)
+        position = position[:, :seq_len]
+        position = position.view(b, seq_len, 1) # (b, seq_len, 1)
+        #print("POS", position, position.shape)
+        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device).view(1, 1, -1) # (b, 1, dim_model/2)
         pe[:, :, 0::2] = torch.sin(position * math.pi * 2 * div_term) # (1, seq_len, dim_model/2)
         pe[:, :, 1::2] = torch.cos(position * math.pi * 2 * div_term)
         # print("pe", pe.shape)
@@ -317,8 +318,7 @@ class Transformer(nn.Module):
             if m.padding_idx is not None:
                 nn.init.zeros_(m.weight[m.padding_idx])
 
-    def forward(self, x_enc, x_dec, t=0):
-        # prediction for the t-th step in the song
+    def forward(self, x_enc, x_dec):
         device = x_dec.device
         b, seq_len = x_dec.shape[:2]
         assert seq_len <= self.block_size, f"Cannot forward sequence of length {seq_len}, block size is only {self.block_size}"
@@ -342,7 +342,7 @@ class Transformer(nn.Module):
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_dec(x_dec, bar_pos[:, t:t+1])
+        pos_emb_dec = self.transformer.wpe_dec(x_dec, bar_pos)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
@@ -369,7 +369,7 @@ class Transformer(nn.Module):
         hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9]) # hits
         pos_loss = F.mse_loss(y_hat[:, :, 9:12], y[:, :, 9:12]) # position
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
-        print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "total", hit_loss + timing_loss)
+        # print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "pos_loss", pos_loss)
         return 3 * hit_loss + pos_loss + 10 * timing_loss # weigh timing loss higher
         
     def from_pretrained(self, path):
@@ -451,7 +451,7 @@ class Transformer(nn.Module):
             print("x_dec:\n", _xd[0, :, 0], _xd.shape)
 
             # generate prediction
-            y_hat = self(x_enc, xd, t) # (b, t, n_chans)
+            y_hat = self(x_enc, xd) # (b, t, n_chans)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
 
             # # append prediction to x_dec

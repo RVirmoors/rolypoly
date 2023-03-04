@@ -59,22 +59,22 @@ def get_lr(it):
     return min_lr + coeff * (learning_rate - min_lr)
 
 def getBatch(split, train_data, val_data, batch_size, block_size):
-    xd = train_data['X_dec'] if split == 'train' else val_data['X_dec']
     xe = train_data['X_enc'] if split == 'train' else val_data['X_enc']
+    xd = train_data['X_dec'] if split == 'train' else val_data['X_dec']
     ys = train_data['Y'] if split == 'train' else val_data['Y']
 
     if len(xd) == 0:
         raise Exception("No data found in %s" % split)
 
-    take_i = np.random.randint(0, len(xd), (batch_size))
-    ix = [np.random.randint(0, xd[i].shape[0] - block_size) for i in take_i]
-    x_dec = torch.stack([xd[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
-    x_enc = torch.stack([xe[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
-    y =     torch.stack([ys[take_i[i]][ix[i]:ix[i]+block_size] for i in take_i])
+    takes = np.random.randint(0, len(xd), (batch_size))
+    ix = [np.random.randint(0, xd[i].shape[0] - block_size) for i in takes]
+    x_enc = torch.stack([xe[takes[i]][ix[i]:ix[i]+block_size] for i in takes])
+    x_dec = torch.stack([xd[takes[i]][ix[i]:ix[i]+block_size] for i in takes])
+    y     = torch.stack([ys[takes[i]][ix[i]:ix[i]+block_size] for i in takes])
 
-    data.dataScaleDown(x_enc)
-    data.dataScaleDown(x_dec)
-    data.dataScaleDown(y)
+    x_enc = data.dataScaleDown(x_enc)
+    x_dec = data.dataScaleDown(x_dec)
+    y     = data.dataScaleDown(y)
 
     if 'cuda' in device:
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
@@ -92,16 +92,22 @@ def estimate_loss(model, train_data, val_data, batch_size, block_size):
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
             X_enc, X_dec, Y = getBatch(split, train_data, val_data, batch_size, block_size)
+            
+            # print("=====================================")
+            # print("X_enc", X_enc[0, :5, 0], X_enc.shape)
+            # print("X_dec", X_dec[0, :5, 0], X_dec.shape)
+
             y_hat = model(X_enc, X_dec)
             if torch.all(Y[:, :, 13] == -1.0):
                 y_hat[:, :, 13] = -1.0 # remove guitar from loss
-            # print("=====================================")
+
             # _yh = y_hat.clone().detach()
             # _y = Y.clone().detach()
             # data.dataScaleUp(_yh)
             # data.dataScaleUp(_y)
-            # print(_yh[0,0, 9:])
-            # print(_y[0,0, 9:])
+            # print(_yh[0, 9:11], _yh.shape)
+            # print(_y[0, 9:11], _y.shape)
+
             loss = model.loss(y_hat, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
