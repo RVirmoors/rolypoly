@@ -236,7 +236,7 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_pos: torch.Tensor)
     i = x_dec.shape[1] - 1
     while i >= 0: # TODO: binary search? make this more efficient
         print("LOOKING FOR MATCH", input[:, 0, 2:5], x_pos[:, i])
-        if torch.allclose(input[:, 0, 2:5], x_pos[:, i):
+        if torch.allclose(input[:, 0, 2:5], x_pos[:, i]):
             x_dec[:, i, 13] = ms_to_bartime(input[:, 0, 1], x_pos[:, i].squeeze())   # tau_guitar
             print("FOUND MATCH", x_dec[:, i, 13])
             return x_dec
@@ -252,7 +252,7 @@ def readScoreLive(input: torch.Tensor):
         live_notes.shape[0], live_notes.shape[1], 2)), dim=2) # (batch, vec_size, 11)
     return live_notes, positions
 
-def dataScaleDown(input: torch.Tensor , pos: torch.Tensor):
+def dataScaleDown(input: torch.Tensor , pos: torch.Tensor = None):
     """
     Scale the input data to range [-1, 1].
 
@@ -264,12 +264,13 @@ def dataScaleDown(input: torch.Tensor , pos: torch.Tensor):
     output: (batch, vec_size, 14)
     """       
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
-    pos[:,:, INX_BPM] = (pos[:,:, INX_BPM] - 40) / 100 - 1
-    pos[:,:, INX_TSIG] = pos[:,:, INX_TSIG] - 1
+    if pos is not None:
+        pos[:,:, INX_BPM] = (pos[:,:, INX_BPM] - 40) / 100 - 1
+        pos[:,:, INX_TSIG] = pos[:,:, INX_TSIG] - 1
 
     return input, pos
 
-def dataScaleUp(input: torch.Tensor, pos: torch.Tensor):
+def dataScaleUp(input: torch.Tensor, pos: torch.Tensor = None):
     """
     Scale the input data back up from [-1, 1].
 
@@ -282,8 +283,9 @@ def dataScaleUp(input: torch.Tensor, pos: torch.Tensor):
     """
     
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
-    pos[:,:, INX_BPM] = (pos[:,:, INX_BPM] + 1) * 100 + 40
-    pos[:,:, INX_TSIG] = pos[:,:, INX_TSIG] + 1
+    if pos is not None:
+        pos[:,:, INX_BPM] = (pos[:,:, INX_BPM] + 1) * 100 + 40
+        pos[:,:, INX_TSIG] = pos[:,:, INX_TSIG] + 1
 
     return input, pos
 

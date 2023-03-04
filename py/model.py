@@ -98,32 +98,27 @@ class SelfAttention(nn.Module):
     """ input: x_dec/x_enc input (batch, seq_len, channels)
         output: y projection (batch, seq_len, channels)
     - adapted from https://github.com/karpathy/nanoGPT/blob/master/model.py"""
+    # TODO: replace with nn.MultiheadAttention ?
 
     def __init__(self, config, causal=True) -> None:
         super().__init__()
         self.dropout = config.dropout
         self.block_size = config.block_size
         self.causal = causal
-        self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention') and self.dropout == 0.0
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                                             .view(1, 1, config.block_size, config.block_size))
-        if self.causal:
-            self.n_chans = data.X_DECODER_CHANNELS      # 14
-            self.n_heads = data.X_DECODER_CHANNELS // 2 # 7            
-            # flash attention make GPU go brrrrr but support is only in PyTorch nightly and still a bit scary
-            # if not self.flash:
-                # print("WARNING: using slow attention. Flash Attention atm needs PyTorch nightly and dropout=0.0")
-        else:
-            self.n_chans = data.X_ENCODER_CHANNELS      # 12
-            self.n_heads = data.X_ENCODER_CHANNELS // 3 # 4
+
+        self.n_chans = config.d_model       # 128
+        self.n_heads = config.d_model // 32 # 4
+
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(self.n_chans, 3 * self.n_chans, bias=False)
         # output projection
         self.c_proj = nn.Linear(self.n_chans, self.n_chans, bias=False)
         # regularization
-        self.attn_drop = nn.Dropout(0.1)
-        self.resid_drop = nn.Dropout(0.1)
+        self.attn_drop = nn.Dropout(self.dropout)
+        self.resid_drop = nn.Dropout(self.dropout)
 
     def forward(self, x):
         B, T, C = x.shape # batch, seq_len, channels
@@ -142,18 +137,12 @@ class SelfAttention(nn.Module):
         q = q * (C // self.n_heads) ** -0.5 # TODO check if this is correct
 
         # attention
-        if self.causal and self.flash:
-            y = torch.zeros_like(q)
-            print("======================= Using Flash Attention: {}".format(self.flash))
-            # flash attention is a bit faster but only works with dropout=0.0
-            #attn = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=self.dropout, is_causal=True)[0]
-        else:
-            attn = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.shape[-1]))
-            if self.causal: # mask out future tokens
-                attn = attn.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
-            attn = attn.softmax(dim=-1)
-            attn = self.attn_drop(attn)
-            y = attn @ v # (B, n_heads, T, C // n_heads)
+        attn = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.shape[-1]))
+        if self.causal: # mask out future tokens
+            attn = attn.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        y = attn @ v # (B, n_heads, T, C // n_heads)
 
         # combine heads
         y = y.transpose(1, 2).contiguous().view(B, T, C) # (B, T, C)
@@ -161,7 +150,6 @@ class SelfAttention(nn.Module):
         # output projection
         y = self.c_proj(y)
         y = self.resid_drop(y)
-
         return y
 
 class CrossAttention(nn.Module):
@@ -177,8 +165,8 @@ class CrossAttention(nn.Module):
         super().__init__()
         self.dropout = config.dropout
         self.block_size = config.block_size
-        self.n_chans = data.X_DECODER_CHANNELS      # 14
-        self.n_heads = data.X_DECODER_CHANNELS // 2 # 7
+        self.n_chans = config.d_model       # 128
+        self.n_heads = config.d_model // 32 # 4
 
         # query, key, value projections for all heads, but in a batch
         # query is from previous decoder layer, key and value are from encoder output
@@ -187,8 +175,8 @@ class CrossAttention(nn.Module):
         # output projection
         self.proj = nn.Linear(self.n_chans, self.n_chans, bias=False)
         # regularization
-        self.attn_drop = nn.Dropout(0.1)
-        self.resid_drop = nn.Dropout(0.1)
+        self.attn_drop = nn.Dropout(config.dropout)
+        self.resid_drop = nn.Dropout(config.dropout)
 
     def forward(self, x, enc_out):
         B, T, C = x.shape # batch, seq_len, channels
@@ -218,7 +206,6 @@ class CrossAttention(nn.Module):
         # output projection
         y = self.proj(y)
         y = self.resid_drop(y)
-
         return y
 
 class FeedForward(nn.Module):
@@ -242,7 +229,7 @@ class DecoderBlock(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        n_chans = data.X_DECODER_CHANNELS
+        n_chans = config.d_model # 128
         self.arch = config.arch
         self.ln_1 = LayerNorm(n_chans, bias=False)
         self.attn = SelfAttention(config, causal=True)
@@ -263,7 +250,7 @@ class EncoderBlock(nn.Module):
     
     def __init__(self, config):
         super().__init__()
-        n_chans = data.X_ENCODER_CHANNELS
+        n_chans = config.d_model # 128
         self.ln_1 = LayerNorm(n_chans, bias=False)
         self.attn = SelfAttention(config, causal=False)
         self.ln_2 = LayerNorm(n_chans, bias=False)
@@ -274,7 +261,6 @@ class EncoderBlock(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 
-
 # === TRANSFORMER CLASS ===
 
 class Transformer(nn.Module):
@@ -284,30 +270,33 @@ class Transformer(nn.Module):
         super().__init__()
         self.block_size = config.block_size
         self.arch = config.arch
+        in_out_chans = data.X_DECODER_CHANNELS + data.X_POS_CHANNELS # 14
+        enc_in_chans = data.X_ENCODER_CHANNELS + data.X_POS_CHANNELS # 12
+
         if self.arch == 'd':
             self.transformer = nn.ModuleDict(dict(
-                wpe = PositionalEncoding(),
-                in_dec = FeedForward(data.X_DECODER_CHANNELS),
+                in_dec = nn.Linear(in_out_chans, config.d_model),
+                wpe_dec = PositionalEncoding(),
                 drop_dec = nn.Dropout(0.1),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
-                ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
-                head = nn.Linear(data.X_DECODER_CHANNELS, data.X_DECODER_CHANNELS),
+                ln_f = LayerNorm(config.d_model, bias=False),
+                head = nn.Linear(config.d_model, in_out_chans),
             ))
         elif self.arch == 'ed':
-            self.transformer = nn.ModuleDict(dict(                
-                wpe = PositionalEncoding(),
-
-                in_enc = FeedForward(data.X_ENCODER_CHANNELS),
-                drop_enc = nn.Dropout(0.1),
+            self.transformer = nn.ModuleDict(dict(
+                in_enc = nn.Linear(enc_in_chans, config.d_model),               
+                wpe_enc = PositionalEncoding(),
+                drop_enc = nn.Dropout(config.dropout),
                 h_enc = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_layers)]),
-                proj_enc = nn.Linear(data.X_ENCODER_CHANNELS, data.X_DECODER_CHANNELS),
+                proj_enc = FeedForward(config.d_model),
 
-                in_dec = FeedForward(data.X_DECODER_CHANNELS),
-                drop_dec = nn.Dropout(0.1),
+                in_dec = nn.Linear(in_out_chans, config.d_model),
+                wpe_dec = PositionalEncoding(),
+                drop_dec = nn.Dropout(config.dropout),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
-                ln_f = LayerNorm(data.X_DECODER_CHANNELS, bias=False),
 
-                head = nn.Linear(data.X_DECODER_CHANNELS, data.X_DECODER_CHANNELS),
+                ln_f = LayerNorm(config.d_model, bias=False),
+                head = nn.Linear(config.d_model, in_out_chans),
             ))
 
         # initialize weights
@@ -327,7 +316,7 @@ class Transformer(nn.Module):
             if m.padding_idx is not None:
                 nn.init.zeros_(m.weight[m.padding_idx])
 
-    def forward(self, x_enc, x_dec):
+    def forward(self, x_enc, x_dec, x_pos):
         device = x_dec.device
         b, t = x_dec.shape[:2]
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
@@ -335,26 +324,22 @@ class Transformer(nn.Module):
         if x_enc.shape[1] == 0: # error handling for empty encoder input
             x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
         
-        cur_bar = x_enc[:, :, 11] // 1 # get current bar from encoder input
+        cur_bar = x_pos[:, :, data.INX_BAR_POS] // 1 # get current bar
         #print ("cur_bar", cur_bar, cur_bar.shape)
-        x_enc[:, :, 11] = x_enc[:, :, 11] - cur_bar # subtract current bar from encoder input
-        if self.arch == 'ed':
-            x_dec[:, :, 11] = x_enc[:, :, 11] # set decoder bar_pos to encoder bar_pos
-        else:
-            x_dec[:, :, 11] = x_dec[:, :, 11] - cur_bar
+        x_pos[:, :, data.INX_BAR_POS] = x_pos[:, :, data.INX_BAR_POS] - cur_bar # subtract current bar from encoder input
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
-            pos_emb_enc = self.transformer.wpe(x_enc)
-            x_enc = self.transformer.in_enc(x_enc)       
+            x_enc = torch.cat((x_enc, x_pos), dim=2)
+            x_enc = self.transformer.in_enc(x_enc)
+            pos_emb_enc = self.transformer.wpe_enc(x_enc, x_pos) 
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
-        pos_emb_dec = self.transformer.wpe(x_dec)
-        #print("pos_emb_enc", pos_emb_enc, pos_emb_enc.shape)
-        #print("pos_emb_dec", pos_emb_dec, pos_emb_dec.shape)
+        x_dec = torch.cat((x_dec, x_pos), dim=2)
         x_dec = self.transformer.in_dec(x_dec)
+        pos_emb_dec = self.transformer.wpe_dec(x_dec, x_pos)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
@@ -364,7 +349,7 @@ class Transformer(nn.Module):
                 x_enc = block(x_enc)
             enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
         else:
-            enc_out = torch.zeros((b, t, data.X_DECODER_CHANNELS), device=device)
+            enc_out = torch.zeros_like(x_enc, device=device)
 
         enc_out = enc_out + pos_emb_dec
         
@@ -378,10 +363,11 @@ class Transformer(nn.Module):
         return y_hat
 
     def loss(self, y_hat, y):
-        hit_loss = F.mse_loss(y_hat[:, :, :12], y[:, :, :12]) # hits
+        hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9]) # hits
+        pos_loss = F.mse_loss(y_hat[:, :, 9:12], y[:, :, 9:12]) # position
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
-        #print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "total", hit_loss + timing_loss)
-        return hit_loss + timing_loss
+        print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "total", hit_loss + timing_loss)
+        return 3 * hit_loss + pos_loss + 10 * timing_loss # weigh timing loss higher
         
     def from_pretrained(self, path):
         self.load_state_dict(torch.load(path))
@@ -445,39 +431,46 @@ class Transformer(nn.Module):
         return optimizer
 
     @torch.no_grad()
-    def generate(self, x_enc, x_dec, num_samples: int = 1):
+    def generate(self, x_enc, x_dec, x_pos, num_samples: int = 1):
         # generate predictions and append them to x_dec
-
         for _ in range(num_samples):
             # crop inputs to block size
-            t = x_dec.size(1) - 1 #if x_dec[0, 0, 12] != -1.0 else 0 # current time step
+            t = x_dec.size(1) - 1 # current time step
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
             print("==current time step: ", t, "==")
             if t - self.block_size >= 0:
                 xe = x_enc[:, t-self.block_size+1 : t+1]
+                xp = x_pos[:, t-self.block_size+1 : t+1]
             else:
                 xe = x_enc[:, :t+1]
+                xp = x_pos[:, :t+1]
             
             _xe = xe.clone().detach()
-            _xe = data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+2, 11], _xe.shape)
+            _xp = x_pos.clone().detach()
+            _xe, _ = data.dataScaleUp(_xe, _xp)
+            print("x_enc:\n", _xe[0, :t+2, 0], _xe.shape)
 
             _xd = xd.clone().detach()
-            _xd = data.dataScaleUp(_xd)
-            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
+            _xd, _xp = data.dataScaleUp(_xd, _xp)
+            print("x_dec:\n", _xd[0, :, 0], _xd.shape)
+
+            print("x_pos:\n", xp[0, :t+2, :], xp.shape)
 
             # generate prediction
-            y_hat = self(xe, xd)
+            y_hat = self(xe, xd, xp) # (b, t, n_chans)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
-            y_hat[:, 11] = torch.frac(y_hat[:, 11]) # keep only fractional part of bar_pos
 
+            pos_hat = y_hat[:, 11:] # (b, 3)
+            pos_hat[:, data.INX_BAR_POS] = torch.frac(pos_hat[:, data.INX_BAR_POS]) # keep only fractional part of bar_pos
+            #print("pos_hat:\n", pos_hat, pos_hat.shape)
+
+            y_hat = y_hat[:, :11] # (b, 11)
             # append prediction to x_dec
+            print(x_dec.shape, y_hat.unsqueeze(1).shape)
             x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
 
-        return x_dec
+        return x_dec, pos_hat
   
-
-
 
 # === TESTS ===
 if __name__ == '__main__':
@@ -487,17 +480,17 @@ if __name__ == '__main__':
                             [38, 111, 140, 1.5, 1.33],
                             [42, 105, 140, 1.5, 1.33],
                             [36, 101, 140, 1.5, 1.66]]])
-    #print(data.readScore(test).shape)
-    #print(readScore(test)[:, :10, :])
-    x_enc = data.readScore(test)
+    x_enc, x_pos = data.readScore(test)
     print("X_ENC:", x_enc, x_enc.shape)
-    x_dec = torch.randn(1, 1, 14)
-    notes = data.readScoreLive(test[:,:3,:])
+    print("X_POS:", x_pos, x_pos.shape)
+    x_dec = torch.randn(1, 1, 11)
+    notes, live_pos = data.readScoreLive(test[:,:3,:])
     #feat = x.squeeze(0)
     
     config = Config()
     m = Transformer(config)
     start = time.time()
-    #print("MODEL OUT:", m(x_enc, x_dec), m(x_enc, x_dec).shape)
-    print("GENERATE:", m.generate(x_enc, x_dec, notes.shape[1]), m.generate(x_enc, x_dec, notes.shape[1]).shape)
+    x_enc, x_pos = data.dataScaleDown(x_enc, x_pos)
+    x_dec, _ = data.dataScaleDown(x_dec)
+    print("GENERATE:", m.generate(x_enc, x_dec, x_pos, notes.shape[1]))
     print(time.time() - start, "s")
