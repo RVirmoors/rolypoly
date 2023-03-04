@@ -326,13 +326,15 @@ class Transformer(nn.Module):
         if x_enc.shape[1] == 0: # error handling for empty encoder input
             x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
         
+        x_enc = x_enc.clone().detach()
+        x_dec = x_dec.clone().detach()
         bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
         bar_num = bar_pos // 1 # get current bar
         print ("bar_num", bar_num, bar_num.shape)
         # print ("bar_pos", bar_pos, bar_pos.shape)
 
-        x_enc[:, :, data.INX_BAR_POS] = x_enc[:, :, data.INX_BAR_POS] - bar_num # subtract current bar from inputs
-        x_dec[:, :, data.INX_BAR_POS] = x_dec[:, :, data.INX_BAR_POS] - bar_num # subtract current bar from inputs
+        x_enc[:, :, data.INX_BAR_POS] = torch.frac(bar_pos) # set bar position to fraction of bar
+        x_dec[:, :, data.INX_BAR_POS] = torch.frac(bar_pos[:,:seq_len]) # set bar position to fraction of bar
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
@@ -363,7 +365,7 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
-        y_hat[:, :, data.INX_BAR_POS] = y_hat[:, :, data.INX_BAR_POS] + bar_num # add current bar back to output
+        y_hat[:, :, data.INX_BAR_POS] = y_hat[:, :, data.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
         return y_hat
 
     def loss(self, y_hat, y):
@@ -445,11 +447,11 @@ class Transformer(nn.Module):
 
             _xe = x_enc.clone().detach()
             _xe = data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+8, 0], _xe.shape)
+            print("x_enc:\n", _xe[0, :t+8, 11], _xe.shape)
 
             _xd = xd.clone().detach()
             _xd = data.dataScaleUp(_xd)
-            print("x_dec:\n", _xd[0, :, 0], _xd.shape)
+            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
 
             # generate prediction
             y_hat = self(x_enc, xd) # (b, t, n_chans)
@@ -480,5 +482,5 @@ if __name__ == '__main__':
     start = time.time()
     x_enc = data.dataScaleDown(x_enc)
     x_dec = data.dataScaleDown(x_dec)
-    print("GENERATE:", m.generate(x_enc, x_dec, notes.shape[1]))
+    print("GENERATE:\n", m.generate(x_enc, x_dec, notes.shape[1]))
     print(time.time() - start, "s")
