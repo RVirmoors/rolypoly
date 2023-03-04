@@ -250,7 +250,7 @@ def readScoreLive(input: torch.Tensor):
 
 def dataScaleDown(input: torch.Tensor):
     """
-    Scale the input data to range [-1, 1].
+    Scale the input data to range [0, 1].
 
     9 velocities from [0, 127]
     bpm from [40, 240]
@@ -262,12 +262,11 @@ def dataScaleDown(input: torch.Tensor):
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
     input[:,:, INX_BPM] = (input[:,:, INX_BPM] - 40) / 100 - 1
     input[:,:, INX_TSIG] = input[:,:, INX_TSIG] - 1
-
     return input
 
 def dataScaleUp(input: torch.Tensor):
     """
-    Scale the input data back up from [-1, 1].
+    Scale the input data back up from [0, 1].
 
     9 velocities to [0, 127]
     bpm to [40, 240]
@@ -280,7 +279,6 @@ def dataScaleUp(input: torch.Tensor):
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
     input[:,:, INX_BPM] = (input[:,:, INX_BPM] + 1) * 100 + 40
     input[:,:, INX_TSIG] = input[:,:, INX_TSIG] + 1
-
     return input
 
 

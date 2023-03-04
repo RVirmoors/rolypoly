@@ -441,7 +441,7 @@ class Transformer(nn.Module):
             t = x_dec.size(1) - 1 # current time step
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
             print("==current time step: ", t, "==")
-            
+
             _xe = x_enc.clone().detach()
             _xe = data.dataScaleUp(_xe)
             print("x_enc:\n", _xe[0, :t+8, 0], _xe.shape)
@@ -473,7 +473,6 @@ if __name__ == '__main__':
     print("X_ENC:", x_enc, x_enc.shape)
     x_dec = torch.randn(1, 1, 14)
     notes = data.readScoreLive(test[:,:3,:])
-    #feat = x.squeeze(0)
     
     config = Config()
     m = Transformer(config)
