@@ -11,11 +11,10 @@ torch.set_printoptions(sci_mode=False, linewidth=200)
 
 X_ENCODER_CHANNELS = 9 # 9 drum channel velocities
 X_DECODER_CHANNELS = 11 # above + tau_drum, tau_guitar
-X_POS_CHANNELS = 4 # bpm, tsig, bar_pos_sin, bar_pos_cos
+X_POS_CHANNELS = 3 # bpm, tsig, bar_pos
 INX_BPM = 0
 INX_TSIG = 1
-INX_BAR_POS_SIN = 2
-INX_BAR_POS_COS = 3
+INX_BAR_POS = 2
 IN_DRUM_CHANNELS = 5 # hit, vel, tempo, tsig, bar_pos
 IN_ONSET_CHANNELS = 5 # 666, tau_guitar, tempo, tsig, bar_pos
 
@@ -168,7 +167,7 @@ def saveYtoCSV(Y, Pos, filename: str) -> int:
     output: number of rows written
     """
     with open(filename, 'w') as f:
-        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, tau_d, tau_g, bpm, tsig, bar_pos_sin, bar_pos_cos\n")
+        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, tau_d, tau_g, bpm, tsig, bar_pos\n")
         rows = Y.shape[0] + Pos.shape[0]
         for row in range(rows):
             f.write(', '.join([str(x) for x in Y[row].tolist()]) + ', '.join([str(x) for x in Pos[row].tolist()]) + '\n')
@@ -212,8 +211,7 @@ def readScore(input: torch.Tensor):
                 # next 3 values are tempo, tsig, bar_pos
                 X_pos[i, k, INX_BPM]  = input[i, j, 2]
                 X_pos[i, k, INX_TSIG] = input[i, j, 3]
-                X_pos[i, k, INX_BAR_POS_SIN] = torch.sin(input[i, j, 4] * 2 * np.pi)
-                X_pos[i, k, INX_BAR_POS_COS] = torch.cos(input[i, j, 4] * 2 * np.pi)
+                X_pos[i, k, INX_BAR_POS] = input[i, j, 4] 
                 if j < input.shape[1] - 1:
                     if input[:, j, 2] != input[:, j+1, 2] or input[:, j, 3] != input[:, j+1, 3] or input[:, j, 4] != input[:, j+1, 4]:
                         # next timestep
@@ -238,9 +236,7 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_pos: torch.Tensor)
     i = x_dec.shape[1] - 1
     while i >= 0: # TODO: binary search? make this more efficient
         print("LOOKING FOR MATCH", input[:, 0, 2:5], x_pos[:, i])
-        match_condition = torch.allclose(input[:, 0, 2:4], x_pos[:, i, :2]) and torch.allclose(torch.sin(input[:, 0, 4] * 2 * np.pi), x_pos[:, i, INX_BAR_POS_SIN]) and torch.allclose(torch.cos(input[:, 0, 4] * 2 * np.pi), x_pos[:, i, INX_BAR_POS_COS])
-
-        if match_condition:
+        if torch.allclose(input[:, 0, 2:5], x_pos[:, i):
             x_dec[:, i, 13] = ms_to_bartime(input[:, 0, 1], x_pos[:, i].squeeze())   # tau_guitar
             print("FOUND MATCH", x_dec[:, i, 13])
             return x_dec

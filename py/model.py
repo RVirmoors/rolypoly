@@ -58,9 +58,10 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
-    n_layers = 4 # number of block layers
+    n_layers = 10 # number of block layers
+    d_model = 128 # number of channels in the model
     block_size = 16 # number of hits in a block
-    dropout = 0.1
+    dropout = 0.4 # dropout rate
 
 # === HELPER CLASSES FOR TRANSFORMER ===
 
@@ -69,12 +70,11 @@ class PositionalEncoding(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, x):
+    def forward(self, x, pos):
         # add positional encoding
-        #print("x", x[:,:,11], x.shape)
         dim_model = x.shape[-1]
         pe = torch.zeros_like(x).to(x.device)
-        position = x[:, :, 11].unsqueeze(-1)
+        position = pos[:, :, data.INX_BAR_POS].unsqueeze(-1)
         #print("POS", position, position.shape)
         div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * div_term)
