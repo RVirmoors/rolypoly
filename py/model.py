@@ -60,6 +60,7 @@ class Config:
     arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
     n_layers = 1 # 10 # number of block layers
     d_model = 32 # 128 # number of channels in the model
+    d_ff = 128 # 512 # number of channels in the feedforward layer
     block_size = 16 # number of hits in a block
     dropout = 0.4 # dropout rate
 
@@ -247,6 +248,15 @@ class DecoderBlock(nn.Module):
         x = x + self.mlp(self.ln_3(x))
         return x
 
+class Decoder(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.dec = nn.TransformerDecoder(nn.TransformerDecoderLayer(d_model=config.d_model, nhead=config.d_model // 4, dropout=config.dropout, dim_feedforward=config.d_ff, batch_first=True, norm_first=True), config.n_layers)
+
+    def forward(self, x, enc_out, mask=None):
+        x = self.dec(x, enc_out, tgt_mask=mask)
+        return x
+
 class EncoderBlock(nn.Module):
     """ adapted from DecoderBlock above"""
     
@@ -289,13 +299,12 @@ class Transformer(nn.Module):
                 in_enc = nn.Linear(enc_in_chans, config.d_model),               
                 wpe_enc = PositionalEncoding(),
                 drop_enc = nn.Dropout(config.dropout),
-                h_enc = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_layers)]),
-                proj_enc = FeedForward(config.d_model),
+                h_enc = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model=config.d_model, nhead=config.d_model // 4, dropout=config.dropout, dim_feedforward=config.d_ff, batch_first=True, norm_first=True), config.n_layers),
 
                 in_dec = nn.Linear(in_out_chans, config.d_model),
                 wpe_dec = PositionalEncoding(),
                 drop_dec = nn.Dropout(config.dropout),
-                h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
+                h_dec = Decoder(config),
 
                 ln_f = LayerNorm(config.d_model, bias=False),
                 head = nn.Linear(config.d_model, in_out_chans),
@@ -351,17 +360,17 @@ class Transformer(nn.Module):
         
         # transformer blocks (ENCODER)
         if self.arch == 'ed':
-            for block in self.transformer.h_enc:
-                x_enc = block(x_enc)
-            enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
+            enc_out = self.transformer.h_enc(x_enc)
         else:
             enc_out = torch.zeros_like(x_enc, device=device)
 
         # enc_out = enc_out + pos_emb_dec # TODO: check if this might help
         
         # transformer blocks (DECODER)
-        for block in self.transformer.h_dec:
-            x_dec = block(x_dec, enc_out)
+        mask = torch.triu(torch.ones((seq_len, seq_len), device=device), diagonal=1).bool()
+
+        x_dec = self.transformer.h_dec(x_dec, enc_out, mask)
+
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
