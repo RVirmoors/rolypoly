@@ -58,7 +58,7 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
-    n_layers = 2 # 10 # number of block layers
+    n_layers = 1 # 10 # number of block layers
     d_model = 32 # 128 # number of channels in the model
     block_size = 16 # number of hits in a block
     dropout = 0.4 # dropout rate
@@ -484,3 +484,5 @@ if __name__ == '__main__':
     x_dec = data.dataScaleDown(x_dec)
     print("GENERATE:\n", m.generate(x_enc, x_dec, notes.shape[1]))
     print(time.time() - start, "s")
+
+    print(m.state_dict())
