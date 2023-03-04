@@ -70,12 +70,12 @@ class PositionalEncoding(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, x, pos):
+    def forward(self, x):
         # add positional encoding
         dim_model = x.shape[-1]
         pe = torch.zeros_like(x).to(x.device)
-        position = pos[:, :, data.INX_BAR_POS].unsqueeze(-1)
-        #print("POS", position, position.shape)
+        position = x[:, :, data.INX_BAR_POS].unsqueeze(-1)
+        print("POS", position, position.shape)
         div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * math.pi * 2 * div_term)
         pe[:, :, 1::2] = torch.cos(position * math.pi * 2 * div_term)
@@ -270,8 +270,8 @@ class Transformer(nn.Module):
         super().__init__()
         self.block_size = config.block_size
         self.arch = config.arch
-        in_out_chans = data.X_DECODER_CHANNELS + data.X_POS_CHANNELS # 14
-        enc_in_chans = data.X_ENCODER_CHANNELS + data.X_POS_CHANNELS # 12
+        in_out_chans = data.X_DECODER_CHANNELS # 14
+        enc_in_chans = data.X_ENCODER_CHANNELS # 12
 
         if self.arch == 'd':
             self.transformer = nn.ModuleDict(dict(
@@ -316,7 +316,7 @@ class Transformer(nn.Module):
             if m.padding_idx is not None:
                 nn.init.zeros_(m.weight[m.padding_idx])
 
-    def forward(self, x_enc, x_dec, x_pos):
+    def forward(self, x_enc, x_dec):
         device = x_dec.device
         b, t = x_dec.shape[:2]
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
@@ -324,22 +324,20 @@ class Transformer(nn.Module):
         if x_enc.shape[1] == 0: # error handling for empty encoder input
             x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
         
-        cur_bar = x_pos[:, :, data.INX_BAR_POS] // 1 # get current bar
+        #cur_bar = x_enc[:, :, data.INX_BAR_POS] // 1 # get current bar
         #print ("cur_bar", cur_bar, cur_bar.shape)
-        x_pos[:, :, data.INX_BAR_POS] = x_pos[:, :, data.INX_BAR_POS] - cur_bar # subtract current bar from encoder input
+        #x_enc[:, :, data.INX_BAR_POS] = x_enc[:, :, data.INX_BAR_POS] - cur_bar # subtract current bar from encoder input
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
-            x_enc = torch.cat((x_enc, x_pos), dim=2)
             x_enc = self.transformer.in_enc(x_enc)
-            pos_emb_enc = self.transformer.wpe_enc(x_enc, x_pos) 
+            pos_emb_enc = self.transformer.wpe_enc(x_enc) 
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
-        x_dec = torch.cat((x_dec, x_pos), dim=2)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_dec(x_dec, x_pos)
+        pos_emb_dec = self.transformer.wpe_dec(x_dec)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
@@ -351,7 +349,7 @@ class Transformer(nn.Module):
         else:
             enc_out = torch.zeros_like(x_enc, device=device)
 
-        enc_out = enc_out + pos_emb_dec
+        # enc_out = enc_out + pos_emb_dec # TODO: check if this might help
         
         # transformer blocks (DECODER)
         for block in self.transformer.h_dec:
@@ -359,7 +357,7 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
-        y_hat[:, :, 11] = y_hat[:, :, 11] + cur_bar # add current bar back to output
+        # y_hat[:, :, 11] = y_hat[:, :, 11] + cur_bar # add current bar back to output
         return y_hat
 
     def loss(self, y_hat, y):
@@ -431,45 +429,31 @@ class Transformer(nn.Module):
         return optimizer
 
     @torch.no_grad()
-    def generate(self, x_enc, x_dec, x_pos, num_samples: int = 1):
+    def generate(self, x_enc, x_dec, num_samples: int = 1):
         # generate predictions and append them to x_dec
         for _ in range(num_samples):
             # crop inputs to block size
             t = x_dec.size(1) - 1 # current time step
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
             print("==current time step: ", t, "==")
-            if t - self.block_size >= 0:
-                xe = x_enc[:, t-self.block_size+1 : t+1]
-                xp = x_pos[:, t-self.block_size+1 : t+1]
-            else:
-                xe = x_enc[:, :t+1]
-                xp = x_pos[:, :t+1]
             
-            _xe = xe.clone().detach()
-            _xp = x_pos.clone().detach()
-            _xe, _ = data.dataScaleUp(_xe, _xp)
+            _xe = x_enc.clone().detach()
+            _xe = data.dataScaleUp(_xe)
             print("x_enc:\n", _xe[0, :t+2, 0], _xe.shape)
 
             _xd = xd.clone().detach()
-            _xd, _xp = data.dataScaleUp(_xd, _xp)
+            _xd = data.dataScaleUp(_xd)
             print("x_dec:\n", _xd[0, :, 0], _xd.shape)
 
-            print("x_pos:\n", xp[0, :t+2, :], xp.shape)
-
             # generate prediction
-            y_hat = self(xe, xd, xp) # (b, t, n_chans)
+            y_hat = self(x_enc, xd) # (b, t, n_chans)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
 
-            pos_hat = y_hat[:, 11:] # (b, 3)
-            pos_hat[:, data.INX_BAR_POS] = torch.frac(pos_hat[:, data.INX_BAR_POS]) # keep only fractional part of bar_pos
-            #print("pos_hat:\n", pos_hat, pos_hat.shape)
-
-            y_hat = y_hat[:, :11] # (b, 11)
             # append prediction to x_dec
             print(x_dec.shape, y_hat.unsqueeze(1).shape)
             x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
 
-        return x_dec, pos_hat
+        return x_dec
   
 
 # === TESTS ===
@@ -480,17 +464,16 @@ if __name__ == '__main__':
                             [38, 111, 140, 1.5, 1.33],
                             [42, 105, 140, 1.5, 1.33],
                             [36, 101, 140, 1.5, 1.66]]])
-    x_enc, x_pos = data.readScore(test)
+    x_enc = data.readScore(test)
     print("X_ENC:", x_enc, x_enc.shape)
-    print("X_POS:", x_pos, x_pos.shape)
-    x_dec = torch.randn(1, 1, 11)
-    notes, live_pos = data.readScoreLive(test[:,:3,:])
+    x_dec = torch.randn(1, 1, 14)
+    notes = data.readScoreLive(test[:,:3,:])
     #feat = x.squeeze(0)
     
     config = Config()
     m = Transformer(config)
     start = time.time()
-    x_enc, x_pos = data.dataScaleDown(x_enc, x_pos)
-    x_dec, _ = data.dataScaleDown(x_dec)
-    print("GENERATE:", m.generate(x_enc, x_dec, x_pos, notes.shape[1]))
+    x_enc = data.dataScaleDown(x_enc)
+    x_dec = data.dataScaleDown(x_dec)
+    print("GENERATE:", m.generate(x_enc, x_dec, notes.shape[1]))
     print(time.time() - start, "s")

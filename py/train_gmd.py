@@ -8,7 +8,6 @@ Code heavily inspired by https://github.com/karpathy/nanoGPT/blob/master/train.p
 """
 
 import torch
-from torch.utils.data import Dataset, DataLoader
 
 import pretty_midi
 import numpy as np
@@ -39,14 +38,16 @@ flags.DEFINE_bool("final", False, "Final training, using all data.")
 
 
 # === GLOBALS ===
-feat_vec_size = data.X_DECODER_CHANNELS
+feat_vec_size = data.X_DECODER_CHANNELS + data.X_POS_CHANNELS
 train_data = {}
 val_data = {}
 train_data['X_dec'] = [] # lists of tensors
 train_data['X_enc'] = []
+train_data['X_pos'] = []
 train_data['Y'] = []
 val_data['X_dec'] = []
 val_data['X_enc'] = []
+val_data['X_pos'] = []
 val_data['Y'] = []
 
 # === DATASET FUNCTIONS ===
@@ -60,7 +61,7 @@ def removeShortTakes(meta, min_dur=5):
     print("Dropped", old - len(meta), "short samples.")
     return meta
 
-def midifileToY(filename: str) -> torch.Tensor:
+def midifileToX_take(filename: str) -> torch.Tensor:
     """
     Convert a midi file to a tensor of X_decoder feature vectors.
     input: path to midi file
@@ -86,9 +87,9 @@ def midifileToY(filename: str) -> torch.Tensor:
     positions_in_bar = data.score_bar_pos(drumtrack, ts, tempos, timesigs)
 
     hits, offsets = quantizeDrumTrack(positions_in_bar)
-    X_dec = parseHO(drumtrack, pitch_class_map, tempos, timesigs, hits, offsets)
+    X_take = parseHO(drumtrack, pitch_class_map, tempos, timesigs, hits, offsets)
     
-    return X_dec
+    return X_take
 
 def quantizeDrumTrack(positions_in_bar, steps=16):
     """
@@ -112,7 +113,7 @@ def quantizeDrumTrack(positions_in_bar, steps=16):
 def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
     """
     input: drumtrack, pitch_class_map, tempos, timesigs, H, O
-    output: X_dec (len, feat_vec_size)
+    output: X_take (len, feat_vec_size)
     """
     hit_index = 0
 
@@ -125,27 +126,27 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
         hit[pitch_class_map[note.pitch]] = note.velocity
         if duration:
             # done adding notes at this timestep, process it
-            hit[9] = tempos[hit_index]
-            hit[10] = timesigs[hit_index][0] / timesigs[hit_index][1]
-            hit[11] = H[index]          # bar position, [0 - # of bars]
-            hit[12] = (O[index] + O[hit_index]) / 2 # tau_drums
-            # hit[13] remains zero (tau_guitar)
+            hit[9] = (O[index] + O[hit_index]) / 2 # tau_drums
+            # hit[10] remains zero (tau_guitar)
+            hit[11] = tempos[hit_index]
+            hit[12] = timesigs[hit_index][0] / timesigs[hit_index][1]
+            hit[13] = H[index]          # bar position, [0 - # of bars]
 
-            # add hit to X_dec
+            # add hit to X_take
             if hit_index == 0:
-                X_dec = hit.unsqueeze(0)
+                X_take = hit.unsqueeze(0)
             else:
-                X_dec = torch.cat((X_dec, hit.unsqueeze(0)), 0)
+                X_take = torch.cat((X_take, hit.unsqueeze(0)), 0)
             hit_index += 1
             duration = 0
-    return X_dec
+    return X_take
 
-def getTrainDataFromY(Y: torch.Tensor):
+def getTrainDataFromX_take(X_take: torch.Tensor):
     """
-    input: Y (len, feat_vec_size)
-    output: X_dec (len, feat_vec_size), X_enc (len, feat_vec_size)
+    input: X_take (len, feat_vec_size)
+    output: X_dec, X_enc, X_pos, Y
     """
-    X_enc = Y[:, :data.X_ENCODER_CHANNELS].clone().detach() # lose tau info
+    X_enc = X_take[:, :data.X_ENCODER_CHANNELS].clone().detach() # lose tau info
     # lose velocity info
     sum_non_zero = torch.sum(X_enc[:,:9], dim=0)
     non_zero = torch.count_nonzero(X_enc[:,:9], dim=0)
@@ -153,11 +154,19 @@ def getTrainDataFromY(Y: torch.Tensor):
     # replace non-zero notes with the mean velocity for that note
     X_enc[:,:9] = torch.where(X_enc[:,:9] > 0, mean, X_enc[:,:9])
 
-    X_dec = Y
-    Y = torch.roll(Y, -1, dims=0)
+    X_pos = X_take[:, -data.X_POS_CHANNELS:].clone().detach()
+
+    X_dec = X_take[:, :data.X_DECODER_CHANNELS].clone().detach()
+    Y = torch.roll(X_take, -1, dims=0)[:, :data.X_DECODER_CHANNELS]
+
+    print("================ from X_take =================")
+    print("X_enc:", X_enc[:3, 0], X_enc.shape)
+    print("X_pos:", X_pos[:3, 2], X_pos.shape)
+    print("X_dec:", X_dec[:3, 0], X_dec.shape)
+    print("Y:    ", Y[:3, 0], Y.shape)
 
     # ignore the last timestep (no next timestep to predict)
-    return X_dec[:-1], X_enc[:-1], Y[:-1]
+    return X_dec[:-1], X_enc[:-1], X_pos[:-1], Y[:-1]
 
 # === MAIN ===
 
@@ -170,24 +179,27 @@ def main(argv):
                                         meta.iloc[idx]['midi_filename'])
         csv_filename = file_name[:-3] + 'csv'
         if FLAGS.source == 'midi':
-            y = midifileToY(file_name)
-            rows = data.saveYtoCSV(y, filename=csv_filename)
+            x_take = midifileToX_take(file_name)
+            rows = data.saveTakeToCSV(x_take, filename=csv_filename)
             print("Saved", csv_filename, ": ", rows, "rows.")
         elif FLAGS.source == 'csv':
-            y = data.loadYFromCSV(csv_filename)
+            x_take = data.loadX_takeFromCSV(csv_filename)
             print("Loaded", csv_filename, ": ", y.shape[0], "rows.")
             if (y.shape[0] <= FLAGS.block_size + 1):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
-            xd, xe, y= getTrainDataFromY(y)
-            if FLAGS.final or meta.iloc[idx]['split'] == 'train':
-                train_data['X_dec'].append(xd)
-                train_data['X_enc'].append(xe)
-                train_data['Y'].append(y)
-            else:
-                val_data['X_dec'].append(xd)
-                val_data['X_enc'].append(xe)
-                val_data['Y'].append(y)
+
+        xd, xe, xp, y= getTrainDataFromX_take(x_take)
+        if FLAGS.final or meta.iloc[idx]['split'] == 'train':
+            train_data['X_dec'].append(xd)
+            train_data['X_enc'].append(xe)
+            train_data['X_pos'].append(xp)
+            train_data['Y'].append(y)
+        else:
+            val_data['X_dec'].append(xd)
+            val_data['X_enc'].append(xe)
+            val_data['X_pos'].append(xp)
+            val_data['Y'].append(y)
 
     config = model.Config()
     config.block_size = FLAGS.block_size
