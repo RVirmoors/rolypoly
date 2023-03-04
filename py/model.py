@@ -311,8 +311,19 @@ class Transformer(nn.Module):
 
     def forward(self, x_enc, x_dec):
         device = x_dec.device
-        b, t = x_dec.shape[:2]
-        assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
+        b, seq_len = x_dec.shape[:2]
+        assert seq_len <= self.block_size, f"Cannot forward sequence of length {seq_len}, block size is only {self.block_size}"
+        
+        if x_enc.shape[1] == 0: # error handling for empty encoder input
+            x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
+        
+        bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
+        bar_num = bar_pos // 1 # get current bar
+        print ("bar_num", bar_num, bar_num.shape)
+        # print ("bar_pos", bar_pos, bar_pos.shape)
+
+        x_enc[:, :, data.INX_BAR_POS] = x_enc[:, :, data.INX_BAR_POS] - bar_num # subtract current bar from inputs
+        x_dec[:, :, data.INX_BAR_POS] = x_dec[:, :, data.INX_BAR_POS] - bar_num # subtract current bar from inputs
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
@@ -348,6 +359,7 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
+        y_hat[:, :, data.INX_BAR_POS] = y_hat[:, :, data.INX_BAR_POS] + bar_num # add current bar back to output
         return y_hat
 
     def loss(self, y_hat, y):

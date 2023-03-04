@@ -249,9 +249,8 @@ def dataScaleDown(input: torch.Tensor):
     output: (batch, vec_size, 14)
     """       
     input[:, :, :9] = input[:, :, :9] / 127
-    input[:, :, 9] = (input[:, :, 9] - 40) / 200
-    input[:, :, 10] = input[:, :, 10] - 0.5
-    input[:, :, 11:] = torch.sin(input[:, :, 11:] * np.pi / 2)
+    input[:,:, INX_BPM] = (input[:,:, INX_BPM] - 40) / 200
+    input[:,:, INX_TSIG] = input[:,:, INX_TSIG] - 0.5
 
     return input
 
@@ -269,9 +268,8 @@ def dataScaleUp(input: torch.Tensor):
     """
     
     input[:, :, :9] = input[:, :, :9] * 127
-    input[:, :, 9] = input[:, :, 9] * 200 + 40
-    input[:, :, 10] = input[:, :, 10] + 0.5
-    input[:, :, 11:] = torch.asin(input[:, :, 11:]) * 2 / np.pi
+    input[:,:, INX_BPM] = input[:,:, INX_BPM] * 200 + 40
+    input[:,:, INX_TSIG] = input[:,:, INX_TSIG] + 0.5
 
     return input
 
