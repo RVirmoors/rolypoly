@@ -148,9 +148,9 @@ class ExportRoly(nn_tilde.Module):
 def test_toy(m):
     score = torch.tensor([[[42, 70, 120, 1, 0],
                         [36, 60, 120, 1, 0.5],
-                        [38, 111, 140, 1.5, 0.33],
-                        [42, 105, 140, 1.5, 0.33],
-                        [36, 101, 140, 1.5, 0.66]]])
+                        [38, 111, 140, 1.5, 1.33],
+                        [42, 105, 140, 1.5, 1.33],
+                        [36, 101, 140, 1.5, 1.66]]])
     live_drums = torch.tensor([[[42, 70, 120, 1, 0],
                         [36, 60, 120, 1, 0.5]]])
     guit = torch.tensor([[[666, 0.666, 120, 1, 0]]])
@@ -171,8 +171,8 @@ def test_gmd(m):
     _, x_enc, _= train_gmd.getTrainDataFromY(y)
     x_dec = torch.cat((x_enc[0, :].unsqueeze(0).unsqueeze(0).clone().detach(), torch.zeros(1, 1, 2)), dim=2)
     x_enc = x_enc.unsqueeze(0)
-    print("first x_dec:\n", x_dec[0, :3, 11], x_dec.shape)
-    print("first x_enc:\n", x_enc[0, :3, 11], x_enc.shape)
+    print("first x_dec:\n", x_dec[0, :3, 0], x_dec.shape)
+    print("first x_enc:\n", x_enc[0, :3, 0], x_enc.shape)
     y_hat = torch.zeros(1, 0, 14)
 
     for i in range(x_enc.shape[1]):
