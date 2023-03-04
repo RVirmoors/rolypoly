@@ -330,7 +330,7 @@ class Transformer(nn.Module):
         x_dec = x_dec.clone().detach()
         bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
         bar_num = bar_pos // 1 # get current bar
-        print ("bar_num", bar_num, bar_num.shape)
+        # print ("bar_num", bar_num, bar_num.shape)
         # print ("bar_pos", bar_pos, bar_pos.shape)
 
         x_enc[:, :, data.INX_BAR_POS] = torch.frac(bar_pos) # set bar position to fraction of bar
@@ -365,7 +365,7 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
-        y_hat[:, :, data.INX_BAR_POS] = y_hat[:, :, data.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
+        y_hat[:, -1, data.INX_BAR_POS] = y_hat[:, -1, data.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
         return y_hat
 
     def loss(self, y_hat, y):
