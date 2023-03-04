@@ -369,7 +369,7 @@ class Transformer(nn.Module):
         hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9]) # hits
         pos_loss = F.mse_loss(y_hat[:, :, 9:12], y[:, :, 9:12]) # position
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
-        # print("LOSS\ny_hat\n", y_hat[-1,-1], y_hat.shape, "\ny\n", y[-1,-1], y.shape, "hit_loss", hit_loss, "timing_loss", timing_loss, "pos_loss", pos_loss)
+        print("LOSS\ny_hat\n", y_hat[-1,-2], y_hat.shape, "\ny\n", y[-1,-2], y.shape, "\nhit_loss", hit_loss, "timing_loss", timing_loss, "pos_loss", pos_loss)
         return 3 * hit_loss + pos_loss + 10 * timing_loss # weigh timing loss higher
         
     def from_pretrained(self, path):
