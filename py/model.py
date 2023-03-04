@@ -70,11 +70,11 @@ class PositionalEncoding(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, x):
+    def forward(self, x, x_pos):
         # add positional encoding
         dim_model = x.shape[-1]
         pe = torch.zeros_like(x).to(x.device)
-        position = x[:, :, data.INX_BAR_POS].unsqueeze(-1)
+        position = x_pos[:, :, data.INX_BAR_POS].unsqueeze(-1)
         print("POS", position, position.shape)
         div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device)
         pe[:, :, 0::2] = torch.sin(position * math.pi * 2 * div_term)
@@ -327,17 +327,18 @@ class Transformer(nn.Module):
         #cur_bar = x_enc[:, :, data.INX_BAR_POS] // 1 # get current bar
         #print ("cur_bar", cur_bar, cur_bar.shape)
         #x_enc[:, :, data.INX_BAR_POS] = x_enc[:, :, data.INX_BAR_POS] - cur_bar # subtract current bar from encoder input
+        x_pos = x_enc.clone().detach()
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
             x_enc = self.transformer.in_enc(x_enc)
-            pos_emb_enc = self.transformer.wpe_enc(x_enc) 
+            pos_emb_enc = self.transformer.wpe_enc(x_enc, x_pos) 
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_dec(x_dec)
+        pos_emb_dec = self.transformer.wpe_dec(x_dec, x_pos[:, t:])
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
