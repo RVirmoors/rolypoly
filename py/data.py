@@ -154,7 +154,7 @@ def score_bar_pos(drumtrack, timesig_changes, tempos, timesigs):
             # print("EOB", barStart, barEnd)
         # cur_pos is always in [0, 1)
         cur_pos = (atTime - barStart) / (barEnd - barStart)
-        bar_positions[index] = cur_pos # + cur_bar
+        bar_positions[index] = cur_pos + cur_bar
         #print(atTime, ":", cur_pos + cur_bar)
     return bar_positions
 
