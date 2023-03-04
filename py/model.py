@@ -70,18 +70,17 @@ class PositionalEncoding(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, x, x_pos):
+    def forward(self, x, position):
         # add positional encoding
         dim_model = x.shape[-1]
-        samples = x.shape[1]
-        print("DIM", dim_model, x.shape, x_pos.shape)
+        # print("DIM", dim_model, x.shape, position.shape)
         pe = torch.zeros_like(x).to(x.device)
-        position = x_pos[:, -samples:, data.INX_BAR_POS].unsqueeze(-1)
+        position = position.view(1, -1, 1) # (1, seq_len, 1)
         print("POS", position, position.shape)
-        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device)        
-        pe[:, :, 0::2] = torch.sin(position * math.pi * 2 * div_term)
+        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device).view(1, 1, -1) # (1, 1, dim_model/2)
+        pe[:, :, 0::2] = torch.sin(position * math.pi * 2 * div_term) # (1, seq_len, dim_model/2)
         pe[:, :, 1::2] = torch.cos(position * math.pi * 2 * div_term)
-        #print("pe", pe[-1], pe.shape)
+        # print("pe", pe.shape)
         return pe
 
 class LayerNorm(nn.Module):
@@ -318,29 +317,32 @@ class Transformer(nn.Module):
             if m.padding_idx is not None:
                 nn.init.zeros_(m.weight[m.padding_idx])
 
-    def forward(self, x_enc, x_dec):
+    def forward(self, x_enc, x_dec, t=0):
+        # prediction for the t-th step in the song
         device = x_dec.device
-        b, t = x_dec.shape[:2]
-        assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
+        b, seq_len = x_dec.shape[:2]
+        assert seq_len <= self.block_size, f"Cannot forward sequence of length {seq_len}, block size is only {self.block_size}"
         
         if x_enc.shape[1] == 0: # error handling for empty encoder input
             x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
         
-        #cur_bar = x_enc[:, :, data.INX_BAR_POS] // 1 # get current bar
-        #print ("cur_bar", cur_bar, cur_bar.shape)
-        #x_enc[:, :, data.INX_BAR_POS] = x_enc[:, :, data.INX_BAR_POS] - cur_bar # subtract current bar from encoder input
-        x_pos = x_enc.clone().detach()
+        bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
+        bar_num = bar_pos // 1 # get current bar
+        # print ("bar_num", bar_num, bar_num.shape)
+        # print ("bar_pos", bar_pos, bar_pos.shape)
+
+        x_enc[:, :, data.INX_BAR_POS] = x_enc[:, :, data.INX_BAR_POS] - bar_num # subtract current bar from encoder input
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
             x_enc = self.transformer.in_enc(x_enc)
-            pos_emb_enc = self.transformer.wpe_enc(x_enc, x_pos) 
+            pos_emb_enc = self.transformer.wpe_enc(x_enc, bar_pos) 
             x_enc = x_enc + pos_emb_enc
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_dec(x_dec, x_pos[:, t:])
+        pos_emb_dec = self.transformer.wpe_dec(x_dec, bar_pos[:, t:t+1])
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
@@ -360,7 +362,7 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
-        # y_hat[:, :, 11] = y_hat[:, :, 11] + cur_bar # add current bar back to output
+        # y_hat[:, :, 11] = y_hat[:, :, 11] + bar_num # add current bar back to output
         return y_hat
 
     def loss(self, y_hat, y):
@@ -442,18 +444,18 @@ class Transformer(nn.Module):
             
             _xe = x_enc.clone().detach()
             _xe = data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+2, 0], _xe.shape)
+            print("x_enc:\n", _xe[0, :t+8, 0], _xe.shape)
 
             _xd = xd.clone().detach()
             _xd = data.dataScaleUp(_xd)
             print("x_dec:\n", _xd[0, :, 0], _xd.shape)
 
             # generate prediction
-            y_hat = self(x_enc, xd) # (b, t, n_chans)
+            y_hat = self(x_enc, xd, t) # (b, t, n_chans)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
 
-            # append prediction to x_dec
-            print(x_dec.shape, y_hat.unsqueeze(1).shape)
+            # # append prediction to x_dec
+            # print(x_dec.shape, y_hat.unsqueeze(1).shape)
             x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
 
         return x_dec
