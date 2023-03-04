@@ -75,6 +75,7 @@ def getBatch(split, train_data, val_data, batch_size, block_size):
     x_enc = data.dataScaleDown(x_enc)
     x_dec = data.dataScaleDown(x_dec)
     y     = data.dataScaleDown(y)
+    y[:, :, data.INX_BAR_POS] = torch.frac(y[:, :, data.INX_BAR_POS]) 
 
     if 'cuda' in device:
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
@@ -132,6 +133,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
         model.load_state_dict(checkpoint['model'])
 
     model.to(device)
+    print(model.state_dict())
     
     optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device)
     if load_model:
@@ -174,11 +176,11 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
         for micro_step in range(gradient_accumulation_steps):
-            print("x_enc:\n", X_enc[0, :3, 11], X_enc.shape)
-            print("x_dec:\n", X_dec[0, :3, 11], X_dec.shape)
-            print("y:\n", Y[0, :3, 11], Y.shape)
+            # print("x_enc:\n", X_enc[0, :3, 11], X_enc.shape)
+            # print("x_dec:\n", X_dec[0, :3, 11], X_dec.shape)
+            # print("y:\n", Y[0, :3, 11], Y.shape)
             Y_hat = model(X_enc, X_dec)
-            print("y_hat:\n", Y_hat[0, :3, 11], Y_hat.shape)
+            # print("y_hat:\n", Y_hat[0, :3, 11], Y_hat.shape)
             if torch.all(Y[:, :, 13] == -1.0):
                 Y_hat[:, :, 13] = -1.0 # remove guitar from loss
             loss = model.loss(Y_hat, Y)

@@ -169,7 +169,7 @@ def main(argv):
     meta = pd.read_csv(os.path.join(FLAGS.root_dir, FLAGS.meta))
     meta = removeShortTakes(meta)
 
-    for idx in range(15):#len(meta)):
+    for idx in range(len(meta)):
         file_name = os.path.join(FLAGS.root_dir,
                                         meta.iloc[idx]['midi_filename'])
         csv_filename = file_name[:-3] + 'csv'
