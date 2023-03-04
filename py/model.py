@@ -8,6 +8,7 @@ Very much inspired by A Karpathy's nanoGPT: https://github.com/karpathy/nanoGPT
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
 
 import data
 import time
@@ -352,6 +353,8 @@ class Transformer(nn.Module):
     def loss(self, y_hat, y):
         hit_loss = F.mse_loss(y_hat[:, :, :12], y[:, :, :12]) # hits
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
+        print("YHAT\n", y_hat.shape, y_hat[0,0,:])
+        print("Y\n", y.shape, y[0,0,:])
         return hit_loss + timing_loss
         
     def from_pretrained(self, path):
@@ -431,11 +434,11 @@ class Transformer(nn.Module):
             
             _xe = xe.clone().detach()
             data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+2, 11], _xe.shape)
+            print("x_enc:\n", _xe[0, :t+2, 0], _xe.shape)
 
             _xd = xd.clone().detach()
             data.dataScaleUp(_xd)
-            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
+            print("x_dec:\n", _xd[0, :, 0], _xd.shape)
 
             # generate prediction
             y_hat = self(xe, xd)

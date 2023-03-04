@@ -238,7 +238,7 @@ def readScoreLive(input: torch.Tensor):
 
 def dataScaleDown(input: torch.Tensor):
     """
-    Scale the input data to range [-1, 1].
+    Scale the input data to range [0, 1].
 
     9 velocities from [0, 127]
     bpm from [40, 240]
@@ -248,16 +248,16 @@ def dataScaleDown(input: torch.Tensor):
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
     """       
-    input[:, :, :9] = input[:, :, :9] / 63.5 - 1
-    input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
-    input[:, :, 10] = input[:, :, 10] - 1
-    input[:, :, 11:] = torch.cos(input[:, :, 11:] * np.pi) * -1
- 
+    input[:, :, :9] = input[:, :, :9] / 127
+    input[:, :, 9] = (input[:, :, 9] - 40) / 200
+    input[:, :, 10] = input[:, :, 10] - 0.5
+    input[:, :, 11:] = torch.sin(input[:, :, 11:] * np.pi / 2)
+
     return input
 
 def dataScaleUp(input: torch.Tensor):
     """
-    Scale the input data back up from [-1, 1].
+    Scale the input data back up from [0, 1].
 
     9 velocities from [0, 127]
     bpm from [40, 240]
@@ -268,10 +268,10 @@ def dataScaleUp(input: torch.Tensor):
     output: (batch, vec_size, 14)
     """
     
-    input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
-    input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
-    input[:, :, 10] = input[:, :, 10] + 1
-    input[:, :, 11:] = torch.acos(input[:, :, 11:] * -1) / np.pi
+    input[:, :, :9] = input[:, :, :9] * 127
+    input[:, :, 9] = input[:, :, 9] * 200 + 40
+    input[:, :, 10] = input[:, :, 10] + 0.5
+    input[:, :, 11:] = torch.asin(input[:, :, 11:]) * 2 / np.pi
 
     return input
 
