@@ -7,9 +7,15 @@ data preprocessing methods
 
 import torch
 import numpy as np
+torch.set_printoptions(sci_mode=False, linewidth=200)
 
-X_ENCODER_CHANNELS = 12 # 9 drum channel velocities + bpm, tsig, bar_pos
-X_DECODER_CHANNELS = 14 # above + tau_drum, tau_guitar
+X_ENCODER_CHANNELS = 9 # 9 drum channel velocities
+X_DECODER_CHANNELS = 11 # above + tau_drum, tau_guitar
+X_POS_CHANNELS = 4 # bpm, tsig, bar_pos_sin, bar_pos_cos
+INX_BPM = 0
+INX_TSIG = 1
+INX_BAR_POS_SIN = 2
+INX_BAR_POS_COS = 3
 IN_DRUM_CHANNELS = 5 # hit, vel, tempo, tsig, bar_pos
 IN_ONSET_CHANNELS = 5 # 666, tau_guitar, tempo, tsig, bar_pos
 
@@ -53,10 +59,9 @@ def ms_to_bartime(ms: float, featVec):
         ms = time(s) to be converted [batch, seq_len, times_to_compute]
         featVec = feature of the note we relate to 
     """
-    tempo = featVec[9]
-    timeSig = featVec[10]
+    tempo = featVec[INX_BPM]
+    timeSig = featVec[INX_TSIG]
     barDiff = ms / 1000. * 60. / tempo / timeSig
-
     return barDiff
 
 def bartime_to_ms(bartime, featVec):
@@ -68,8 +73,8 @@ def bartime_to_ms(bartime, featVec):
     """
     if len(bartime.shape) == 2:
         bartime = bartime.unsqueeze(2)
-    tempo = featVec[:, :, 9].unsqueeze(2)
-    timeSig = featVec[:, :, 10].unsqueeze(2)
+    tempo = featVec[:, :, INX_BPM].unsqueeze(2)
+    timeSig = featVec[:, :, INX_TSIG].unsqueeze(2)
     ms = bartime * 1000. / 60. * tempo * timeSig
     if ms.shape[2] == 1:
         ms = ms.view(bartime.shape[0], bartime.shape[1])
@@ -130,9 +135,9 @@ def score_timesig(drumtrack, timesig_changes):
 
 def score_bar_pos(drumtrack, timesig_changes, tempos, timesigs):
     """
-    Return np.list of positions in bar for every note in track
+    Return np.list of positions for every note in track
     """
-    positions_in_bar = np.zeros(len(drumtrack.notes))
+    bar_positions = np.zeros(len(drumtrack.notes))
     first_timesig = timesig_changes[0]
     cur_bar = 0 # current bar
     barStart = atTime = 0
@@ -150,47 +155,53 @@ def score_bar_pos(drumtrack, timesig_changes, tempos, timesigs):
             # print("EOB", barStart, barEnd)
         # cur_pos is always in [0, 1)
         cur_pos = (atTime - barStart) / (barEnd - barStart)
-        positions_in_bar[index] = cur_bar + cur_pos
+        bar_positions[index] = cur_pos # + cur_bar
         #print(atTime, ":", cur_pos + cur_bar)
-    return positions_in_bar
+    return bar_positions
 
 # === FILE I/O ===
 
-def saveYtoCSV(Y, filename: str) -> int:
+def saveYtoCSV(Y, Pos, filename: str) -> int:
     """
-    Save Y tensor to csv file.
-    input: Y (len, feat_vec_size), filename
+    Save Y, Pos tensors to csv file.
+    input: Y (len, feat_vec_size), Pos (len, pos_size), filename
     output: number of rows written
     """
     with open(filename, 'w') as f:
-        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, bar_pos, tau_d, tau_g\n")
-        rows = Y.shape[0]
+        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, tau_d, tau_g, bpm, tsig, bar_pos_sin, bar_pos_cos\n")
+        rows = Y.shape[0] + Pos.shape[0]
         for row in range(rows):
-            f.write(', '.join([str(x) for x in Y[row].tolist()]) + '\n')
+            f.write(', '.join([str(x) for x in Y[row].tolist()]) + ', '.join([str(x) for x in Pos[row].tolist()]) + '\n')
     return rows
 
 def loadYFromCSV(filename: str) -> torch.Tensor:
     """
     Load Y tensor from csv file.
     input: filename
-    output: Y (len, feat_vec_size)
+    output: Y (len, feat_vec_size), Pos (len, pos_size)
     """
     with open(filename, 'r') as f:
         lines = f.readlines()
         rows = len(lines) - 1
         cols = len(lines[1].split(', '))
-        Y = torch.zeros(rows, cols)
+        Y = torch.zeros(rows, X_DECODER_CHANNELS)
+        Pos = torch.zeros(rows, X_POS_CHANNELS)
+        assert cols == X_DECODER_CHANNELS + X_POS_CHANNELS
         for row in range(rows):
-            Y[row] = torch.tensor([float(x) for x in lines[row + 1].split(', ')])
-    return Y
+            Y[row] = torch.tensor([float(x) for x in lines[row + 1].split(', ')][:X_DECODER_CHANNELS])
+            Pos[row] = torch.tensor([float(x) for x in lines[row + 1].split(', ')][X_DECODER_CHANNELS:])
+    return Y, Pos
 
 # === DATA PROCESSING ===
 
-def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
+def readScore(input: torch.Tensor):
     # input: (batch, score_size, 5) from cpp host
-    # output: (batch, score_size, m_enc_dim = 12)
+    # output: (batch, score_size, m_enc_dim = 12), (batch, score_size, m_pos_dim = 4)
+    m_enc_dim = X_ENCODER_CHANNELS
+    m_pos_dim = X_POS_CHANNELS
     pitch_class_map = classes_to_map()
     X_score = torch.zeros(input.shape[0], input.shape[1], m_enc_dim)
+    X_pos = torch.zeros(input.shape[0], input.shape[1], m_pos_dim)
     k = 0 # write index
     # first 9 values are drum velocities
     for i in range(input.shape[0]):
@@ -199,20 +210,24 @@ def readScore(input: torch.Tensor, m_enc_dim: int = X_ENCODER_CHANNELS):
                 hits = pitch_class_map[int(input[i, j, 0])]
                 X_score[i, k, hits] = input[i, j, 1]
                 # next 3 values are tempo, tsig, bar_pos
-                X_score[:, k, 9:12] = input[:, j, 2:5]
+                X_pos[i, k, INX_BPM]  = input[i, j, 2]
+                X_pos[i, k, INX_TSIG] = input[i, j, 3]
+                X_pos[i, k, INX_BAR_POS_SIN] = torch.sin(input[i, j, 4] * 2 * np.pi)
+                X_pos[i, k, INX_BAR_POS_COS] = torch.cos(input[i, j, 4] * 2 * np.pi)
                 if j < input.shape[1] - 1:
                     if input[:, j, 2] != input[:, j+1, 2] or input[:, j, 3] != input[:, j+1, 3] or input[:, j, 4] != input[:, j+1, 4]:
                         # next timestep
                         k += 1
-    # remove all rows with only zeros
+    # remove any rows with only zeros
     mask = ~torch.all(X_score == 0, dim=2).squeeze()
     #print("mask:", mask.dim(), mask.shape, mask)
     if mask.dim() == 0:
-        return X_score
+        return X_score, X_pos
     X_score = X_score[:, mask, :]
-    return X_score
+    X_pos = X_pos[:, mask, :]
+    return X_score, X_pos
 
-def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_enc: torch.Tensor):
+def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_pos: torch.Tensor):
     # add tau_guitar to decoder input
     # input: (batch, 1, 5) from cpp host
     # output: (batch, vec_size, 14)
@@ -221,61 +236,60 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_enc: torch.Tensor)
     if input[:, 0, 0] != 666:
         return x_dec
     i = x_dec.shape[1] - 1
-    while i >= 0:
-        print("LOOKING FOR MATCH", input[:, 0, 2:5], x_enc[:, i, 9:12])
-        if torch.allclose(input[:, 0, 2:5], x_enc[:, i, 9:12]):
-            x_dec[:, i, 13] = ms_to_bartime(input[:, 0, 1], x_enc[:, i].squeeze())   # tau_guitar
+    while i >= 0: # TODO: binary search? make this more efficient
+        print("LOOKING FOR MATCH", input[:, 0, 2:5], x_pos[:, i])
+        match_condition = torch.allclose(input[:, 0, 2:4], x_pos[:, i, :2]) and torch.allclose(torch.sin(input[:, 0, 4] * 2 * np.pi), x_pos[:, i, INX_BAR_POS_SIN]) and torch.allclose(torch.cos(input[:, 0, 4] * 2 * np.pi), x_pos[:, i, INX_BAR_POS_COS])
+
+        if match_condition:
+            x_dec[:, i, 13] = ms_to_bartime(input[:, 0, 1], x_pos[:, i].squeeze())   # tau_guitar
             print("FOUND MATCH", x_dec[:, i, 13])
             return x_dec
         i -= 1
     return x_dec
 
 def readScoreLive(input: torch.Tensor):
+    # add two zeros for decoder input
     # input: (batch, vec_size, 5) from cpp host
-    # output: (batch, vec_size, 14)
-    live_notes = readScore(input) # (batch, vec_size, 12)
+    # output: (batch, vec_size, 11), (batch, vec_size, 4)
+    live_notes, positions = readScore(input) # (batch, vec_size, 9)
     live_notes = torch.cat((live_notes, torch.zeros(
-        live_notes.shape[0], live_notes.shape[1], 2)), dim=2) # (batch, vec_size, 14)
-    return live_notes
+        live_notes.shape[0], live_notes.shape[1], 2)), dim=2) # (batch, vec_size, 11)
+    return live_notes, positions
 
-def dataScaleDown(input: torch.Tensor):
+def dataScaleDown(input: torch.Tensor , pos: torch.Tensor):
     """
     Scale the input data to range [-1, 1].
 
     9 velocities from [0, 127]
     bpm from [40, 240]
     tsig from [0.5, 1.5]
-    tau_d, tau_g from [0, 1]
 
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
     """       
     input[:, :, :9] = input[:, :, :9] / 63.5 - 1
-    input[:, :, 9] = (input[:, :, 9] - 40) / 100 - 1
-    input[:, :, 10] = input[:, :, 10] - 1
-    # input[:, :, 12:] = input[:, :, 12:] * 2 - 1 # tau_d, tau_g are bartimes
+    pos[:,:, INX_BPM] = (pos[:,:, INX_BPM] - 40) / 100 - 1
+    pos[:,:, INX_TSIG] = pos[:,:, INX_TSIG] - 1
 
-    return input
+    return input, pos
 
-def dataScaleUp(input: torch.Tensor):
+def dataScaleUp(input: torch.Tensor, pos: torch.Tensor):
     """
     Scale the input data back up from [-1, 1].
 
     9 velocities to [0, 127]
     bpm to [40, 240]
     tsig to [0.5, 1.5]
-    tau_d, tau_g to [0, 1]
 
     input: (batch, vec_size, 14)
     output: (batch, vec_size, 14)
     """
     
     input[:, :, :9] = (input[:, :, :9] + 1) * 63.5
-    input[:, :, 9] = (input[:, :, 9] + 1) * 100 + 40
-    input[:, :, 10] = input[:, :, 10] + 1
-    # input[:, :, 12:] = (input[:, :, 12:] + 1) / 2
+    pos[:,:, INX_BPM] = (pos[:,:, INX_BPM] + 1) * 100 + 40
+    pos[:,:, INX_TSIG] = pos[:,:, INX_TSIG] + 1
 
-    return input
+    return input, pos
 
 
 # === TESTS ===
@@ -290,16 +304,13 @@ if __name__ == '__main__':
                             [36, 101, 140, 1.5, 0.66]]])
     test0 = torch.tensor([[[0, 0, 0, 0, 0]]])
     test1 = torch.tensor([[[36, 60, 120, 1, 0.5]]])
-    x = readScore(test)
-    print("readScore shape =", x.shape)
+    x, pos = readScore(test)
+    print("readScore shape =", x.shape, ":", pos.shape)
     x = torch.cat((x, torch.randn(x.shape[0], x.shape[1], 2)), dim=2)
 
     x_original = x.clone().detach()
-    dataScaleUp(dataScaleDown(x))
+    x, _ = dataScaleUp(dataScaleDown(x, pos)[0], pos)
 
-    print(x_original, x)
-    tolerance = 1e-3
+    print(x_original, "\n====\n", x)
+    tolerance = 1e-100
     assert torch.allclose(x, x_original, atol=tolerance)
-
-    feat = x.squeeze(0)
-    print(feat)
