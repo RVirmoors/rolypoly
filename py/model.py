@@ -73,10 +73,12 @@ class PositionalEncoding(nn.Module):
     def forward(self, x, x_pos):
         # add positional encoding
         dim_model = x.shape[-1]
+        samples = x.shape[1]
+        print("DIM", dim_model, x.shape, x_pos.shape)
         pe = torch.zeros_like(x).to(x.device)
-        position = x_pos[:, :, data.INX_BAR_POS].unsqueeze(-1)
+        position = x_pos[:, -samples:, data.INX_BAR_POS].unsqueeze(-1)
         print("POS", position, position.shape)
-        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device)
+        div_term = torch.exp(torch.arange(0, dim_model, 2).float() * (-math.log(128.0) / dim_model)).to(x.device)        
         pe[:, :, 0::2] = torch.sin(position * math.pi * 2 * div_term)
         pe[:, :, 1::2] = torch.cos(position * math.pi * 2 * div_term)
         #print("pe", pe[-1], pe.shape)
