@@ -62,8 +62,21 @@ class Config:
     d_model = 16 # 128 # number of channels in the model
     block_size = 16 # number of hits in a block
     dropout = 0.15 # dropout rate
+    max_seq_len = 1000 # max sequence length
 
 # === HELPER CLASSES FOR TRANSFORMER ===
+
+class PositionalEncodingSimple(nn.Module):
+    def __init__(self, config) -> None:
+        super().__init__()
+        self.max_seq_len = config.max_seq_len
+        self.embed = nn.Embedding(config.max_seq_len, config.d_model)
+
+    def forward(self, x, t = 0):
+        #print("embedding from", t, "to", self.max_seq_len)
+        pos = torch.arange(t, self.max_seq_len, dtype=torch.long).to(x.device).unsqueeze(0)
+        #print("pos", pos.shape, pos[:, :4])
+        return self.embed(pos)
 
 class PositionalEncoding(nn.Module):
     """ Positional Encoding """
@@ -287,13 +300,13 @@ class Transformer(nn.Module):
         elif self.arch == 'ed':
             self.transformer = nn.ModuleDict(dict(
                 in_enc = nn.Linear(enc_in_chans, config.d_model),               
-                wpe_enc = PositionalEncoding(),
+                wpe_enc = PositionalEncodingSimple(config),
                 drop_enc = nn.Dropout(config.dropout),
                 h_enc = nn.ModuleList([EncoderBlock(config) for _ in range(config.n_layers)]),
                 proj_enc = FeedForward(config.d_model),
 
                 in_dec = nn.Linear(in_out_chans, config.d_model),
-                wpe_dec = PositionalEncoding(),
+                wpe_dec = PositionalEncodingSimple(config),
                 drop_dec = nn.Dropout(config.dropout),
                 h_dec = nn.ModuleList([DecoderBlock(config) for _ in range(config.n_layers)]),
 
@@ -339,18 +352,22 @@ class Transformer(nn.Module):
         bp = bar_pos.detach().clone()
         x_enc[:, :, data.INX_BAR_POS] = torch.frac(bp) # set bar position to fraction of bar
         x_dec[:, :, data.INX_BAR_POS] = torch.frac(bp[:,:seq_len]) # set bar position to fraction of bar
+        x_enc[:, :, data.INX_BAR_POS] = torch.cos(x_enc[:, :, data.INX_BAR_POS] * math.pi) # set bar position to cos of fraction of bar
+        x_dec[:, :, data.INX_BAR_POS] = torch.cos(x_dec[:, :, data.INX_BAR_POS] * math.pi) # set bar position to cos of fraction of bar
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
             x_enc = self.transformer.in_enc(x_enc)
-            pos_emb_enc = self.transformer.wpe_enc(x_enc, bar_pos) 
-            x_enc = x_enc + pos_emb_enc
+            #pos_emb_enc = self.transformer.wpe_enc(x_enc, bar_pos) 
+            pos_emb_enc = self.transformer.wpe_enc(x_enc)
+            x_enc = x_enc + pos_emb_enc[:, :x_enc.shape[1]]
             x_enc = self.transformer.drop_enc(x_enc)
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_dec(x_dec, bar_pos_dec)
-        x_dec = x_dec + pos_emb_dec
+        # pos_emb_dec = self.transformer.wpe_dec(x_dec, bar_pos_dec)
+        pos_emb_dec = self.transformer.wpe_dec(x_dec, t)
+        x_dec = x_dec + pos_emb_dec[:, :x_dec.shape[1]]
         x_dec = self.transformer.drop_dec(x_dec)
         
         # transformer blocks (ENCODER)
@@ -369,6 +386,7 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
+        y_hat[:, -1, data.INX_BAR_POS] = torch.acos(y_hat[:, -1, data.INX_BAR_POS]) / math.pi # convert bar position back to fraction of bar
         y_hat[:, -1, data.INX_BAR_POS] = y_hat[:, -1, data.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
         return y_hat
 
