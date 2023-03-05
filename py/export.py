@@ -167,27 +167,28 @@ def test_toy(m):
     print("guit -> dec: ", out, out.shape)
 
 def test_gmd(m):
-    y = data.loadYFromCSV('gmd.csv')
-    _, x_enc, _= train_gmd.getTrainDataFromY(y)
-    x_dec = torch.cat((x_enc[0, :].unsqueeze(0).unsqueeze(0).clone().detach(), torch.zeros(1, 1, 2)), dim=2)
-    x_enc = x_enc.unsqueeze(0)
-    print("first x_dec:\n", x_dec[0, :3, 0], x_dec.shape)
-    print("first x_enc:\n", x_enc[0, :3, 0], x_enc.shape)
-    y_hat = torch.zeros(1, 0, 14)
+    x_take = data.loadX_takeFromCSV('gmd.csv')
+    xd, xe, y = train_gmd.getTrainDataFromX_take(x_take)
+    x_dec = xd[0].unsqueeze(0).unsqueeze(0) #torch.cat((xe[0, :].unsqueeze(0).unsqueeze(0).clone().detach(), torch.zeros(1, 1, 2)), dim=2)
+    x_enc = xe.unsqueeze(0)
+    y = y.unsqueeze(0)
+    print("first x_dec:\n", x_dec[0, :3], x_dec.shape)
+    print("first x_enc:\n", x_enc[0, :3], x_enc.shape)
 
-    for i in range(x_enc.shape[1]):
+    for i in range(4):#x_enc.shape[1]):
         xd = x_dec.clone().detach()
         xe = x_enc.clone().detach()
         data.dataScaleDown(xd)
         data.dataScaleDown(xe)
         x_dec = m.pretrained.generate(xe, xd, 1)
         data.dataScaleUp(x_dec)
-        y_hat = torch.cat((y_hat, x_dec[:, -1:, :]), dim=1)
         x_dec[:, -1:, 13] = 0
+        x_dec[:, -1, 9:12] = x_enc[:, i+1, 9:12]
 
         xd = x_dec.clone().detach()
+        print("x_dec final out:\n", xd[:,-1] * 100, xd.shape)
+        print("y:\n", y[:,i] * 100, y.shape)
         xd[:, :, 12:14] = data.bartime_to_ms(xd[:, :, 12:14], xd)
-        print("x_dec final out:\n", xd[:,:,11], xd.shape)
 
 # ==================== MAIN =====================
 

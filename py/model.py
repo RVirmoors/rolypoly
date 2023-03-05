@@ -458,11 +458,11 @@ class Transformer(nn.Module):
 
             _xe = x_enc.clone().detach()
             _xe = data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+8, 11], _xe.shape)
+            #print("x_enc:\n", _xe[0, :t+8, 0], "...", _xe.shape)
 
             _xd = xd.clone().detach()
             _xd = data.dataScaleUp(_xd)
-            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
+            #print("x_dec:\n", _xd[0, :, 0], _xd.shape)
 
             # generate prediction
             y_hat = self(x_enc, xd) # (b, t, n_chans)

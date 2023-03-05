@@ -184,7 +184,7 @@ def main(argv):
                 print("Skipping", csv_filename, "because it's too short.")
                 continue
 
-        xd, xe, y= getTrainDataFromX_take(x_take)
+        xd, xe, y = getTrainDataFromX_take(x_take)
 
         if FLAGS.final or meta.iloc[idx]['split'] == 'train':
             train_data['X_dec'].append(xd)
