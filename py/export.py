@@ -182,12 +182,13 @@ def test_gmd(m):
         data.dataScaleDown(xe)
         x_dec = m.pretrained.generate(xe, xd, 1)
         data.dataScaleUp(x_dec)
-        y_hat = torch.cat((y_hat, x_dec[:, -1:, :]), dim=1)
         x_dec[:, -1:, 13] = 0
+        x_dec[:, -1, 9:12] = x_enc[:, i+1, 9:12]
 
         xd = x_dec.clone().detach()
+        print("x_dec final out:\n", xd[:,-1] * 100, xd.shape)
+        print("y:\n", y[:,i] * 100, y.shape)
         xd[:, :, 12:14] = data.bartime_to_ms(xd[:, :, 12:14], xd)
-        print("x_dec final out:\n", xd[:,:,11], xd.shape)
 
 # ==================== MAIN =====================
 
