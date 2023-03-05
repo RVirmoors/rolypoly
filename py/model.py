@@ -58,10 +58,10 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
-    n_layers = 1 # 10 # number of block layers
-    d_model = 32 # 128 # number of channels in the model
+    n_layers = 6 # 10 # number of block layers
+    d_model = 16 # 128 # number of channels in the model
     block_size = 16 # number of hits in a block
-    dropout = 0.4 # dropout rate
+    dropout = 0.15 # dropout rate
 
 # === HELPER CLASSES FOR TRANSFORMER ===
 
@@ -355,7 +355,7 @@ class Transformer(nn.Module):
                 x_enc = block(x_enc)
             enc_out = self.transformer.proj_enc(x_enc) # (b, t, n_decoder_chans)
         else:
-            enc_out = torch.zeros_like(x_enc, device=device)
+            enc_out = self.transformer.proj_enc(torch.zeros_like(x_dec, device=device))
 
         # enc_out = enc_out + pos_emb_dec # TODO: check if this might help
         
@@ -373,7 +373,7 @@ class Transformer(nn.Module):
         pos_loss = F.mse_loss(y_hat[:, :, 9:12], y[:, :, 9:12]) # position
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
         # print("LOSS\ny_hat\n", y_hat[-1,-2], y_hat.shape, "\ny\n", y[-1,-2], y.shape, "\nhit_loss", hit_loss, "timing_loss", timing_loss, "pos_loss", pos_loss)
-        return 3 * hit_loss + 0.2 * pos_loss + 10 * timing_loss # weigh timing loss higher
+        return hit_loss + 0.00001 * pos_loss + 10 * timing_loss # weigh timing loss higher
         
     def from_pretrained(self, path):
         self.load_state_dict(torch.load(path))
@@ -447,7 +447,7 @@ class Transformer(nn.Module):
 
             _xe = x_enc.clone().detach()
             _xe = data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+8, 11], _xe.shape)
+            print("x_enc:\n", _xe[0, :t+8, 11], "...", _xe.shape)
 
             _xd = xd.clone().detach()
             _xd = data.dataScaleUp(_xd)
