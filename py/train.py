@@ -18,8 +18,8 @@ import data # data helper methods
 
 # I/O
 out_dir = 'out'
-eval_interval = 40
-log_interval = 20
+eval_interval = 25
+log_interval = 10
 eval_iters = 75 # 200
 eval_only = False # if True, script exits right after the first eval
 os.makedirs(out_dir, exist_ok=True)
