@@ -142,7 +142,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
         print("compiling the model... (takes ~a minute)")
         m = torch.compile(m) # requires PyTorch 2.0
 
-    print(model.state_dict())
+    # print(model.state_dict())
     
     scaler = torch.cuda.amp.GradScaler(enabled = (dtype == 'float16'))
 
