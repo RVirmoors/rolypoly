@@ -58,11 +58,11 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
-    n_layers = 1 # 10 # number of block layers
-    d_model = 32 # 128 # number of channels in the model
+    n_layers = 6 # 10 # number of block layers
+    d_model = 64 # 128 # number of channels in the model
     d_ff = 128 # 512 # number of channels in the feedforward layer
     block_size = 16 # number of hits in a block
-    dropout = 0.4 # dropout rate
+    dropout = 0.15 # dropout rate
 
 # === HELPER CLASSES FOR TRANSFORMER ===
 
@@ -300,6 +300,7 @@ class Transformer(nn.Module):
                 wpe_enc = PositionalEncoding(),
                 drop_enc = nn.Dropout(config.dropout),
                 h_enc = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model=config.d_model, nhead=config.d_model // 4, dropout=config.dropout, dim_feedforward=config.d_ff, batch_first=True, norm_first=True), config.n_layers),
+                out_enc = nn.Linear(config.d_model, config.d_model),
 
                 in_dec = nn.Linear(in_out_chans, config.d_model),
                 wpe_dec = PositionalEncoding(),
@@ -360,7 +361,8 @@ class Transformer(nn.Module):
         
         # transformer blocks (ENCODER)
         if self.arch == 'ed':
-            enc_out = self.transformer.h_enc(x_enc)
+            x_enc = self.transformer.h_enc(x_enc)
+            enc_out = self.transformer.out_enc(x_enc)
         else:
             enc_out = torch.zeros_like(x_enc, device=device)
 
