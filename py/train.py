@@ -172,7 +172,8 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
                     }
                     print(f"==== saving checkpoint to {out_dir} =============================")
                     torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
-            print("Q attention:\n", model.transformer.proj_enc[0])
+            # print("Q attention:\n", model.transformer.proj_enc, model.transformer.proj_enc.c_fc.weight, model.transformer.proj_enc.c_proj.weight)
+            # print("K attention:\n", model.transformer.h_dec[0].attn.c_proj.weight)
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
