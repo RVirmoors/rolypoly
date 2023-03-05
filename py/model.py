@@ -112,7 +112,7 @@ class SelfAttention(nn.Module):
                                             .view(1, 1, config.block_size, config.block_size))
 
         self.n_chans = config.d_model       # 128
-        self.n_heads = config.d_model // 32 # 4
+        self.n_heads = config.d_model // 4 # 4
 
         # key, query, value projections for all heads, but in a batch
         self.c_attn = nn.Linear(self.n_chans, 3 * self.n_chans, bias=False)
@@ -168,7 +168,7 @@ class CrossAttention(nn.Module):
         self.dropout = config.dropout
         self.block_size = config.block_size
         self.n_chans = config.d_model       # 128
-        self.n_heads = config.d_model // 32 # 4
+        self.n_heads = config.d_model // 4 # 4
 
         # query, key, value projections for all heads, but in a batch
         # query is from previous decoder layer, key and value are from encoder output
