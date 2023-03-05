@@ -133,7 +133,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
         model.load_state_dict(checkpoint['model'])
 
     model.to(device)
-    print(model.state_dict())
+    # print(model.state_dict())
     
     optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device)
     if load_model:
@@ -172,6 +172,7 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
                     }
                     print(f"==== saving checkpoint to {out_dir} =============================")
                     torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+            print("Q attention:\n", model.transformer.proj_enc[0])
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16

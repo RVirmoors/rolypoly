@@ -318,7 +318,8 @@ class Transformer(nn.Module):
             if m.padding_idx is not None:
                 nn.init.zeros_(m.weight[m.padding_idx])
 
-    def forward(self, x_enc, x_dec):
+    def forward(self, x_enc, x_dec, t = 0):
+        # predicting with x_dec starting at timestep t in the song
         device = x_dec.device
         b, seq_len = x_dec.shape[:2]
         assert seq_len <= self.block_size, f"Cannot forward sequence of length {seq_len}, block size is only {self.block_size}"
@@ -329,12 +330,15 @@ class Transformer(nn.Module):
         x_enc = x_enc.clone()
         x_dec = x_dec.clone()
         bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
-        bar_num = bar_pos // 1 # get current bar
+        bar_num = bar_pos // 1 # get bar numbers
         # print ("bar_num", bar_num, bar_num.shape)
-        # print ("bar_pos", bar_pos, bar_pos.shape)
+        #print ("bar_pos", bar_pos, bar_pos.shape)
+        bar_pos_dec = bar_pos.detach().clone()[:, t:]
+        #print("bar_pos_dec", bar_pos_dec, bar_pos_dec.shape)
 
-        x_enc[:, :, data.INX_BAR_POS] = torch.frac(bar_pos) # set bar position to fraction of bar
-        x_dec[:, :, data.INX_BAR_POS] = torch.frac(bar_pos[:,:seq_len]) # set bar position to fraction of bar
+        bp = bar_pos.detach().clone()
+        x_enc[:, :, data.INX_BAR_POS] = torch.frac(bp) # set bar position to fraction of bar
+        x_dec[:, :, data.INX_BAR_POS] = torch.frac(bp[:,:seq_len]) # set bar position to fraction of bar
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
@@ -345,7 +349,7 @@ class Transformer(nn.Module):
 
         # add position embedding (DECODER)
         x_dec = self.transformer.in_dec(x_dec)
-        pos_emb_dec = self.transformer.wpe_dec(x_dec, bar_pos)
+        pos_emb_dec = self.transformer.wpe_dec(x_dec, bar_pos_dec)
         x_dec = x_dec + pos_emb_dec
         x_dec = self.transformer.drop_dec(x_dec)
         
@@ -443,7 +447,7 @@ class Transformer(nn.Module):
             # crop inputs to block size
             t = x_dec.size(1) - 1 # current time step
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
-            print("==current time step: ", t, "==")
+            print("==current time step:", t, "==")
 
             _xe = x_enc.clone().detach()
             _xe = data.dataScaleUp(_xe)
@@ -454,7 +458,9 @@ class Transformer(nn.Module):
             print("x_dec:\n", _xd[0, :, 11], _xd.shape)
 
             # generate prediction
-            y_hat = self(x_enc, xd) # (b, t, n_chans)
+            dec_start = 0 if t < self.block_size else t - self.block_size + 1
+            # print("dec_start", dec_start, "t", t, "block_size", self.block_size)
+            y_hat = self(x_enc, xd, dec_start) # (b, t, n_chans)
             y_hat = y_hat[:, -1, :] # latest prediction = next step (b, n_chans)
 
             # # append prediction to x_dec
@@ -485,4 +491,4 @@ if __name__ == '__main__':
     print("GENERATE:\n", m.generate(x_enc, x_dec, notes.shape[1]))
     print(time.time() - start, "s")
 
-    print(m.state_dict())
+    # print(m.state_dict())

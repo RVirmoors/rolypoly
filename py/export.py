@@ -175,7 +175,7 @@ def test_gmd(m):
     print("first x_dec:\n", x_dec[0, :3], x_dec.shape)
     print("first x_enc:\n", x_enc[0, :3], x_enc.shape)
 
-    for i in range(4):#x_enc.shape[1]):
+    for i in range(24):#x_enc.shape[1]):
         xd = x_dec.clone().detach()
         xe = x_enc.clone().detach()
         data.dataScaleDown(xd)
