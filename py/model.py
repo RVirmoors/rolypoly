@@ -340,8 +340,8 @@ class Transformer(nn.Module):
         if x_enc.shape[1] == 0: # error handling for empty encoder input
             x_enc = torch.zeros((x_enc.shape[0], 1, x_enc.shape[2]), device=device)
         
-        x_enc = x_enc.clone()
-        x_dec = x_dec.clone()
+        x_enc = x_enc.clone().detach()
+        x_dec = x_dec.clone().detach()
         bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
         bar_num = bar_pos // 1 # get bar numbers
         # print ("bar_num", bar_num, bar_num.shape)
