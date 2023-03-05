@@ -18,9 +18,9 @@ import data # data helper methods
 
 # I/O
 out_dir = 'out'
-eval_interval = 66
+eval_interval = 40
 log_interval = 20
-eval_iters = 80 # 200
+eval_iters = 75 # 200
 eval_only = False # if True, script exits right after the first eval
 os.makedirs(out_dir, exist_ok=True)
 
@@ -99,8 +99,8 @@ def estimate_loss(model, train_data, val_data, batch_size, block_size):
             # print("X_dec", X_dec[0, :5, 0], X_dec.shape)
 
             y_hat = model(X_enc, X_dec)
-            if torch.all(Y[:, :, 13] == -1.0):
-                y_hat[:, :, 13] = -1.0 # remove guitar from loss
+            if torch.all(Y[:, :, 13] == 0.0):
+                y_hat[:, :, 13] = 0.0 # remove guitar from loss
 
             # _yh = y_hat.clone().detach()
             # _y = Y.clone().detach()
@@ -181,8 +181,8 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
             # print("y:\n", Y[0, :3, 11], Y.shape)
             Y_hat = model(X_enc, X_dec)
             # print("y_hat:\n", Y_hat[0, :3, 11], Y_hat.shape)
-            if torch.all(Y[:, :, 13] == -1.0):
-                Y_hat[:, :, 13] = -1.0 # remove guitar from loss
+            if torch.all(Y[:, :, 13] == 0.0):
+                Y_hat[:, :, 13] = 0.0 # remove guitar from loss
             loss = model.loss(Y_hat, Y)
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
             X_enc, X_dec, Y = getBatch('train', train_data, val_data, batch_size, block_size)
