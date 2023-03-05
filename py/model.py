@@ -386,8 +386,8 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
-        y_hat[:, -1, data.INX_BAR_POS] = torch.acos(y_hat[:, -1, data.INX_BAR_POS]) / math.pi # convert bar position back to fraction of bar
-        y_hat[:, -1, data.INX_BAR_POS] = y_hat[:, -1, data.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
+        # y_hat[:, -1, data.INX_BAR_POS] = torch.acos(y_hat[:, -1, data.INX_BAR_POS]) / math.pi # convert bar position back to fraction of bar
+        # y_hat[:, -1, data.INX_BAR_POS] = y_hat[:, -1, data.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
         return y_hat
 
     def loss(self, y_hat, y):
