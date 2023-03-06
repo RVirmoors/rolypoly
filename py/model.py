@@ -58,7 +58,7 @@ class Swing(nn.Module):
 @dataclass
 class Config:
     arch = 'ed' # 'd' for decoder-only, 'ed' for encoder-decoder
-    n_layers = 8 # 10 # number of block layers
+    n_layers = 6 # 10 # number of block layers
     d_model = 64 # 128 # number of channels in the model
     block_size = 16 # number of hits in a block
     dropout = 0.15 # dropout rate
@@ -391,8 +391,16 @@ class Transformer(nn.Module):
         return y_hat
 
     def loss(self, y_hat, y):
-        y_hat[:,:,:9] = torch.sigmoid(y_hat[:,:,:9]) # apply sigmoid to hit predictions
-        hit_loss = F.binary_cross_entropy_with_logits(y_hat[:, :, :9], y[:, :, :9]) # hits
+        # for hits where y is 0, weight the loss by 0.1
+        # for hits where y is 1, weight the loss by 1
+        
+        _y = y.clone().detach()
+        mask = torch.where(_y[:, :, :9] == 0, 0.1, 1.0) # create mask
+        hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9], reduction='none') # calculate binary cross entropy loss
+        weighted_hit_loss = hit_loss * mask # apply weighting
+        hit_loss = torch.mean(weighted_hit_loss) # calculate mean of weighted loss
+
+        #hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9]) # hits
         pos_loss = F.mse_loss(y_hat[:, :, 9:12], y[:, :, 9:12]) # position
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
         #print("LOSS\ny_hat\n", y_hat[-1,-2], y_hat.shape, "\ny\n", y[-1,-2], y.shape, "\nhit_loss", hit_loss, "timing_loss", 100 * timing_loss, "pos_loss", 0.1 * pos_loss)
