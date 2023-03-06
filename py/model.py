@@ -394,11 +394,11 @@ class Transformer(nn.Module):
         return y_hat
 
     def loss(self, y_hat, y):
-        # for hits where y is 0, weight the loss by 0.1
+        # for hits where y is 0, weight the loss by 0.2
         # for hits where y is 1, weight the loss by 1
         
         _y = y.clone().detach()
-        mask = torch.where(_y[:, :, :9] == 0, 0.1, 1.0) # create mask
+        mask = torch.where(_y[:, :, :9] == 0, 0.2, 1.0) # create mask
         hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9], reduction='none') # calculate binary cross entropy loss
         weighted_hit_loss = hit_loss * mask # apply weighting
         hit_loss = torch.mean(weighted_hit_loss) # calculate mean of weighted loss
