@@ -83,6 +83,11 @@
 			<description>Onset detection latency (samples) </description>
 		</attribute>
 
+		<attribute name='score_filter' get='1' set='1' type='long' size='1' >
+			<digest>Filter out notes not in the score </digest>
+			<description>Filter out notes not in the score </description>
+		</attribute>
+
 	</attributelist>
 
 

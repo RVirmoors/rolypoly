@@ -1,5 +1,5 @@
 // 2023 rvirmoors
-// adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
+// based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 
 #define DEBUG true
 
@@ -161,12 +161,15 @@ public:
   attribute<int> latency{this, "latency", 512,
                          description{"Onset detection latency (samples)"}};
 
+  attribute<bool> score_filter{this, "score_filter", true,
+                         description{"Filter out notes not in the score"}};
+
   // BOOT STAMP
   message<> maxclass_setup{
       this, "maxclass_setup",
       [this](const c74::min::atoms &args, const int inlet) -> c74::min::atoms {
         cout << "rolypoly~ v" << VERSION << " - 2023 Grigore Burloiu - rvirmoors.github.io" << endl;
-        cout << "adapted from nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos" << endl;
+        cout << "based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos" << endl;
         return {};
       }};
 
@@ -245,7 +248,13 @@ public:
       torch::Tensor input_tensor = torch::randn({1, 1, IN_DIM});
       for (int i = 0; i < 7; i++) {
           auto start = std::chrono::high_resolution_clock::now();
-          m_model.get_model().forward({input_tensor}).toTensor();
+          try {
+              m_model.get_model().forward({ input_tensor }).toTensor();
+          }
+          catch (std::exception& e)
+          {
+              cerr << e.what() << endl;
+          }
           auto end = std::chrono::high_resolution_clock::now();
           duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
           if (DEBUG) cout << "step " << i+1 << "/7: " << duration.count() / 1000. << " ms" << endl;
@@ -676,11 +685,11 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
   if (m_model.is_loaded()) {
     try {
       modelOut = m_model.get_model().forward({input_tensor}).toTensor();
+      if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
     } catch (const std::exception& e) {
       std::cerr << e.what() << std::endl;
     }
   }
-  if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
   getTauFromModel();
 }
 
@@ -779,8 +788,13 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   }
   // send the onset to the model
   if (DEBUG) {
-    auto output = m_model.get_model().forward({input_tensor}).toTensor();
-    cout << "ONSET x_dec scaled down:\n" << output << endl;
+      try {
+          auto output = m_model.get_model().forward({ input_tensor }).toTensor();
+          cout << "ONSET x_dec scaled down:\n" << output << endl;
+      } catch (std::exception& e)
+      {
+          cerr << e.what() << endl;
+      }
   } else {
     m_model.get_model().forward({input_tensor}).toTensor();
   }

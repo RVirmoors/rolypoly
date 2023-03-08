@@ -32,6 +32,8 @@ class ExportRoly(nn_tilde.Module):
         self.register_attribute('generate', False)
         # finetune: train the model based on the just ended performance
         self.register_attribute('finetune', False)
+        # score_filter: play only notes that appear in the score (x_enc)
+        self.register_attribute('score_filter', True)
 
         # REGISTER BUFFERS
         self.register_buffer('x_enc', torch.zeros(1, 0, 12)) # score
@@ -69,6 +71,10 @@ class ExportRoly(nn_tilde.Module):
     def get_finetune(self) -> bool:
         return self.finetune[0]
 
+    @torch.jit.export
+    def get_score_filter(self) -> bool:
+        return self.score_filter[0]
+
     # defining attribute setters
     @torch.jit.export
     def set_play(self, value: bool):
@@ -88,6 +94,11 @@ class ExportRoly(nn_tilde.Module):
     @torch.jit.export
     def set_finetune(self, value: bool):
         self.finetune = (value,)
+        return 0
+
+    @torch.jit.export
+    def set_score_filter(self, value: bool):
+        self.score_filter = (value,)
         return 0
 
     # definition of the main method
@@ -127,6 +138,9 @@ class ExportRoly(nn_tilde.Module):
                 data.dataScaleUp(self.x_dec)
                 # update y_hat and x_dec with latest predictions
                 self.y_hat = torch.cat((self.y_hat, self.x_dec[:, -num_samples:, :]), dim=1)
+                if self.score_filter[0] and self.x_enc.shape[1]:
+                    # set non x_enc notes to zero
+                    self.y_hat[:,:,:self.x_enc.shape[2]][self.x_enc[:,:self.y_hat.shape[1]] == 0] = 0
                 # reset x_dec[13] to 0, waiting for live tau_guitar
                 self.x_dec[:, -num_samples:, 13] = 0
                 # return predictions
@@ -184,6 +198,8 @@ def test_gmd(m):
         data.dataScaleUp(x_dec)
         x_dec[:, -1:, 13] = 0
         x_dec[:, -1, 9:12] = x_enc[:, i+1, 9:12]
+        # set non x_enc notes to zero
+        x_dec[:,:,:x_enc.shape[2]][x_enc[:,:x_dec.shape[1]] == 0] = 0
 
         xd = x_dec.clone().detach()
         print("x_dec final out:\n", xd[:,-1], xd.shape)

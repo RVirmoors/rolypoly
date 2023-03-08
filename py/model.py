@@ -387,13 +387,13 @@ class Transformer(nn.Module):
             x_dec = block(x_dec, enc_out)
         y_hat = self.transformer.ln_f(x_dec)
 
-        y_hat = self.transformer.head(y_hat)
+        yh = self.transformer.head(y_hat).clone()
         # y_hat[:, -1, constants.INX_BAR_POS] = torch.acos(y_hat[:, -1, constants.INX_BAR_POS]) / math.pi # convert bar position back to fraction of bar
         # y_hat[:, -1, constants.INX_BAR_POS] = y_hat[:, -1, constants.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
-        y_hat[:,:,:9] = torch.sigmoid(y_hat[:,:,:9]) # apply sigmoid to hits
-        y_hat[:, :, 9:12] = torch.tanh(y_hat[:, :, 9:12]) # apply tanh to position
-        y_hat[:, :, 12:] = torch.tanh(y_hat[:, :, 12:]) # apply tanh to timing
-        return y_hat
+        yh[:,:,:9] = torch.sigmoid(yh[:,:,:9]) # apply sigmoid to hits
+        yh[:, :, 9:12] = torch.tanh(yh[:, :, 9:12]) # apply tanh to position
+        yh[:, :, 12:] = torch.tanh(yh[:, :, 12:]) # apply tanh to timing
+        return yh
 
     def loss(self, y_hat, y):
         # for hits where y is 0, weight the loss by 0.2
