@@ -167,7 +167,7 @@ def test_toy(m):
                         [36, 101, 140, 1.5, 1.66]]])
     live_drums = torch.tensor([[[42, 70, 120, 1, 0],
                         [36, 60, 120, 1, 0.5]]])
-    guit = torch.tensor([[[666, 0.666, 120, 1, 0]]])
+    guit = torch.tensor([[[666, 66.6, 120, 1, 0]]])
 
     m.set_read(True)
     out = m.forward(score)
@@ -206,6 +206,10 @@ def test_gmd(m):
         print("y:\n", y[:,i], y.shape)
         xd[:, :, 12:14] = data.bartime_to_ms(xd[:, :, 12:14], xd)
 
+    guit = torch.tensor([[[666, 66.6, 84, 1, 1.56]]])
+    out = data.readLiveOnset(guit, x_dec, x_enc)
+    #  print("guit -> dec: ", out[:,-8:], out.shape)
+
 # ==================== MAIN =====================
 
 if __name__ == '__main__':
@@ -229,5 +233,6 @@ if __name__ == '__main__':
         m.export_to_ts('../help/roly.ts') # TODO: make this a command line argument
         print("Exported model to ../help/roly.ts")
     else:
+        # test_toy(m)
         test_gmd(m)
 

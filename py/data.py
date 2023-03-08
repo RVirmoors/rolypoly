@@ -188,7 +188,7 @@ def loadX_takeFromCSV(filename: str) -> torch.Tensor:
 
 def readScore(input: torch.Tensor):
     # input: (batch, score_size, 5) from cpp host
-    # output: (batch, score_size, m_enc_dim = 12), (batch, score_size, m_pos_dim = 4)
+    # output: (batch, score_size, m_enc_dim = 12)
     m_enc_dim = constants.X_ENCODER_CHANNELS
     pitch_class_map = classes_to_map()
     X_score = torch.zeros(input.shape[0], input.shape[1], m_enc_dim)
@@ -226,8 +226,8 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_enc: torch.Tensor)
     i = x_dec.shape[1] - 1
     while i >= 0: # TODO: binary search? make this more efficient
         print("LOOKING FOR MATCH", input[:, 0, 2:5], x_enc[:, i, constants.INX_BPM:])
-        if torch.allclose(input[:, 0, 2:5], x_enc[:, i, constants.INX_BPM:]):
-            x_dec[:, i, constants.INX_TAU_G] = ms_to_bartime(input[:, 0, 1], x_enc[:, i].squeeze())   # tau_guitar
+        if torch.allclose(input[:, 0, 2:5], x_enc[:, i, constants.INX_BPM:], atol=0.01):
+            x_dec[:, i, constants.INX_TAU_G] = ms_to_bartime(input[0, 0, 1].item(), x_enc[:, i].squeeze())   # tau_guitar
             print("FOUND MATCH", x_dec[:, i, constants.INX_TAU_G])
             return x_dec
         i -= 1
