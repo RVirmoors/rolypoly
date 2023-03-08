@@ -18,6 +18,7 @@ import time
 import data # data helper methods
 import model # model definition
 import train # training methods
+import constants
 from helper import get_y_n
 
 
@@ -38,7 +39,7 @@ flags.DEFINE_bool("final", False, "Final training, using all data.")
 
 
 # === GLOBALS ===
-feat_vec_size = data.X_DECODER_CHANNELS
+feat_vec_size = constants.X_DECODER_CHANNELS
 train_data = {}
 val_data = {}
 train_data['X_dec'] = [] # lists of tensors
@@ -144,7 +145,7 @@ def getTrainDataFromX_take(X_take: torch.Tensor):
     input: X_take (len, feat_vec_size)
     output: X_dec, X_enc, Y
     """
-    X_enc = X_take[:, :data.X_ENCODER_CHANNELS].clone().detach() # lose tau info
+    X_enc = X_take[:, :constants.X_ENCODER_CHANNELS].clone().detach() # lose tau info
     # lose velocity info
     sum_non_zero = torch.sum(X_enc[:,:9], dim=0)
     non_zero = torch.count_nonzero(X_enc[:,:9], dim=0)

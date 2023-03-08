@@ -186,14 +186,14 @@ def test_gmd(m):
         x_dec[:, -1, 9:12] = x_enc[:, i+1, 9:12]
 
         xd = x_dec.clone().detach()
-        print("x_dec final out:\n", xd[:,-1] * 100, xd.shape)
-        print("y:\n", y[:,i] * 100, y.shape)
+        print("x_dec final out:\n", xd[:,-1], xd.shape)
+        print("y:\n", y[:,i], y.shape)
         xd[:, :, 12:14] = data.bartime_to_ms(xd[:, :, 12:14], xd)
 
 # ==================== MAIN =====================
 
 if __name__ == '__main__':
-    test = True
+    test = False
     pretrain = True
 
     if pretrain:

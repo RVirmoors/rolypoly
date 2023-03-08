@@ -11,6 +11,8 @@ from torch.nn import functional as F
 torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
 
 import data
+import constants
+
 import time
 import math
 import inspect
@@ -72,7 +74,7 @@ class PositionalEncodingSimple(nn.Module):
         self.max_seq_len = config.max_seq_len
         self.embed = nn.Embedding(config.max_seq_len, config.d_model)
 
-    def forward(self, x, t = 0):
+    def forward(self, x, t:int = 0):
         #print("embedding from", t, "to", self.max_seq_len)
         pos = torch.arange(t, self.max_seq_len, dtype=torch.long).to(x.device).unsqueeze(0)
         #print("pos", pos.shape, pos[:, :4])
@@ -285,8 +287,8 @@ class Transformer(nn.Module):
         super().__init__()
         self.block_size = config.block_size
         self.arch = config.arch
-        in_out_chans = data.X_DECODER_CHANNELS # 14
-        enc_in_chans = data.X_ENCODER_CHANNELS # 12
+        in_out_chans = constants.X_DECODER_CHANNELS # 14
+        enc_in_chans = constants.X_ENCODER_CHANNELS # 12
 
         if self.arch == 'd':
             self.transformer = nn.ModuleDict(dict(
@@ -331,7 +333,7 @@ class Transformer(nn.Module):
             if m.padding_idx is not None:
                 nn.init.zeros_(m.weight[m.padding_idx])
 
-    def forward(self, x_enc, x_dec, t = 0):
+    def forward(self, x_enc, x_dec, t:int = 0):
         # predicting with x_dec starting at timestep t in the song
         device = x_dec.device
         b, seq_len = x_dec.shape[:2]
@@ -342,7 +344,7 @@ class Transformer(nn.Module):
         
         x_enc = x_enc.clone().detach()
         x_dec = x_dec.clone().detach()
-        bar_pos = x_enc[:, :, data.INX_BAR_POS] # get bar position from encoder input
+        bar_pos = x_enc[:, :, constants.INX_BAR_POS] # get bar position from encoder input
         bar_num = bar_pos // 1 # get bar numbers
         # print ("bar_num", bar_num, bar_num.shape)
         #print ("bar_pos", bar_pos, bar_pos.shape)
@@ -350,10 +352,10 @@ class Transformer(nn.Module):
         #print("bar_pos_dec", bar_pos_dec, bar_pos_dec.shape)
 
         bp = bar_pos.detach().clone()
-        x_enc[:, :, data.INX_BAR_POS] = torch.frac(bp) # set bar position to fraction of bar
-        x_dec[:, :, data.INX_BAR_POS] = torch.frac(bp[:,:seq_len]) # set bar position to fraction of bar
-        x_enc[:, :, data.INX_BAR_POS] = torch.cos(x_enc[:, :, data.INX_BAR_POS] * math.pi) # set bar position to cos of fraction of bar
-        x_dec[:, :, data.INX_BAR_POS] = torch.cos(x_dec[:, :, data.INX_BAR_POS] * math.pi) # set bar position to cos of fraction of bar
+        x_enc[:, :, constants.INX_BAR_POS] = torch.frac(bp) # set bar position to fraction of bar
+        x_dec[:, :, constants.INX_BAR_POS] = torch.frac(bp[:,:seq_len]) # set bar position to fraction of bar
+        x_enc[:, :, constants.INX_BAR_POS] = torch.cos(x_enc[:, :, constants.INX_BAR_POS] * math.pi) # set bar position to cos of fraction of bar
+        x_dec[:, :, constants.INX_BAR_POS] = torch.cos(x_dec[:, :, constants.INX_BAR_POS] * math.pi) # set bar position to cos of fraction of bar
 
         # add position embedding (ENCODER)
         if self.arch == 'ed':
@@ -386,8 +388,8 @@ class Transformer(nn.Module):
         y_hat = self.transformer.ln_f(x_dec)
 
         y_hat = self.transformer.head(y_hat)
-        # y_hat[:, -1, data.INX_BAR_POS] = torch.acos(y_hat[:, -1, data.INX_BAR_POS]) / math.pi # convert bar position back to fraction of bar
-        # y_hat[:, -1, data.INX_BAR_POS] = y_hat[:, -1, data.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
+        # y_hat[:, -1, constants.INX_BAR_POS] = torch.acos(y_hat[:, -1, constants.INX_BAR_POS]) / math.pi # convert bar position back to fraction of bar
+        # y_hat[:, -1, constants.INX_BAR_POS] = y_hat[:, -1, constants.INX_BAR_POS] + bar_num[:,seq_len-1] # add current bar back to output
         y_hat[:,:,:9] = torch.sigmoid(y_hat[:,:,:9]) # apply sigmoid to hits
         y_hat[:, :, 9:12] = torch.tanh(y_hat[:, :, 9:12]) # apply tanh to position
         y_hat[:, :, 12:] = torch.tanh(y_hat[:, :, 12:]) # apply tanh to timing
@@ -479,13 +481,13 @@ class Transformer(nn.Module):
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
             print("==current time step:", t, "==")
 
-            _xe = x_enc.clone().detach()
-            _xe = data.dataScaleUp(_xe)
-            print("x_enc:\n", _xe[0, :t+8, 11], "...", _xe.shape)
+            # _xe = x_enc.clone().detach()
+            # _xe = data.dataScaleUp(_xe)
+            # print("x_enc:\n", _xe[0, :t+8, 11], "...", _xe.shape)
 
-            _xd = xd.clone().detach()
-            _xd = data.dataScaleUp(_xd)
-            print("x_dec:\n", _xd[0, :, 11], _xd.shape)
+            # _xd = xd.clone().detach()
+            # _xd = data.dataScaleUp(_xd)
+            # print("x_dec:\n", _xd[0, :, 11], _xd.shape)
 
             # generate prediction
             dec_start = 0 if t < self.block_size else t - self.block_size + 1

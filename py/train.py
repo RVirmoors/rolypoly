@@ -15,6 +15,7 @@ import os
 torch.set_printoptions(sci_mode=False)
 
 import data # data helper methods
+import constants
 
 # I/O
 out_dir = 'out'
@@ -75,7 +76,7 @@ def getBatch(split, train_data, val_data, batch_size, block_size):
     x_enc = data.dataScaleDown(x_enc)
     x_dec = data.dataScaleDown(x_dec)
     y     = data.dataScaleDown(y)
-    y[:, :, data.INX_BAR_POS] = torch.frac(y[:, :, data.INX_BAR_POS]) 
+    y[:, :, constants.INX_BAR_POS] = torch.frac(y[:, :, constants.INX_BAR_POS]) 
 
     if 'cuda' in device:
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
