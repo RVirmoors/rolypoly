@@ -10,7 +10,7 @@ import nn_tilde
 
 import data # data helper methods
 import train_gmd # for testing GMD
-import train_live
+import finetune
 import constants
 import model
 torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
@@ -139,7 +139,7 @@ class ExportRoly(nn_tilde.Module):
                 self.x_dec = self.pretrained.generate(xe, xd, num_samples)
                 data.dataScaleUp(self.x_dec)
                 # update y_hat and x_dec with latest predictions
-                self.y_hat = torch.cat((self.y_hat, self.x_dec[:, -num_samples:, :]), dim=1)
+                self.y_hat = torch.cat((self.y_hat, self.x_dec[:, -num_samples:]), dim=1)
                 if self.score_filter[0] and self.x_enc.shape[1]:
                     # set non x_enc notes to zero
                     self.y_hat[:,:,:self.x_enc.shape[2]][self.x_enc[:,:self.y_hat.shape[1]] == 0] = 0
@@ -151,7 +151,7 @@ class ExportRoly(nn_tilde.Module):
                 return out
 
         elif self.finetune[0]:
-            self.pretrained, loss = train_live.finetune(self.pretrained, self.x_enc, self.x_dec, self.y_hat)
+            self.pretrained, loss = finetune.finetune(self.pretrained, self.x_enc, self.x_dec, self.y_hat)
             return loss
 
         else:

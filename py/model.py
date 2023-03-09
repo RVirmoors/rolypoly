@@ -345,12 +345,6 @@ class Transformer(nn.Module):
         x_enc = x_enc.clone().detach()
         x_dec = x_dec.clone().detach()
         bar_pos = x_enc[:, :, constants.INX_BAR_POS] # get bar position from encoder input
-        bar_num = bar_pos // 1 # get bar numbers
-        # print ("bar_num", bar_num, bar_num.shape)
-        #print ("bar_pos", bar_pos, bar_pos.shape)
-        bar_pos_dec = bar_pos.detach().clone()[:, t:]
-        #print("bar_pos_dec", bar_pos_dec, bar_pos_dec.shape)
-
         bp = bar_pos.detach().clone()
         x_enc[:, :, constants.INX_BAR_POS] = torch.frac(bp) # set bar position to fraction of bar
         x_dec[:, :, constants.INX_BAR_POS] = torch.frac(bp[:,:seq_len]) # set bar position to fraction of bar
