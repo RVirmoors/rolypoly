@@ -150,8 +150,8 @@ def train(model, config, load_model, epochs, train_data, val_data, batch_size):
     X_enc, X_dec, Y = getBatch('train', train_data, val_data, batch_size, block_size) # get first batch
     t0 = time.time()
     local_iter_num = 0 # number of iterations in the lifetime of this process
-    #for epoch in range(epochs):
-    while True:
+    for epoch in range(epochs):
+    #while True:
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if decay_lr else learning_rate
         for param_group in optimizer.param_groups:

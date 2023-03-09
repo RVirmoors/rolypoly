@@ -347,6 +347,7 @@ public:
     MIN_FUNCTION {
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
+        m_model.get_model().save("model.pt");
         // write train data to csv files
         std::ofstream csvFile;
         // send ones to get Y_hat

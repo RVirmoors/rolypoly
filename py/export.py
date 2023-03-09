@@ -10,6 +10,8 @@ import nn_tilde
 
 import data # data helper methods
 import train_gmd # for testing GMD
+import train_live
+import constants
 import model
 torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -142,16 +144,15 @@ class ExportRoly(nn_tilde.Module):
                     # set non x_enc notes to zero
                     self.y_hat[:,:,:self.x_enc.shape[2]][self.x_enc[:,:self.y_hat.shape[1]] == 0] = 0
                 # reset x_dec[13] to 0, waiting for live tau_guitar
-                self.x_dec[:, -num_samples:, 13] = 0
+                self.x_dec[:, -num_samples:, constants.INX_TAU_G] = 0
                 # return predictions
                 out = self.y_hat[:, -num_samples:, :].clone().detach()
                 out[:, :, 12:] = data.bartime_to_ms(out[:, :, 12:], out)
                 return out
 
         elif self.finetune[0]:
-            if input[0,0,0] == 0:
-                return self.x_dec
-            return self.y_hat
+            self.pretrained, loss = train_live.finetune(self.pretrained, self.x_enc, self.x_dec, self.y_hat)
+            return loss
 
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
