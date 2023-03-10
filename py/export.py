@@ -198,7 +198,6 @@ def test_gmd(m):
         x_dec = m.pretrained.generate(xe, xd, 1)
         data.dataScaleUp(x_dec)
         x_dec[:, -1:, 13] = 0
-        x_dec[:, -1, 9:12] = x_enc[:, i+1, 9:12]
         # set non x_enc notes to zero
         x_dec[:,:,:x_enc.shape[2]][x_enc[:,:x_dec.shape[1]] == 0] = 0
 

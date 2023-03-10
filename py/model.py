@@ -419,7 +419,7 @@ class Transformer(nn.Module):
         # separate out all parameters to those that will and won't experience regularizing weight decay
         decay = set()
         no_decay = set()
-        whitelist_weight_modules = (torch.nn.Linear, )
+        whitelist_weight_modules = (torch.nn.Linear)
         blacklist_weight_modules = (torch.nn.LayerNorm, LayerNorm, torch.nn.Embedding)
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
@@ -459,10 +459,10 @@ class Transformer(nn.Module):
             {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
         ]
         # new PyTorch nightly has a new 'fused' option for AdamW that is much faster
-        use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
-        print(f"using fused AdamW: {use_fused}")
-        extra_args = dict(fused=True) if use_fused else dict()
-        optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, **extra_args)
+        # use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
+        # print(f"using fused AdamW: {use_fused}")
+        #extra_args = dict(fused=True) if use_fused else dict()
+        optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas)#, **extra_args)
 
         return optimizer
 
@@ -473,7 +473,7 @@ class Transformer(nn.Module):
             # crop inputs to block size
             t = x_dec.size(1) - 1 # current time step
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
-            print("==current time step:", t, "==")
+            print("== current time step:", t, "==")
 
             # _xe = x_enc.clone().detach()
             # _xe = data.dataScaleUp(_xe)
@@ -492,6 +492,7 @@ class Transformer(nn.Module):
             # # append prediction to x_dec
             # print(x_dec.shape, y_hat.unsqueeze(1).shape)
             x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
+            x_dec[:, -1, 9:12] = x_enc[:, t+1, 9:12]
 
         return x_dec
   

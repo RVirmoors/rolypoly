@@ -347,25 +347,14 @@ public:
     MIN_FUNCTION {
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
-        m_model.get_model().save("model.pt");
-        // write train data to csv files
-        std::ofstream csvFile;
-        // send ones to get Y_hat
+        m_model.get_model().save("model_pre.pt");
+        cout << "Finetuning the model... this could take a while." << endl;
+        // send ones to get loss
         torch::Tensor input_tensor = torch::ones({1, 1, IN_DIM});
-        auto output = m_model.get_model().forward({input_tensor}).toTensor();
-        if (DEBUG) cout << "TRAIN output Y_hat: " << output << endl;
-        csvFile.open("runYhat.csv");
-        csvFile << "kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n";
-        csvFile << tensor_to_csv(output[0]);
-        csvFile.close();
-        // send zeros to get X_dec
-        input_tensor = torch::zeros({1, 1, IN_DIM});
-        output = m_model.get_model().forward({input_tensor}).toTensor();
-        if (DEBUG) cout << "TRAIN output X_dec: " << output << endl;
-        csvFile.open("runXdec.csv");
-        csvFile << "kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, pos_in_bar, tau_d, tau_g\n";
-        csvFile << tensor_to_csv(output[0]);
-        csvFile.close();
+        auto loss = m_model.get_model().forward({input_tensor}).toTensor();
+        cout << "Done. Loss: " << loss << endl;
+        // save model
+        m_model.get_model().save("model.pt");
         // reset the training flag
         m_train = false;
         attr = "finetune"; attr_value = "false"; set_attr();
