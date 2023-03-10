@@ -76,7 +76,7 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
 
     loss = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
     losses = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
-    epochs = 12 + x_enc.shape[0] // 30 # 12 + 1 epoch per 30 steps in the input sequence
+    epochs = 7 + x_enc.shape[0] // 30 # 7 + 1 epoch per 30 steps in the input sequence
     for epoch in range(epochs):
         # for param_group in optimizer.param_groups:
         #     param_group['lr'] = lr
@@ -118,7 +118,7 @@ def run_gmd(x_take):
     print("first x_dec:\n", x_dec[0, :3], x_dec.shape)
     print("first x_enc:\n", x_enc[0, :3], x_enc.shape)
     # generate
-    # for i in range(35):
+    # for i in range(3):
     for i in range(x_enc.shape[1] - 1):
         xd = x_dec.clone().detach()
         xe = x_enc.clone().detach()
@@ -147,6 +147,9 @@ if __name__ == '__main__':
     m.load_state_dict(torch.load('out/model_best.pt', map_location=device))
     print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
 
+
+    # m = torch.jit.load('../help/model.pt', map_location=device).pretrained
+
     # simulate live run
     x_take = data.loadX_takeFromCSV('gmd.csv')
     x_enc, x_dec, y_hat = run_gmd(x_take)
@@ -156,7 +159,7 @@ if __name__ == '__main__':
     # finetune
     t0 = time.time()
     torch.set_printoptions(sci_mode=False, linewidth=200, precision=6)
-    # finetune(m, list(m.parameters()), x_enc[:,:36], x_dec, y_hat, Follow=0.5)    
+    # finetune(m, list(m.parameters()), x_enc[:,:4], x_dec, y_hat, Follow=0.5)    
     finetune(m, list(m.parameters()), x_enc, x_dec, y_hat, Follow=0.4)
     t1 = time.time()
     print("finetune took", t1-t0, "s")

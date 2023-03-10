@@ -8,9 +8,6 @@ INX_TAU_G = 13
 IN_DRUM_CHANNELS = 5 # hit, vel, bpm, tsig, bar_pos
 IN_ONSET_CHANNELS = 5 # 666, tau_guitar, bpm, tsig, bar_pos
 
-import torch
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 weight_decay = 1e-1
 beta1 = 0.9
 beta2 = 0.95
