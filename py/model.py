@@ -473,7 +473,7 @@ class Transformer(nn.Module):
             # crop inputs to block size
             t = x_dec.size(1) - 1 # current time step
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
-            print("== current time step:", t, "==")
+            # print("== current time step:", t, "==")
 
             # _xe = x_enc.clone().detach()
             # _xe = data.dataScaleUp(_xe)
