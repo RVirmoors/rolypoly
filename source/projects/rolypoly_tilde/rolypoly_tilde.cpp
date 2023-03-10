@@ -347,14 +347,24 @@ public:
     MIN_FUNCTION {
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
-        m_model.get_model().save("model_pre.pt");
+        //m_model.get_model().save("model_pre.pt");
         cout << "Finetuning the model... this could take a while." << endl;
+        torch::AutoGradMode enable_grad(true);
+        m_model.get_model().train();
         // send ones to get loss
         torch::Tensor input_tensor = torch::ones({1, 1, IN_DIM});
-        auto loss = m_model.get_model().forward({input_tensor}).toTensor();
-        cout << "Done. Loss: " << loss << endl;
+        torch::Tensor losses;
+        try {
+            losses = m_model.get_model().forward({ input_tensor }).toTensor();
+        }
+        catch (std::exception& e)
+        {
+            cerr << e.what() << endl;
+        }
+        cout << "Done. Losses: " << losses << endl;
         // save model
         m_model.get_model().save("model.pt");
+        cout << "Saved model.pt" << endl;
         // reset the training flag
         m_train = false;
         attr = "finetune"; attr_value = "false"; set_attr();
@@ -455,6 +465,30 @@ rolypoly::rolypoly(const atoms &args)
       cerr << "error during loading" << endl;
       error();
       return;
+  }
+
+  // LOAD FINETUNED MODEL IF EXISTS
+  try {
+    torch::jit::script::Module finetuned = torch::jit::load("model.pt");
+    // copy the parameters from the finetuned model to the base model
+    std::unordered_map<std::string, at::Tensor> name_to_tensor;
+    for (auto& param : finetuned.named_parameters()) {
+        name_to_tensor[param.name] = param.value;
+    }
+    for (auto& base_param : m_model.get_model().named_parameters()) {
+        auto name = base_param.name;
+        auto& base_tensor = base_param.value;
+        auto fine_tuned_param = name_to_tensor[name];
+        base_tensor.detach_();        
+        base_tensor.copy_(fine_tuned_param);
+        // cout << "Loaded " << name << endl;
+    }
+    cout << "Loaded finetuned model" << endl;
+    torch::AutoGradMode enable_grad(false);
+  }         
+  catch (std::exception& e)
+  {
+      cerr << e.what() << endl;
   }
 
   // GET MODEL'S METHOD PARAMETERS
@@ -843,7 +877,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     }
     if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score.size()) {
       if (DEBUG) cout << "reached end of midifile" << endl;
-      cout << "Done playing. To finetune the model based on this run, send the 'train' message to this object." << endl;
+      cout << "Done playing. To finetune the model based on this run, send the 'train' message." << endl;
       attr = "play"; attr_value = "false"; set_attr();
       m_play = false;
       done_playing = true;

@@ -85,7 +85,7 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
         X_dec = Y_hat.detach().clone() # for the next step
 
         optimizer.zero_grad()
-        loss[:,:,0].backward()
+        loss[:,:,0].backward(retain_graph=True)
         # torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0) # TODO: make this work in torchscript
 
         # create list of gradients

@@ -386,3 +386,4 @@ tmp
 .vs
 package-info.json
 py/out/*
+help/model.pt
