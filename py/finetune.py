@@ -84,7 +84,7 @@ def finetune(m: model.Transformer, x_enc, x_dec, y_hat, Follow:float = 0.5):
     #optimizer = torch.jit.script(optimizer)
     X_enc, X_dec, G, D = getBatch(x_enc, y_hat, g, d, block_size) # add batch dimension
 
-    epochs = 37 + x_enc.shape[0] // 30 # 7 + 1 epoch per 30 steps in the input sequence
+    epochs = 12 + x_enc.shape[0] // 30 # 12 + 1 epoch per 30 steps in the input sequence
     for epoch in range(epochs):
         # for param_group in optimizer.param_groups:
         #     param_group['lr'] = lr
@@ -125,8 +125,8 @@ if __name__ == '__main__':
     print("first x_dec:\n", x_dec[0, :3], x_dec.shape)
     print("first x_enc:\n", x_enc[0, :3], x_enc.shape)
     # generate
-    for i in range(35):
-    #for i in range(x_enc.shape[1] - 1):
+    #for i in range(35):
+    for i in range(x_enc.shape[1] - 1):
         xd = x_dec.clone().detach()
         xe = x_enc.clone().detach()
         data.dataScaleDown(xd)
@@ -148,7 +148,7 @@ if __name__ == '__main__':
 
     # finetune
     t0 = time.time()
-    finetune(m, x_enc[:,:36], x_dec, y_hat, Follow=0.5)
-    # finetune(m, x_enc, x_dec, y_hat, Follow=0.01)
+    # finetune(m, x_enc[:,:36], x_dec, y_hat, Follow=0.5)
+    finetune(m, x_enc, x_dec, y_hat, Follow=0.4)
     t1 = time.time()
     print("finetune took", t1-t0, "s")
