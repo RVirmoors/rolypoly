@@ -404,7 +404,7 @@ class Transformer(nn.Module):
         timing_loss = F.mse_loss(y_hat[:,:, 12] - y_hat[:,:, 13], y[:,:, 12] - y[:,:, 13]) # timing
         #print("LOSS\ny_hat\n", y_hat[-1,-2], y_hat.shape, "\ny\n", y[-1,-2], y.shape, "\nhit_loss", hit_loss, "timing_loss", 100 * timing_loss, "pos_loss", 0.1 * pos_loss)
         return hit_loss + 0.1 * pos_loss + 100 * timing_loss # weigh timing loss higher
-        
+
     def from_pretrained(self, path):
         self.load_state_dict(torch.load(path))
 

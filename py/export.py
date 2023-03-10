@@ -13,6 +13,7 @@ import train_gmd # for testing GMD
 import finetune
 import constants
 import model
+from typing import List, Tuple
 torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using device:", device)
@@ -21,9 +22,10 @@ print("Using device:", device)
 
 class ExportRoly(nn_tilde.Module):
 
-    def __init__(self, pretrained):
+    def __init__(self, pretrained, params: List[torch.Tensor]):
         super().__init__()
         self.pretrained = pretrained
+        self.params = params
 
         # REGISTER ATTRIBUTES
         # read: load a new drum track
@@ -124,7 +126,7 @@ class ExportRoly(nn_tilde.Module):
             if m_buf_size == 1 and input[0, 0, 0] == 666: # just one onset
                 print("one onset")
                 if self.x_dec.shape[1] <= 1:
-                    return torch.zeros(1, 1, 14) # can't modify x_dec yet!
+                    return torch.zeros(1, 1, constants.X_DECODER_CHANNELS) # can't modify x_dec yet!
                 # update x_dec[:,:,14] with realised tau_guitar
                 self.x_dec = data.readLiveOnset(input, self.x_dec, self.x_enc)
                 return self.x_dec
@@ -132,7 +134,11 @@ class ExportRoly(nn_tilde.Module):
                 next_notes = data.readScoreLive(input)
                 num_samples = next_notes.shape[1]
                 # get predictions
-                xe = self.x_enc.clone().detach()
+                if self.x_enc.shape[1]:
+                    xe = self.x_enc.clone().detach()
+                else:
+                    # x_enc hasn't been loaded yet (warmup)
+                    xe = torch.zeros(1, 10, constants.X_ENCODER_CHANNELS)
                 xd = self.x_dec.clone().detach()
                 data.dataScaleDown(xe)
                 data.dataScaleDown(xd)
@@ -151,7 +157,7 @@ class ExportRoly(nn_tilde.Module):
                 return out
 
         elif self.finetune[0]:
-            self.pretrained, loss = finetune.finetune(self.pretrained, self.x_enc, self.x_dec, self.y_hat)
+            self.pretrained, loss = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat)
             return loss
 
         else:
@@ -226,9 +232,10 @@ if __name__ == '__main__':
         config = model.Config()
         pretrained = model.Transformer(config)
 
-    #pretrained = model.Basic()
     pretrained.eval()
-    m = ExportRoly(pretrained=pretrained)
+    pretrained = torch.jit.script(pretrained)
+    m = ExportRoly(pretrained=pretrained, params=list(pretrained.parameters()))
+    
     if not test:
         m.export_to_ts('../help/roly.ts') # TODO: make this a command line argument
         print("Exported model to ../help/roly.ts")

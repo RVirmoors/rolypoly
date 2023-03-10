@@ -45,8 +45,13 @@ class Net(torch.nn.Module):
         x = self.fc2(x)
         return x
 
-# Create an instance of the network and the optimizer
+@torch.jit.export
+def printParams(net: torch.nn.Module):
+    print(net.parameters())
+
 net = Net()
+printParams(net)
+
 optimizer = Adam(net.parameters())
 
 # Define the loss function
@@ -55,6 +60,11 @@ loss_fn = torch.nn.CrossEntropyLoss()
 # Generate some random data
 x = torch.randn(4, 10)
 y = torch.tensor([0, 1, 0, 1])
+
+scripted_net = torch.jit.script(net)
+print(type(scripted_net))
+printParams(scripted_net)
+# printParams(net)
 
 for epoch in range(1000):
     # Forward pass
