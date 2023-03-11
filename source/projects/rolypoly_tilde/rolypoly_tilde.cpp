@@ -1,7 +1,7 @@
 // 2023 rvirmoors
 // based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 
-#define DEBUG true
+#define DEBUG false
 
 #ifndef VERSION
 #define VERSION "2.0b1"
@@ -263,7 +263,7 @@ public:
       cout << "Done. A model run lasts around " << int(duration.count() / 1000.) << " ms." << endl;
       // if the model is too slow, we need to increase the lookahead
       if (duration.count() / 1000. > lookahead_ms / 4) {
-        lookahead_ms = duration.count() / 1000. * 4 + 50;
+        lookahead_ms = duration.count() / 1000. * 6 + 50;
         cout << "That's too slow. Increasing lookahead to " << lookahead_ms << " ms." << endl;
       }
       return {};
@@ -279,7 +279,7 @@ public:
       //cout << "timer play" << endl;
       perform_threaded.set();
       if (!done_playing) {
-        m_timer.delay(lookahead_ms / 2);
+        m_timer.delay(lookahead_ms / 4);
       }
     } else if (timer_mode == TIMER::TRAIN) {
       //cout << "timer train" << endl;
@@ -510,7 +510,7 @@ rolypoly::rolypoly(const atoms &args)
   }         
   catch (std::exception& e)
   {
-      cerr << e.what() << endl;
+      if (DEBUG) cerr << e.what() << endl;
   }
 
   // GET MODEL'S METHOD PARAMETERS
@@ -725,7 +725,7 @@ void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
       input_tensor[0][i][c] = v[i][c];
     }
   }
-  if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
+ // if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
   // send the notes to the model
   if (m_model.is_loaded()) {
     try {
@@ -776,7 +776,7 @@ double rolypoly::computeNextNoteTimeMs() {
 bool rolypoly::incrementPlayIndexes() {
   // increment t_score and t_play
   double current_time_ms = score[t_score][TIME_MS];
-  if (DEBUG) cout << "== PERFORM == just played: " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
+  if (DEBUG) cout << "== PERFORM == just played: " << t_play << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
   while (score[t_score][TIME_MS] == current_time_ms) {
     t_score++;
     if (t_score >= score.size()) {
@@ -869,8 +869,11 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
   // OUTPUT
   if (m_play) {
     // if the "play" attribute is true,
-    // if there are notes to play, play them
-    
+    if (!play_notes.size()) {
+      // no notes yet!
+      fill_with_zero(output);
+      return;
+    }
     // increment playhead
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
     double next_ms; // usually it's the next note that doesn't have a tau yet
@@ -889,15 +892,14 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       for (int c = 0; c < output.channel_count(); c++) {
         auto out = output.samples(c);
         double vel = play_notes[t_play][c];
-        cout << "vel: " << vel << " at t: " << t_play << endl;
-        if (vel > 5)
-          out[micro_index] = std::max(std::min(vel / 127., 1.), 0.5);
+        // cout << "vel: " << vel << " at t: " << t_play << endl;
+        if (vel > 0)
+          out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
       }
       bool done = incrementPlayIndexes();
       if (done) break;
     }
     if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score.size()) {
-      if (DEBUG) cout << "reached end of midifile" << endl;
       cout << "Done playing. To finetune the model based on this run, send the 'train' message." << endl;
       attr = "play"; attr_value = "false"; set_attr();
       m_play = false;
