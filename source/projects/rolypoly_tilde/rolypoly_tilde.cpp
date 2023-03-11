@@ -115,6 +115,7 @@ public:
   int current_timesig_index;
   double barStart = 0, barEnd = 0;
 
+  void loadFinetuned(std::string path);
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
   //void resetInputBuffer();
@@ -351,7 +352,7 @@ public:
         cout << "Finetuning the model... this could take a while." << endl;
         torch::AutoGradMode enable_grad(true);
         m_model.get_model().train();
-        // send ones to get loss
+        // send ones to train & get loss
         torch::Tensor input_tensor = torch::ones({1, 1, IN_DIM});
         torch::Tensor losses;
         try {
@@ -361,10 +362,11 @@ public:
         {
             cerr << e.what() << endl;
         }
-        cout << "Done. Losses: " << losses << endl;
+        cout << "Done. Losses: " << losses.slice(2, 0, 5) << endl;
         // save model
         m_model.get_model().save("model.pt");
         cout << "Saved model.pt" << endl;
+        loadFinetuned("model.pt");
         // reset the training flag
         m_train = false;
         attr = "finetune"; attr_value = "false"; set_attr();
@@ -418,6 +420,27 @@ public:
   };
 };
 
+void rolypoly::loadFinetuned(std::string path) {
+  torch::jit::script::Module finetuned = torch::jit::load(path);
+  // copy the parameters from the finetuned model to the base model
+  torch::AutoGradMode enable_grad(false);
+  std::unordered_map<std::string, at::Tensor> name_to_tensor;
+  for (auto& param : finetuned.named_parameters()) {
+      name_to_tensor[param.name] = param.value;
+  }
+  for (auto& base_param : m_model.get_model().named_parameters()) {
+      auto name = base_param.name;
+      auto& base_tensor = base_param.value;
+      auto fine_tuned_param = name_to_tensor[name];
+      base_tensor.copy_(fine_tuned_param);
+      base_tensor.detach_();
+      base_tensor.requires_grad_(true);
+      // cout << "Loaded " << name << endl;
+  }
+  cout << "Loaded finetuned model" << endl;
+  m_model.get_model().eval();
+}
+
 void rolypoly::initialiseScore() {
   score.clear();
   score.reserve(MAX_SCORE_LENGTH);
@@ -470,25 +493,7 @@ rolypoly::rolypoly(const atoms &args)
 
   // LOAD FINETUNED MODEL IF EXISTS
   try {
-    torch::jit::script::Module finetuned = torch::jit::load("model.pt");
-    // copy the parameters from the finetuned model to the base model
-    
-    torch::AutoGradMode enable_grad(false);
-    std::unordered_map<std::string, at::Tensor> name_to_tensor;
-    for (auto& param : finetuned.named_parameters()) {
-        name_to_tensor[param.name] = param.value;
-    }
-    for (auto& base_param : m_model.get_model().named_parameters()) {
-        auto name = base_param.name;
-        auto& base_tensor = base_param.value;
-        auto fine_tuned_param = name_to_tensor[name];
-        base_tensor.copy_(fine_tuned_param);
-        base_tensor.detach_();
-        base_tensor.requires_grad_(true);
-        // cout << "Loaded " << name << endl;
-    }
-    cout << "Loaded finetuned model" << endl;
-    m_model.get_model().eval();
+    loadFinetuned("model.pt");
   }         
   catch (std::exception& e)
   {

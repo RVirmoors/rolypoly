@@ -82,11 +82,18 @@ class ExportRoly(nn_tilde.Module):
     # defining attribute setters
     @torch.jit.export
     def set_play(self, value: bool):
+        if value: # if play is set to true, reset x_dec and y_hat
+            self.x_dec = torch.zeros(1, 1, 14)
+            self.y_hat = torch.zeros(1, 0, 14)
         self.play = (value,)
         return 0
 
     @torch.jit.export
     def set_read(self, value: bool):
+        if value: # if read is set to true, reset x_enc, x_dec and y_hat
+            self.x_enc = torch.zeros(1, 0, 12)
+            self.x_dec = torch.zeros(1, 1, 14)
+            self.y_hat = torch.zeros(1, 0, 14)
         self.read = (value,)
         return 0
 
@@ -116,8 +123,6 @@ class ExportRoly(nn_tilde.Module):
             self.x_enc = data.readScore(input)
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)
             # initialise x_dec and y_hat
-            # self.x_dec = self.x_enc[0, 0, :].unsqueeze(0).unsqueeze(0).clone().detach()
-            # self.x_dec = torch.cat((self.x_dec, torch.zeros(1, 1, 2)), dim=2)
             self.x_dec = torch.zeros(1, 1, 14)
             self.y_hat = torch.zeros(1, 0, 14)
             return out
@@ -139,7 +144,11 @@ class ExportRoly(nn_tilde.Module):
                 else:
                     # x_enc hasn't been loaded yet (warmup)
                     xe = torch.zeros(1, 10, constants.X_ENCODER_CHANNELS)
-                xd = self.x_dec.clone().detach()
+                if self.x_dec.shape[1] == 1:
+                    xd = xe[0,0].clone().detach().unsqueeze(0).unsqueeze(0)
+                    xd = torch.cat((xd, torch.zeros(1, 1, 2)), dim=2)
+                else:
+                    xd = self.x_dec.clone().detach()
                 data.dataScaleDown(xe)
                 data.dataScaleDown(xd)
                 self.x_dec = self.pretrained.generate(xe, xd, num_samples)
@@ -149,6 +158,7 @@ class ExportRoly(nn_tilde.Module):
                 if self.score_filter[0] and self.x_enc.shape[1]:
                     # set non x_enc notes to zero
                     self.y_hat[:,:,:self.x_enc.shape[2]][self.x_enc[:,:self.y_hat.shape[1]] == 0] = 0
+                    self.x_dec[:,:,:self.x_enc.shape[2]][self.x_enc[:,:self.x_dec.shape[1]] == 0] = 0
                 # reset x_dec[13] to 0, waiting for live tau_guitar
                 self.x_dec[:, -num_samples:, constants.INX_TAU_G] = 0
                 # return predictions
@@ -157,6 +167,19 @@ class ExportRoly(nn_tilde.Module):
                 return out
 
         elif self.finetune[0]:
+            self.x_dec[0, 3, constants.INX_TAU_G] = -1.4
+            self.x_dec[0, 5, constants.INX_TAU_G] = -1.4
+            self.x_dec[0, 7, constants.INX_TAU_G] = -1.4
+            self.x_dec[0, 9, constants.INX_TAU_G] = -1.4
+            self.x_dec[0, 11, constants.INX_TAU_G] = -1.4
+            self.x_dec[0, 13, constants.INX_TAU_G] = -1.4
+            self.x_dec[0, 15, constants.INX_TAU_G] = -1.4
+            self.x_dec[0, 4, constants.INX_TAU_G] = 0.4
+            self.x_dec[0, 6, constants.INX_TAU_G] = 0.4
+            self.x_dec[0, 8, constants.INX_TAU_G] = 0.4
+            self.x_dec[0, 10, constants.INX_TAU_G] = 0.4
+            self.x_dec[0, 12, constants.INX_TAU_G] = 0.4
+            self.x_dec[0, 14, constants.INX_TAU_G] = 0.4
             self.pretrained, self.params, loss = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat, Follow=0.9)
             return loss
 
