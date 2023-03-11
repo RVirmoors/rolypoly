@@ -157,7 +157,7 @@ class ExportRoly(nn_tilde.Module):
                 return out
 
         elif self.finetune[0]:
-            self.pretrained, loss = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat)
+            self.pretrained, self.params, loss = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat)
             return loss
 
         else:
@@ -233,7 +233,7 @@ if __name__ == '__main__':
         pretrained = model.Transformer(config)
 
     pretrained.eval()
-    pretrained = torch.jit.script(pretrained)
+    # pretrained = torch.jit.script(pretrained)
     m = ExportRoly(pretrained=pretrained, params=list(pretrained.parameters()))
     
     if not test:

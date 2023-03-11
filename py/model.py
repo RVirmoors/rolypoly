@@ -395,7 +395,7 @@ class Transformer(nn.Module):
         
         _y = y.clone().detach()
         mask = torch.where(_y[:, :, :9] == 0, 0.2, 1.0) # create mask
-        hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9], reduction='none') # calculate binary cross entropy loss
+        hit_loss = F.mse_loss(y_hat[:, :, :9], y[:, :, :9], reduction='none') # calculate loss
         weighted_hit_loss = hit_loss * mask # apply weighting
         hit_loss = torch.mean(weighted_hit_loss) # calculate mean of weighted loss
 
@@ -474,6 +474,7 @@ class Transformer(nn.Module):
             t = x_dec.size(1) - 1 # current time step
             xd = x_dec if x_dec.size(1) < self.block_size else x_dec[:, -self.block_size:]
             # print("== current time step:", t, "==")
+            # print(".", end="", flush=True)
 
             # _xe = x_enc.clone().detach()
             # _xe = data.dataScaleUp(_xe)

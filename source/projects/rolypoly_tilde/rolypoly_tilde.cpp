@@ -376,6 +376,7 @@ public:
   message<> read {this, "read", "Load score",
     MIN_FUNCTION {
       done_reading = false;
+      initialiseScore();
       attr = "read"; attr_value = "true"; set_attr();
       m_read = true;
       timer_mode = TIMER::READ;
@@ -471,6 +472,8 @@ rolypoly::rolypoly(const atoms &args)
   try {
     torch::jit::script::Module finetuned = torch::jit::load("model.pt");
     // copy the parameters from the finetuned model to the base model
+    
+    torch::AutoGradMode enable_grad(false);
     std::unordered_map<std::string, at::Tensor> name_to_tensor;
     for (auto& param : finetuned.named_parameters()) {
         name_to_tensor[param.name] = param.value;
@@ -479,12 +482,11 @@ rolypoly::rolypoly(const atoms &args)
         auto name = base_param.name;
         auto& base_tensor = base_param.value;
         auto fine_tuned_param = name_to_tensor[name];
-        base_tensor.detach_();        
         base_tensor.copy_(fine_tuned_param);
         // cout << "Loaded " << name << endl;
     }
     cout << "Loaded finetuned model" << endl;
-    torch::AutoGradMode enable_grad(false);
+    m_model.get_model().eval();
   }         
   catch (std::exception& e)
   {

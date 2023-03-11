@@ -19,7 +19,11 @@ class Adam(object):
 
     def step(self, params: List[torch.Tensor], grads: List[torch.Tensor]):
         self.steps += 1
+        assert len(params) == len(grads)
         for i, (p, g) in enumerate(zip(params, grads)):
+            assert p.shape == g.shape
+            assert p.shape == self.m[i].shape
+            assert p.shape == self.v[i].shape
             if g is None:
                 continue
             if self.weight_decay != 0:
