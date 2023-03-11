@@ -489,7 +489,8 @@ class Transformer(nn.Module):
             # # append prediction to x_dec
             # print(x_dec.shape, y_hat.unsqueeze(1).shape)
             x_dec = torch.cat([x_dec, y_hat.unsqueeze(1)], dim=1) # (b, t+1, n_chans)
-            x_dec[:, -1, 9:12] = x_enc[:, t+1, 9:12]
+            if t+1 < x_enc.size(1):
+                x_dec[:, -1, 9:12] = x_enc[:, t+1, 9:12]
 
         return x_dec
   

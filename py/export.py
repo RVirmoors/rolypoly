@@ -158,8 +158,8 @@ class ExportRoly(nn_tilde.Module):
                 self.y_hat = torch.cat((self.y_hat, self.x_dec[:, -num_samples:]), dim=1)
                 if self.score_filter[0] and self.x_enc.shape[1]:
                     # set non x_enc notes to zero
-                    self.y_hat[:,:,:self.x_enc.shape[2]][self.x_enc[:,:self.y_hat.shape[1]] == 0] = 0
-                    self.x_dec[:,:,:self.x_enc.shape[2]][self.x_enc[:,:self.x_dec.shape[1]] == 0] = 0
+                    self.y_hat[:,:self.x_enc.shape[1],:constants.X_ENCODER_CHANNELS][self.x_enc[:,:self.y_hat.shape[1]] == 0] = 0
+                    self.x_dec[:,:self.x_enc.shape[1],:constants.X_ENCODER_CHANNELS][self.x_enc[:,:self.x_dec.shape[1]] == 0] = 0
                 # reset x_dec[13] to 0, waiting for live tau_guitar
                 self.x_dec[:, -num_samples:, constants.INX_TAU_G] = 0
                 # return predictions
