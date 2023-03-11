@@ -483,6 +483,8 @@ rolypoly::rolypoly(const atoms &args)
         auto& base_tensor = base_param.value;
         auto fine_tuned_param = name_to_tensor[name];
         base_tensor.copy_(fine_tuned_param);
+        base_tensor.detach_();
+        base_tensor.requires_grad_(true);
         // cout << "Loaded " << name << endl;
     }
     cout << "Loaded finetuned model" << endl;
@@ -816,7 +818,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   if (DEBUG) {
       try {
           auto output = m_model.get_model().forward({ input_tensor }).toTensor();
-          cout << "ONSET x_dec scaled down:\n" << output << endl;
+          cout << "ONSET x_dec:\n" << output << endl;
       } catch (std::exception& e)
       {
           cerr << e.what() << endl;
@@ -870,7 +872,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         }
         double note = play_notes[t_play][c];
         if (note > 5)
-          out[micro_index] = note / 127.;
+          out[micro_index] = std::max(std::min(note / 127., 1.), 0.);
       }
       incrementPlayIndexes();
     } else {

@@ -11,4 +11,4 @@ IN_ONSET_CHANNELS = 5 # 666, tau_guitar, bpm, tsig, bar_pos
 weight_decay = 1e-1
 beta1 = 0.9
 beta2 = 0.95
-lr = 6e-4 # learning rate
+lr = 6e-5 # learning rate for finetuning

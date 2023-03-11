@@ -61,7 +61,7 @@ def getLoss(D_hat, D, G_hat, G, V_hat, V, Follow: float):
     loss[:,:,3] = F.mse_loss(D_hat * mask, (G - G_hat) * mask) # realised drum timing vs guitar timing
     loss[:,:,4] = F.mse_loss(G_hat * mask, G) # realised vs predicted guitar timing
 
-    loss[:,:,0] = (1 - Follow) * (loss[:,:,1] + 0.3 * loss[:,:,2]) + Follow * loss[:,:,3] + 1.0 * loss[:,:,4]   
+    loss[:,:,0] = (1 - Follow) * (loss[:,:,1] + 0.1 * loss[:,:,2]) + Follow * loss[:,:,3] + 1.0 * loss[:,:,4]   
     return loss
 
 def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_hat, Follow:float = 0.5):
@@ -72,9 +72,7 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     y_hat = y_hat.squeeze() # [seq_len, 14]
     block_size = m.block_size
 
-    # m.to(device)
-    # m.train()
-    optimizer = adam_ts.Adam(params, lr=constants.lr, betas=(constants.beta1, constants.beta2))
+    optimizer = adam_ts.Adam(params, lr=constants.lr, betas=(constants.beta1, constants.beta2), weight_decay=constants.weight_decay)
     # optimizer = torch.optim.Adam(m.parameters(), lr=lr, weight_decay=weight_decay)
     #optimizer = torch.jit.script(optimizer)
     X_enc, X_dec, G, D, V = getBatch(x_enc, y_hat, g, d, v, block_size) # add batch dimension
@@ -83,7 +81,7 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     best_loss = 1000
     best_params = params.copy()
     losses = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
-    epochs = 27 + x_enc.shape[0] // 30 # 7 + 1 epoch per 30 steps in the input sequence
+    epochs = 17 + x_enc.shape[0] // 30 # 7 + 1 epoch per 30 steps in the input sequence
     for epoch in range(epochs):
         # for param_group in optimizer.param_groups:
         #     param_group['lr'] = lr
@@ -99,7 +97,7 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
         if (loss[:,:,0].item() < best_loss):
             best_loss = loss[:,:,0].item()
             best_params = params.copy()
-            print("best loss", best_loss)
+            # print("best loss", best_loss)
 
         optimizer.zero_grad()
         loss[:,:,0].backward(retain_graph=True)
@@ -134,7 +132,7 @@ def run_gmd(x_take):
     print("first x_dec:\n", x_dec[0, :3], x_dec.shape)
     print("first x_enc:\n", x_enc[0, :3], x_enc.shape)
     # generate
-    for i in range(3):
+    for i in range(13):
     # for i in range(x_enc.shape[1] - 1):
         xd = x_dec.clone().detach()
         xe = x_enc.clone().detach()
@@ -166,27 +164,30 @@ if __name__ == '__main__':
     checkpoint = torch.load('out/ckpt.pt', map_location=device)
     config = checkpoint['config']
     m = model.Transformer(config)
-    # m.load_state_dict(torch.jit.load('../help/model.pt', map_location=device).pretrained.state_dict())
+    m.load_state_dict(torch.jit.load('../help/model.pt', map_location=device).pretrained.state_dict())
     print("Loaded pretrained model:", type(m))
     m.eval()
 
     # simulate live run
     x_take = data.loadX_takeFromCSV('gmd.csv')
+    m.eval()
     x_enc, x_dec, y_hat = run_gmd(x_take)
     print("x_dec after run:\n", x_dec, x_dec.shape)
-    print("y_hat after run:\n", y_hat, y_hat.shape)
+    # print("y_hat after run:\n", y_hat, y_hat.shape)
 
     # finetune
-    m.train()
-    t0 = time.time()
-    torch.set_printoptions(sci_mode=False, linewidth=200, precision=6)
-    finetune(m, list(m.parameters()), x_enc[:,:4], x_dec, y_hat, Follow=0.5)    
-    # finetune(m, list(m.parameters()), x_enc, x_dec, y_hat, Follow=0.4)
-    t1 = time.time()
-    print("finetune took", t1-t0, "s")
+    for _ in range(5):
+        m.train()
+        t0 = time.time()
+        torch.set_printoptions(sci_mode=False, linewidth=200, precision=6)
+        finetune(m, list(m.parameters()), x_enc[:,:14], x_dec, y_hat, Follow=0.5)    
+        # finetune(m, list(m.parameters()), x_enc, x_dec, y_hat, Follow=0.4)
+        t1 = time.time()
+        print("finetune took", t1-t0, "s")
 
-
-    torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
-    x_enc, x_dec, y_hat = run_gmd(x_take)
+        torch.set_printoptions(sci_mode=False, linewidth=200, precision=2)
+        m.eval()
+        x_enc, x_dec, y_hat = run_gmd(x_take)
+        
     print("x_dec after run:\n", x_dec, x_dec.shape)
-    print("y_hat after run:\n", y_hat, y_hat.shape)
+    # print("y_hat after run:\n", y_hat, y_hat.shape)
