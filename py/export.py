@@ -248,16 +248,20 @@ def test_gmd(m):
 if __name__ == '__main__':
     test = False
     pretrain = True
+    basic = False
 
-    if pretrain:
-        checkpoint = torch.load('out/ckpt.pt', map_location=device)
-        config = checkpoint['config']
-        pretrained = model.Transformer(config)
-        pretrained.load_state_dict(torch.load('out/model_best.pt', map_location=device))
-        print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
+    if basic:
+        pretrained = model.Basic()
     else:
-        config = model.Config()
-        pretrained = model.Transformer(config)
+        if pretrain:
+            checkpoint = torch.load('out/ckpt.pt', map_location=device)
+            config = checkpoint['config']
+            pretrained = model.Transformer(config)
+            pretrained.load_state_dict(torch.load('out/model_best.pt', map_location=device))
+            print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
+        else:
+            config = model.Config()
+            pretrained = model.Transformer(config)
 
     # pretrained = torch.jit.script(pretrained)
     m = ExportRoly(pretrained=pretrained, params=list(pretrained.parameters()))

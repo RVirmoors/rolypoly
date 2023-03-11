@@ -12,3 +12,6 @@ weight_decay = 1e-1
 beta1 = 0.9
 beta2 = 0.95
 lr = 8e-4 # learning rate for finetuning
+
+gmd_tau_d_avg = 0
+gmd_tau_d_std = 0.01

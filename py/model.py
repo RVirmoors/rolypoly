@@ -21,15 +21,11 @@ from dataclasses import dataclass
 # === TEST / TOY MODELS ===
 
 class Basic(nn.Module):
-    def __init__(self, in_channels=14, out_channels=14):
-        # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
-        # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
+    def __init__(self):
         super(Basic, self).__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
 
     def forward(self, _, x):
-        return x + 1/127
+        return x # + 1/127
 
     def generate(self, _, x, num_samples:int=1):
         out = x

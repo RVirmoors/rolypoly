@@ -8,7 +8,8 @@ py/runs
 py/venv
 _old/py/runs/
 _old/py/models/last.pt
-*.wav
+_old/max/*.wav
+# *.wav
 *.reapeaks
 
 ## Ignore Visual Studio temporary files, build results, and

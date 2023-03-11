@@ -378,7 +378,7 @@ public:
           {
               cerr << e.what() << endl;
           }
-          cout << "D_hat     D (pre)    G_hat     G\n" << diag.slice(2, 0, 4).slice(1, 0, 10) << endl;
+          cout << "D_hat     G_hat     G\n" << diag.slice(2, 0, 3).slice(1, 0, 10) << endl;
         }
         // reset the training flag
         m_train = false;

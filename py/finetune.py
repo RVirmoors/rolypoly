@@ -19,24 +19,20 @@ import time
 import copy
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def getBatch(x_enc, y_hat, g, d, v, block_size: int):
+def getBatch(x_enc, y_hat, g, block_size: int):
     batch_size = y_hat.shape[0] // block_size
     if batch_size == 0:
         xe = x_enc.unsqueeze(0)
         xd = y_hat.unsqueeze(0)
         G  = g.unsqueeze(0)
-        D  = d.unsqueeze(0)
-        V  = v.unsqueeze(0)
     else:
         xe = torch.stack([x_enc[i*block_size:(i+1)*block_size] for i in range(batch_size)])
         xd = torch.stack([y_hat[i*block_size:(i+1)*block_size] for i in range(batch_size)])
         G  = torch.stack([    g[i*block_size:(i+1)*block_size] for i in range(batch_size)])
-        D  = torch.stack([    d[i*block_size:(i+1)*block_size] for i in range(batch_size)])
-        V  = torch.stack([    v[i*block_size:(i+1)*block_size] for i in range(batch_size)])
     xe = data.dataScaleDown(xe)
     xd = data.dataScaleDown(xd)
 
-    return xe, xd, G, D, V
+    return xe, xd, G
 
 def getTimings(x_dec, y_hat):
     D_hat = x_dec[:,:,constants.INX_TAU_D]
@@ -51,13 +47,16 @@ def generateGMD(model: model.Transformer, x_enc, xd):
     v = x_dec[0,:,:9]
     return d, v
 
-def getLoss(D_hat, D, G_hat, G, V_hat, V, Follow: float):
+def getLoss(D_hat, G_hat, G, V_hat, V, Follow: float):
     loss = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
 
     # remove loss for missing guitar notes
     mask = (G != 0)
-    loss[:,:,1] = F.mse_loss(D_hat * mask, D * mask) # realised drum timing vs GMD
-    loss[:,:,2] = F.mse_loss(V_hat * mask.unsqueeze(2), V * mask.unsqueeze(2)) # realised velocities vs GMD
+
+    avg_D = torch.mean((D_hat * mask)[D_hat != 0])
+    std_D = torch.std((D_hat * mask)[D_hat != 0])
+    loss[:,:,1] = (avg_D - constants.gmd_tau_d_avg) ** 2 + (std_D - constants.gmd_tau_d_std) ** 2 # realised drum timing vs GMD
+    loss[:,:,2] = F.mse_loss(V_hat * mask.unsqueeze(2), V * mask.unsqueeze(2)) # realised velocities vs score
     loss[:,:,3] = F.mse_loss(D_hat * mask, (G - G_hat) * mask) # realised drum timing vs guitar timing
     loss[:,:,4] = F.mse_loss(G_hat * mask, G) # realised vs predicted guitar timing
 
@@ -68,15 +67,13 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     x_enc = x_enc.squeeze() # [seq_len, 12]
     g = x_dec[:,:,constants.INX_TAU_G].squeeze() # [seq_len]
     xd = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
-    d, v = generateGMD(m, x_enc, xd) # [seq_len]
+    # d, v = generateGMD(m, x_enc, xd) # [seq_len]
     y_hat = y_hat.squeeze() # [seq_len, 14]
     block_size = m.block_size
 
     optimizer = adam_ts.Adam(params, lr=constants.lr, betas=(constants.beta1, constants.beta2), weight_decay=constants.weight_decay)
-    # optimizer = torch.optim.Adam(m.parameters(), lr=lr, weight_decay=weight_decay)
-    #optimizer = torch.jit.script(optimizer)
-    X_enc, X_dec, G, D, V = getBatch(x_enc, y_hat, g, d, v, block_size) # add batch dimension
-    D_hat = torch.zeros_like(D)
+    X_enc, X_dec, G = getBatch(x_enc, y_hat, g, block_size) # add batch dimension
+    D_hat = torch.zeros_like(G)
     G_hat = torch.zeros_like(G)
 
     loss = torch.zeros(1, 0, constants.X_DECODER_CHANNELS)
@@ -85,14 +82,12 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     losses = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
     epochs = 30 # + x_enc.shape[0] // 20 # 30 + 1 epoch per 20 hits in the input sequence
     for epoch in range(epochs):
-        # for param_group in optimizer.param_groups:
-        #     param_group['lr'] = lr
         Y_hat = m.forward(X_enc, X_dec)
-        D_hat, G_hat = getTimings(X_dec, Y_hat) # we already have G & D from getBatch
+        D_hat, G_hat = getTimings(X_dec, Y_hat) # we already have G from getBatch
+        V = X_enc[:,:,:9]
         V_hat = Y_hat[:,:,:9]
-        # print("D_hat", D_hat[0,:10], "D", D[0,:10], "G_hat", G_hat[0,:10], "G", G[0,:10])
 
-        loss = getLoss(D_hat, D, G_hat, G, V_hat, V, Follow)
+        loss = getLoss(D_hat, G_hat, G, V_hat, V, Follow)
         losses = torch.cat((losses, loss), dim=1)
         X_dec = Y_hat.detach().clone() # for the next step
 
@@ -120,10 +115,10 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     for i in range(len(params)):
         params[i] = best_params[i]
 
-    # diagnostics D_hat, D, G_hat, G
-    diag = torch.stack((D_hat, D, G_hat, G), dim=2)
-    diag = torch.cat((diag, torch.zeros(diag.shape[0], diag.shape[1], 10)), dim=2)
-    print("              D_hat         D         G_hat         G\n", diag[0, :10, :4])
+    # diagnostics: D_hat, G_hat, G
+    diag = torch.stack((D_hat, G_hat, G), dim=2)
+    diag = torch.cat((diag, torch.zeros(diag.shape[0], diag.shape[1], 11)), dim=2)
+    print("              D_hat          G_hat         G\n", diag[0, :10, :3])
 
     return m, params, losses, diag
 
