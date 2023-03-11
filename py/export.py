@@ -169,20 +169,20 @@ class ExportRoly(nn_tilde.Module):
 
         elif self.finetune[0]:
             if input[0, 0, 0] == 1: # just one onset
-                self.x_dec[0, 3, constants.INX_TAU_G] = -0.02
-                self.x_dec[0, 5, constants.INX_TAU_G] = -0.02
-                self.x_dec[0, 7, constants.INX_TAU_G] = -0.02
-                self.x_dec[0, 9, constants.INX_TAU_G] = -0.02
-                self.x_dec[0, 11, constants.INX_TAU_G] = -0.02
-                self.x_dec[0, 13, constants.INX_TAU_G] = -0.02
-                self.x_dec[0, 15, constants.INX_TAU_G] = -0.02
-                self.x_dec[0, 4, constants.INX_TAU_G] = 0.01
-                self.x_dec[0, 6, constants.INX_TAU_G] = 0.01
-                self.x_dec[0, 8, constants.INX_TAU_G] = 0.01
-                self.x_dec[0, 10, constants.INX_TAU_G] = 0.01
-                self.x_dec[0, 12, constants.INX_TAU_G] = 0.01
-                self.x_dec[0, 14, constants.INX_TAU_G] = 0.01
-                self.pretrained, self.params, loss, self.diag = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat, Follow=0.999)
+                # self.x_dec[0, 3, constants.INX_TAU_G] = -0.02
+                # self.x_dec[0, 5, constants.INX_TAU_G] = -0.02
+                # self.x_dec[0, 7, constants.INX_TAU_G] = -0.02
+                # self.x_dec[0, 9, constants.INX_TAU_G] = -0.02
+                # self.x_dec[0, 11, constants.INX_TAU_G] = -0.02
+                # self.x_dec[0, 13, constants.INX_TAU_G] = -0.02
+                # self.x_dec[0, 15, constants.INX_TAU_G] = -0.02
+                # self.x_dec[0, 4, constants.INX_TAU_G] = 0.01
+                # self.x_dec[0, 6, constants.INX_TAU_G] = 0.01
+                # self.x_dec[0, 8, constants.INX_TAU_G] = 0.01
+                # self.x_dec[0, 10, constants.INX_TAU_G] = 0.01
+                # self.x_dec[0, 12, constants.INX_TAU_G] = 0.01
+                # self.x_dec[0, 14, constants.INX_TAU_G] = 0.01
+                self.pretrained, self.params, loss, self.diag = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat, Follow=0.6)
                 return loss
             else: # diagnostics
                 return self.diag

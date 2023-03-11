@@ -3109,7 +3109,7 @@
 					"numoutlets" : 14,
 					"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
 					"patching_rect" : [ 107.5, 188.666667640209198, 155.5, 22.0 ],
-					"text" : "rolypoly~ roly s120"
+					"text" : "rolypoly~ roly baron"
 				}
 
 			}
