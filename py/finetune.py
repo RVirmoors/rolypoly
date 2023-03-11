@@ -76,6 +76,8 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     # optimizer = torch.optim.Adam(m.parameters(), lr=lr, weight_decay=weight_decay)
     #optimizer = torch.jit.script(optimizer)
     X_enc, X_dec, G, D, V = getBatch(x_enc, y_hat, g, d, v, block_size) # add batch dimension
+    D_hat = torch.zeros_like(D)
+    G_hat = torch.zeros_like(G)
 
     loss = torch.zeros(1, 0, constants.X_DECODER_CHANNELS)
     best_loss = 1000
@@ -118,7 +120,12 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     for i in range(len(params)):
         params[i] = best_params[i]
 
-    return m, params, losses
+    # diagnostics D_hat, D, G_hat, G
+    print(D_hat.shape, D.shape, G_hat.shape, G.shape)
+    diag = torch.stack((D_hat, D, G_hat, G), dim=2)
+    diag = torch.cat((diag, torch.zeros(diag.shape[0], diag.shape[1], 10)), dim=2)
+
+    return m, params, losses, diag
 
 
 
@@ -164,7 +171,7 @@ if __name__ == '__main__':
     checkpoint = torch.load('out/ckpt.pt', map_location=device)
     config = checkpoint['config']
     m = model.Transformer(config)
-    m.load_state_dict(torch.jit.load('../help/model.pt', map_location=device).pretrained.state_dict())
+    # m.load_state_dict(torch.jit.load('../help/model.pt', map_location=device).pretrained.state_dict())
     print("Loaded pretrained model:", type(m))
     m.eval()
 

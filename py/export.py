@@ -43,6 +43,7 @@ class ExportRoly(nn_tilde.Module):
         self.register_buffer('x_enc', torch.zeros(1, 0, 12)) # score
         self.register_buffer('x_dec', torch.randn(1, 1, 14)) # actuals
         self.register_buffer('y_hat', torch.zeros(1, 0, 14)) # predictions
+        self.register_buffer('diag', torch.zeros(1, 1, 14)) # diagnostics (finetune)
 
         # REGISTER METHODS
         self.register_method(
@@ -167,21 +168,24 @@ class ExportRoly(nn_tilde.Module):
                 return out
 
         elif self.finetune[0]:
-            self.x_dec[0, 3, constants.INX_TAU_G] = -1.4
-            self.x_dec[0, 5, constants.INX_TAU_G] = -1.4
-            self.x_dec[0, 7, constants.INX_TAU_G] = -1.4
-            self.x_dec[0, 9, constants.INX_TAU_G] = -1.4
-            self.x_dec[0, 11, constants.INX_TAU_G] = -1.4
-            self.x_dec[0, 13, constants.INX_TAU_G] = -1.4
-            self.x_dec[0, 15, constants.INX_TAU_G] = -1.4
-            self.x_dec[0, 4, constants.INX_TAU_G] = 0.4
-            self.x_dec[0, 6, constants.INX_TAU_G] = 0.4
-            self.x_dec[0, 8, constants.INX_TAU_G] = 0.4
-            self.x_dec[0, 10, constants.INX_TAU_G] = 0.4
-            self.x_dec[0, 12, constants.INX_TAU_G] = 0.4
-            self.x_dec[0, 14, constants.INX_TAU_G] = 0.4
-            self.pretrained, self.params, loss = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat, Follow=0.9)
-            return loss
+            if input[0, 0, 0] == 1: # just one onset
+                self.x_dec[0, 3, constants.INX_TAU_G] = -0.02
+                self.x_dec[0, 5, constants.INX_TAU_G] = -0.02
+                self.x_dec[0, 7, constants.INX_TAU_G] = -0.02
+                self.x_dec[0, 9, constants.INX_TAU_G] = -0.02
+                self.x_dec[0, 11, constants.INX_TAU_G] = -0.02
+                self.x_dec[0, 13, constants.INX_TAU_G] = -0.02
+                self.x_dec[0, 15, constants.INX_TAU_G] = -0.02
+                self.x_dec[0, 4, constants.INX_TAU_G] = 0.01
+                self.x_dec[0, 6, constants.INX_TAU_G] = 0.01
+                self.x_dec[0, 8, constants.INX_TAU_G] = 0.01
+                self.x_dec[0, 10, constants.INX_TAU_G] = 0.01
+                self.x_dec[0, 12, constants.INX_TAU_G] = 0.01
+                self.x_dec[0, 14, constants.INX_TAU_G] = 0.01
+                self.pretrained, self.params, loss, self.diag = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat, Follow=0.999)
+                return loss
+            else: # diagnostics
+                return self.diag
 
         else:
             out = torch.cat((self.x_enc, torch.zeros(1, self.x_enc.shape[1], 2)), dim=2)

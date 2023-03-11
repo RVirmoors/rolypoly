@@ -362,11 +362,24 @@ public:
         {
             cerr << e.what() << endl;
         }
-        cout << "Done. Losses: " << losses.slice(2, 0, 5) << endl;
+        cout << "Done. Losses:\nTOTAL   Dhat-D   Vhat-V  Dhat-dG  Ghat-G\n" << losses.slice(2, 0, 5) << endl;
         // save model
         m_model.get_model().save("model.pt");
         cout << "Saved model.pt" << endl;
         loadFinetuned("model.pt");
+        if (DEBUG) {
+          // send zeros to get diag info
+          input_tensor = torch::zeros({1, 1, IN_DIM});
+          torch::Tensor diag;
+          try {
+              diag = m_model.get_model().forward({ input_tensor }).toTensor();
+          }
+          catch (std::exception& e)
+          {
+              cerr << e.what() << endl;
+          }
+          cout << "D_hat     D (pre)    G_hat     G\n" << diag.slice(2, 0, 4).slice(1, 0, 10) << endl;
+        }
         // reset the training flag
         m_train = false;
         attr = "finetune"; attr_value = "false"; set_attr();
