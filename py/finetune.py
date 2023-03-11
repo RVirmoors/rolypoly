@@ -83,7 +83,7 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     best_loss = 1000
     best_params = params.copy()
     losses = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
-    epochs = 17 + x_enc.shape[0] // 30 # 7 + 1 epoch per 30 steps in the input sequence
+    epochs = 30 # + x_enc.shape[0] // 20 # 30 + 1 epoch per 20 hits in the input sequence
     for epoch in range(epochs):
         # for param_group in optimizer.param_groups:
         #     param_group['lr'] = lr
@@ -121,9 +121,9 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
         params[i] = best_params[i]
 
     # diagnostics D_hat, D, G_hat, G
-    print(D_hat.shape, D.shape, G_hat.shape, G.shape)
     diag = torch.stack((D_hat, D, G_hat, G), dim=2)
     diag = torch.cat((diag, torch.zeros(diag.shape[0], diag.shape[1], 10)), dim=2)
+    print("              D_hat         D         G_hat         G\n", diag[0, :10, :4])
 
     return m, params, losses, diag
 
@@ -152,27 +152,27 @@ def run_gmd(x_take):
         x_dec[:, -1, 9:12] = x_enc[:, i+1, 9:12]
         # set non x_enc notes to zero
         x_dec[:,:,:x_enc.shape[2]][x_enc[:,:x_dec.shape[1]] == 0] = 0
-        if torch.rand(1) < 0.4:
-            guit = torch.tensor([[[666, torch.rand(1)*100, 0,0,0]]])
-            guit[:,:,2:5] = x_dec[:, -1, 9:12]
-            data.readLiveOnset(guit, x_dec, x_enc)
+        # if torch.rand(1) < 0.4:
+        #     guit = torch.tensor([[[666, torch.rand(1)*100, 0,0,0]]])
+        #     guit[:,:,2:5] = x_dec[:, -1, 9:12]
+        #     data.readLiveOnset(guit, x_dec, x_enc)
     
     return x_enc, x_dec, y_hat
 
 
 if __name__ == '__main__':
     # load pretrained model
-    # checkpoint = torch.load('out/ckpt.pt', map_location=device)
-    # config = checkpoint['config']
-    # m = model.Transformer(config)
-    # m.load_state_dict(torch.load('out/model_best.pt', map_location=device))
-    # print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
-
     checkpoint = torch.load('out/ckpt.pt', map_location=device)
     config = checkpoint['config']
     m = model.Transformer(config)
+    m.load_state_dict(torch.load('out/model_best.pt', map_location=device))
+    print("Loaded pretrained model:", checkpoint['iter_num'], "epochs, loss:", checkpoint['best_val_loss'].item())
+
+    # checkpoint = torch.load('out/ckpt.pt', map_location=device)
+    # config = checkpoint['config']
+    # m = model.Transformer(config)
     # m.load_state_dict(torch.jit.load('../help/model.pt', map_location=device).pretrained.state_dict())
-    print("Loaded pretrained model:", type(m))
+    # print("Loaded pretrained model:", type(m))
     m.eval()
 
     # simulate live run
@@ -184,10 +184,21 @@ if __name__ == '__main__':
 
     # finetune
     for _ in range(5):
+        x_dec[0, 3, constants.INX_TAU_G] = -0.02
+        x_dec[0, 5, constants.INX_TAU_G] = -0.02
+        x_dec[0, 7, constants.INX_TAU_G] = -0.02
+        x_dec[0, 9, constants.INX_TAU_G] = -0.02
+        x_dec[0, 11, constants.INX_TAU_G] = -0.02
+        x_dec[0, 13, constants.INX_TAU_G] = -0.02
+        x_dec[0, 4, constants.INX_TAU_G] = 0.01
+        x_dec[0, 6, constants.INX_TAU_G] = 0.01
+        x_dec[0, 8, constants.INX_TAU_G] = 0.01
+        x_dec[0, 10, constants.INX_TAU_G] = 0.01
+        x_dec[0, 12, constants.INX_TAU_G] = 0.01
         m.train()
         t0 = time.time()
         torch.set_printoptions(sci_mode=False, linewidth=200, precision=6)
-        finetune(m, list(m.parameters()), x_enc[:,:14], x_dec, y_hat, Follow=0.5)    
+        m, _, _ ,_ = finetune(m, list(m.parameters()), x_enc[:,:14], x_dec, y_hat, Follow=0.999)    
         # finetune(m, list(m.parameters()), x_enc, x_dec, y_hat, Follow=0.4)
         t1 = time.time()
         print("finetune took", t1-t0, "s")
