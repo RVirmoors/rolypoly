@@ -227,7 +227,8 @@ def readLiveOnset(input: torch.Tensor, x_dec: torch.Tensor, x_enc: torch.Tensor)
     while i >= 0: # TODO: binary search? make this more efficient
         # print("LOOKING FOR MATCH", input[:, 0, 2:5], x_enc[:, i, constants.INX_BPM:])
         if torch.allclose(input[:, 0, 2:5], x_enc[:, i, constants.INX_BPM:], atol=0.01):
-            x_dec[:, i, constants.INX_TAU_G] = ms_to_bartime(input[0, 0, 1].item(), x_enc[:, i].squeeze())   # tau_guitar
+            tau_g = ms_to_bartime(input[0, 0, 1].item(), x_enc[:, i].squeeze()) # tau_guitar
+            x_dec[:, i, constants.INX_TAU_G] = tau_g  
             # print("FOUND MATCH", x_dec[:, i, constants.INX_TAU_G])
             return x_dec
         i -= 1

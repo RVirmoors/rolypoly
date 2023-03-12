@@ -785,7 +785,7 @@ double rolypoly::computeNextNoteTimeMs() {
 bool rolypoly::incrementPlayIndexes() {
   // increment t_score and t_play
   double current_time_ms = score[t_score][TIME_MS];
-  cout << "== PERFORM == just played: " << t_play << " | " << score[t_score][0] << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
+  if (DEBUG) cout << "== PERFORM == just played: " << t_play << " | " << score[t_score][0] << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
   while (score[t_score][TIME_MS] == current_time_ms) {
     t_score++;
     if (t_score >= score.size()) {
@@ -811,7 +811,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   double onset_time_ms = playhead_ms + 
     lib::math::samples_to_milliseconds(location - latency, samplerate());
   
-  cout << "== ONSET == at " << onset_time_ms << " ms" << endl;
+  if (DEBUG) cout << "== ONSET == at " << onset_time_ms << " ms" << endl;
 
   // find the closest note in the score
   int closest_note = 0;
@@ -841,9 +841,9 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   double tau_guitar = onset_time_ms - closest_note_time;
   if (abs(tau_guitar) < closest_note_duration/3) {
     // if so, then we have a hit
-    cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
+    if (DEBUG) cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
   } else {
-    cout << "NOT within " << closest_note_duration/3 << " of " << closest_note_time << endl; return;
+    if (DEBUG) cout << "NOT within " << closest_note_duration/3 << " of " << closest_note_time << endl; return;
   }
 
 
