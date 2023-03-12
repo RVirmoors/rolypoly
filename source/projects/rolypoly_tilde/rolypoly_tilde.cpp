@@ -116,10 +116,11 @@ public:
   int current_timesig_index;
   double barStart = 0, barEnd = 0;
 
+  double m_follow; // [0 ... 1] how much to finetune the model to follow the guitar
+
   void loadFinetuned(std::string path);
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
-  //void resetInputBuffer();
   bool midiNotesToModel();
 
   void prepareToPlay();
@@ -165,9 +166,6 @@ public:
 
   attribute<bool> score_filter{this, "score_filter", true,
                          description{"Filter out notes not in the score"}}; // TODO: implement
-
-  attribute<float> follow{this, "follow", 0.5,
-                         description{"Follow the guitar (0.0 = no, 1.0 = full)"}}; // TODO: implement
 
   // BOOT STAMP
   message<> maxclass_setup{
@@ -358,6 +356,7 @@ public:
         m_model.get_model().train();
         // send ones to train & get loss
         torch::Tensor input_tensor = torch::ones({1, 1, IN_DIM});
+        input_tensor[0][0][1] = m_follow;
         torch::Tensor losses;
         try {
             losses = m_model.get_model().forward({ input_tensor }).toTensor();
@@ -366,7 +365,7 @@ public:
         {
             cerr << e.what() << endl;
         }
-        cout << "Done. Losses:\nTOTAL   Dhat-D   Vhat-V  Dhat-dG  Ghat-G\n" << losses.slice(2, 0, 5) << endl;
+        cout << "Done. Losses:\nTOTAL   Dhat-D   Vhat-V  Dhat-G  Ghat-G\n" << losses.slice(2, 0, 5) << endl;
         // save model
         m_model.get_model().save("model.pt");
         cout << "Saved model.pt" << endl;
@@ -427,6 +426,13 @@ public:
         cerr << "no score loaded, can't train yet!" << endl;
         return {};
       }
+      if (args.size() == 1) {
+        m_follow = args[0];
+        cout << "Finetuning with Follow = " << m_follow << endl;
+      } else {
+        cout << "Using default Follow: " << m_follow << endl;
+      }
+
       attr = "finetune"; attr_value = "true"; set_attr();
       m_train = true;
       timer_mode = TIMER::TRAIN;
@@ -467,7 +473,7 @@ rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr),
       m_read(false), m_play(false), m_generate(false), m_train(false),
       m_method("forward"),
-      m_use_thread(true), lookahead_ms(500) {
+      m_use_thread(true), lookahead_ms(500), m_follow(0.4) {
 
   m_model = Backend();
 

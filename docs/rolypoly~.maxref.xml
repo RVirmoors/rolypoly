@@ -83,11 +83,6 @@
 			<description>Onset detection latency (samples) </description>
 		</attribute>
 
-		<attribute name='follow' get='1' set='1' type='float32' size='1' >
-			<digest>Follow the guitar (0</digest>
-			<description>Follow the guitar (0.0 = no, 1.0 = full) </description>
-		</attribute>
-
 		<attribute name='score_filter' get='1' set='1' type='long' size='1' >
 			<digest>Filter out notes not in the score </digest>
 			<description>Filter out notes not in the score </description>
