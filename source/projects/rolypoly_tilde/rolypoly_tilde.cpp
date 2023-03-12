@@ -100,6 +100,7 @@ public:
   double playhead_ms;  // in ms
   long i_fromModel; // next timestep to be read from the model  
   long t_play; // next timestep to be played from play_notes
+  long last_onset; // last timestep with an onset detected
   std::vector<std::array<double, IN_DIM>> in_notes; // notes to be sent to the model
   std::array<double, IN_DIM> in_onset; // onset to be sent to the model
   at::Tensor modelOut; // result from calling model.forward()
@@ -670,10 +671,8 @@ bool rolypoly::midiNotesToModel() {
 }
 
 void rolypoly::prepareToPlay() {
-  if (m_compute_thread && m_compute_thread->joinable()) {
-    cout << "JOINING THREAD" << endl;
+  if (m_compute_thread && m_compute_thread->joinable()) {\
     m_compute_thread->join();
-    cout << "JOINED THREAD" << endl;
   }
   playhead_ms = i_toModel = i_fromModel =
     t_score = t_play = 0;
@@ -818,6 +817,8 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
       closest_note_time = note_time;
     }
   }
+  if (closest_note == last_onset) return; // don't send the same note twice
+  last_onset = closest_note;
 
   // is the onset within 1/3 of the closest note duration?
   double closest_note_duration;
@@ -833,6 +834,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
     if (DEBUG) cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
   } else return;
 
+
   torch::Tensor input_tensor = torch::zeros({1, 1, IN_DIM});
   input_tensor[0][0][0] = 666; // mark this as a live onset
   input_tensor[0][0][1] = tau_guitar; // in ms
@@ -840,17 +842,17 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
     input_tensor[0][0][c] = score[closest_note][c]; // bpm, tsig, pos_in_bar
   }
   // send the onset to the model
-  if (DEBUG) {
+  // if (DEBUG) {
       try {
           auto output = m_model.get_model().forward({ input_tensor }).toTensor();
-          cout << "ONSET x_dec:\n" << output << endl;
+          // cout << "ONSET x_dec:\n" << output << endl;
       } catch (std::exception& e)
       {
           cerr << e.what() << endl;
       }
-  } else {
-    m_model.get_model().forward({input_tensor}).toTensor();
-  }
+  // } else {
+  //   m_model.get_model().forward({input_tensor}).toTensor();
+  // }
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
@@ -866,7 +868,7 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
 void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
   // INPUT
-  if (m_play) {
+  if (m_play && play_notes.size() && !done_playing) {
     processLiveOnsets(input);
   }
 
@@ -897,8 +899,12 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         auto out = output.samples(c);
         double vel = play_notes[t_play][c];
         // cout << "vel: " << vel << " at t: " << t_play << endl;
-        if (vel > 0)
-          out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
+        if (c < 9) {
+          if (vel > 0)
+            out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
+        }
+        else
+          out[micro_index] = vel;
       }
       bool done = incrementPlayIndexes();
       if (done) break;

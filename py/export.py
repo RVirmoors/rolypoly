@@ -131,7 +131,7 @@ class ExportRoly(nn_tilde.Module):
         if self.play[0]:
             if m_buf_size == 1 and input[0, 0, 0] == 666: # just one onset
                 print("one onset")
-                if self.x_dec.shape[1] <= 1:
+                if self.x_dec.shape[1] <= 1 or self.x_dec.shape[1] > self.x_enc.shape[1] - 2:
                     return torch.zeros(1, 1, constants.X_DECODER_CHANNELS) # can't modify x_dec yet!
                 # update x_dec[:,:,14] with realised tau_guitar
                 self.x_dec = data.readLiveOnset(input, self.x_dec, self.x_enc)
