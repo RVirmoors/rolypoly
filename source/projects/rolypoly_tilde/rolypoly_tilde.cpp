@@ -163,7 +163,10 @@ public:
                          description{"Onset detection latency (samples)"}};
 
   attribute<bool> score_filter{this, "score_filter", true,
-                         description{"Filter out notes not in the score"}};
+                         description{"Filter out notes not in the score"}}; // TODO: implement
+
+  attribute<float> follow{this, "follow", 0.5,
+                         description{"Follow the guitar (0.0 = no, 1.0 = full)"}}; // TODO: implement
 
   // BOOT STAMP
   message<> maxclass_setup{
