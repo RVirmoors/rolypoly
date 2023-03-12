@@ -60,7 +60,7 @@ def getLoss(D_hat, G_hat, G, V_hat, V, Follow: float):
     loss[:,:,3] = F.mse_loss(D_hat * mask, G) # realised drum timing vs guitar timing
     loss[:,:,4] = F.mse_loss(G_hat * mask, G) # realised vs predicted guitar timing
 
-    loss[:,:,0] = (1 - Follow) * (loss[:,:,1] + 0.1 * loss[:,:,2]) + Follow * loss[:,:,3] + loss[:,:,4]   
+    loss[:,:,0] = (1 - Follow) * (loss[:,:,1] + 0.01 * loss[:,:,2]) + Follow * loss[:,:,3] + 0.5 * loss[:,:,4]   
     return loss
 
 def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_hat, Follow:float = 0.5):

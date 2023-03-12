@@ -785,7 +785,7 @@ double rolypoly::computeNextNoteTimeMs() {
 bool rolypoly::incrementPlayIndexes() {
   // increment t_score and t_play
   double current_time_ms = score[t_score][TIME_MS];
-  if (DEBUG) cout << "== PERFORM == just played: " << t_play << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
+  cout << "== PERFORM == just played: " << t_play << " | " << score[t_score][0] << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
   while (score[t_score][TIME_MS] == current_time_ms) {
     t_score++;
     if (t_score >= score.size()) {
@@ -811,7 +811,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   double onset_time_ms = playhead_ms + 
     lib::math::samples_to_milliseconds(location - latency, samplerate());
   
-  if (DEBUG) cout << "== ONSET == at " << onset_time_ms << " ms" << endl;
+  cout << "== ONSET == at " << onset_time_ms << " ms" << endl;
 
   // find the closest note in the score
   int closest_note = 0;
@@ -829,16 +829,22 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   // is the onset within 1/3 of the closest note duration?
   double closest_note_duration;
   if (onset_time_ms > closest_note_time && closest_note < score.size()-1) {
-    closest_note_duration = score[closest_note+1][TIME_MS] - closest_note_time;
+    int next_note = closest_note+1;
+    while (score[next_note][TIME_MS] == closest_note_time && next_note < score.size()-1) next_note++;
+    closest_note_duration = score[next_note][TIME_MS] - closest_note_time;
   } else if (onset_time_ms < closest_note_time && closest_note > 0) {
-    closest_note_duration = closest_note_time - score[closest_note-1][TIME_MS];
-  } else return;
+    int prev_note = closest_note-1;
+    while (score[prev_note][TIME_MS] == closest_note_time && prev_note > 0) prev_note--;
+    closest_note_duration = closest_note_time - score[prev_note][TIME_MS];
+  } else return; // no duration to compare to
 
   double tau_guitar = onset_time_ms - closest_note_time;
   if (abs(tau_guitar) < closest_note_duration/3) {
     // if so, then we have a hit
-    if (DEBUG) cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
-  } else return;
+    cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
+  } else {
+    cout << "NOT within " << closest_note_duration/3 << " of " << closest_note_time << endl; return;
+  }
 
 
   torch::Tensor input_tensor = torch::zeros({1, 1, IN_DIM});
