@@ -80,8 +80,7 @@ def finetune(m: model.Transformer, params: List[torch.Tensor], x_enc, x_dec, y_h
     best_loss = 1000
     best_params = params.copy()
     losses = torch.zeros(1, 1, constants.X_DECODER_CHANNELS)
-    epochs = 30 # + x_enc.shape[0] // 20 # 30 + 1 epoch per 20 hits in the input sequence
-    for epoch in range(epochs):
+    for epoch in range(constants.epochs):
         Y_hat = m.forward(X_enc, X_dec)
         D_hat, G_hat = getTimings(X_dec, Y_hat) # we already have G from getBatch
         V = X_enc[:,:,:9]

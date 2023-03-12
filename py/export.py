@@ -182,7 +182,7 @@ class ExportRoly(nn_tilde.Module):
                 # self.x_dec[0, 10, constants.INX_TAU_G] = 0.01
                 # self.x_dec[0, 12, constants.INX_TAU_G] = 0.01
                 # self.x_dec[0, 14, constants.INX_TAU_G] = 0.01
-                self.pretrained, self.params, loss, self.diag = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat, Follow=0.6)
+                self.pretrained, self.params, loss, self.diag = finetune.finetune(self.pretrained, self.params, self.x_enc, self.x_dec, self.y_hat, Follow=0.4)
                 return loss
             else: # diagnostics
                 return self.diag

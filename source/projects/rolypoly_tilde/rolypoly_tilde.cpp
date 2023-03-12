@@ -514,6 +514,7 @@ rolypoly::rolypoly(const atoms &args)
   catch (std::exception& e)
   {
       if (DEBUG) cerr << e.what() << endl;
+      cout << "No finetuned model found." << endl;
   }
 
   // GET MODEL'S METHOD PARAMETERS
