@@ -74,23 +74,16 @@ def bartime_to_ms(bartime, featVec):
         ms = ms.view(bartime.shape[0], bartime.shape[1])
     return ms
 
-def upbeat(bartime: torch.Tensor) -> bool:
+def offbeat(bartime: torch.Tensor) -> bool:
     """
     Check if a bar-relative time is on an upbeat.
     input:
         bartime = time to be checked
     """
     bartime = torch.tensor(bartime)
-    if torch.isclose(bartime, torch.tensor(0.), atol=0.05):
-        return False
-    if torch.isclose(bartime, torch.tensor(0.25), atol=0.05):
-        return False
-    if torch.isclose(bartime, torch.tensor(0.5), atol=0.05):
-        return False
-    if torch.isclose(bartime, torch.tensor(0.75), atol=0.05):
-        return False
-    if torch.isclose(bartime, torch.tensor(1.), atol=0.05):
-        return False
+    for i in range(5):
+        if torch.isclose(bartime, torch.tensor(i/4), atol=0.05):
+            return False
     return True
 
 # === PRETTY MIDI SCORE PARSING ===

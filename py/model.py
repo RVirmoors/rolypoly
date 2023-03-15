@@ -36,20 +36,15 @@ class Basic(nn.Module):
         return out
 
 class Swing(nn.Module):
-    def __init__(self, in_channels=14, out_channels=14):
-        # in: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
-        # out: 14 channels (9 drum velocities, bpm, tsig, pos_in_bar, tau_d, tau_g)
+    def __init__(self):
         super(Swing, self).__init__()
-        torch.set_printoptions(precision=2, sci_mode=False)
-        self.in_channels = in_channels
-        self.out_channels = out_channels
 
     def forward(self, _, x):
-        for i in range(x.shape[-1]):
-            if data.upbeat(x[0, 11, i]):
+        for i in range(x.shape[1]):
+            if data.upbeat(x[0, i, constants.INX_BAR_POS]):
                 # if we're on an upbeat, nudge the note forward
-                nudge = data.bartime_to_ms(0.05, x[0, :, i])
-                x[0, 12, i] = nudge
+                nudge = data.bartime_to_ms(0.05, x[0, i, :])
+                x[0, i, constants.INX_TAU_D] = nudge
         return x
 
 # === TRANSFORMER HYPERPARAMETERS ===
