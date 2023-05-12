@@ -76,7 +76,7 @@ def bartime_to_ms(bartime, featVec):
 
 def offbeat(bartime: torch.Tensor) -> bool:
     """
-    Check if a bar-relative time is on an upbeat.
+    Check if a bar-relative time is on an offbeat.
     input:
         bartime = time to be checked
     """
