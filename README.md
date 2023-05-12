@@ -1,6 +1,6 @@
 # rolypoly~
 
-work underway (Jan-Feb '22) on porting to ircam's nn~ for real-time use in Max!
+(update May '23) the object is functional, alpha release w/ full documentation coming soon
 
 ## quickstart
 
