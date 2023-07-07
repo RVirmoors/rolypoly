@@ -550,7 +550,9 @@ rolypoly::rolypoly(const atoms &args)
     this, "(signal) musician input", "signal"));
 
   for (int i(0); i < m_out_dim; i++) {
-    std::string output_label = "";
+    std::string output_label = "(signal) ";
+    if (i == 0)
+      output_label = "(message) noteout or (signal) ";
     try {
       output_label = m_model.get_model().attr(m_method + "_output_labels").toList().get(i).toStringRef();
     } catch (...) {
