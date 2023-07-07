@@ -167,6 +167,12 @@ public:
   attribute<bool> score_filter{this, "score_filter", true,
                          description{"Filter out notes not in the score"}}; // TODO: implement
 
+  attribute<bool> signal_out{this, "signal_out", true,
+                         description{"Output signals"}};  // TODO: implement
+
+  attribute<bool> message_out{this, "message_out", true,
+                         description{"Output messages"}}; // TODO: implement
+
   // BOOT STAMP
   message<> maxclass_setup{
       this, "maxclass_setup",
