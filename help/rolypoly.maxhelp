@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 312.0, 85.0, 931.0, 913.0 ],
+		"rect" : [ 605.0, 85.0, 931.0, 913.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 1,
 		"default_fontsize" : 12.0,
@@ -1595,9 +1595,9 @@
 									"id" : "obj-1",
 									"maxclass" : "newobj",
 									"numinlets" : 1,
-									"numoutlets" : 14,
-									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
-									"patching_rect" : [ 107.5, 188.666667640209198, 155.5, 22.0 ],
+									"numoutlets" : 15,
+									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "" ],
+									"patching_rect" : [ 107.5, 188.666667640209198, 166.0, 22.0 ],
 									"text" : "rolypoly~ roly tim.mid"
 								}
 
@@ -2150,7 +2150,7 @@
 						}
 ,
 						"classnamespace" : "box",
-						"rect" : [ 312.0, 111.0, 931.0, 887.0 ],
+						"rect" : [ 605.0, 111.0, 931.0, 887.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -2699,9 +2699,9 @@
 									"id" : "obj-1",
 									"maxclass" : "newobj",
 									"numinlets" : 1,
-									"numoutlets" : 14,
-									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal" ],
-									"patching_rect" : [ 107.5, 188.666667640209198, 155.5, 22.0 ],
+									"numoutlets" : 15,
+									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "" ],
+									"patching_rect" : [ 107.5, 188.666667640209198, 166.0, 22.0 ],
 									"text" : "rolypoly~ roly tim.mid"
 								}
 
@@ -2736,6 +2736,14 @@
 							}
  ],
 						"lines" : [ 							{
+								"patchline" : 								{
+									"destination" : [ "obj-18", 0 ],
+									"midpoints" : [ 264.0, 411.0, 86.5, 411.0 ],
+									"source" : [ "obj-1", 14 ]
+								}
+
+							}
+, 							{
 								"patchline" : 								{
 									"destination" : [ "obj-2", 0 ],
 									"order" : 1,

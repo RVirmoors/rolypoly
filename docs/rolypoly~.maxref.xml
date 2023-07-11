@@ -73,6 +73,11 @@
 
 	<attributelist>
 
+		<attribute name='signal_out' get='1' set='1' type='long' size='1' >
+			<digest>Output signals </digest>
+			<description>Output signals </description>
+		</attribute>
+
 		<attribute name='enable' get='1' set='1' type='long' size='1' >
 			<digest>Enable / disable tensor computation </digest>
 			<description>Enable / disable tensor computation </description>
@@ -86,6 +91,11 @@
 		<attribute name='score_filter' get='1' set='1' type='long' size='1' >
 			<digest>Filter out notes not in the score </digest>
 			<description>Filter out notes not in the score </description>
+		</attribute>
+
+		<attribute name='message_out' get='1' set='1' type='long' size='1' >
+			<digest>Output messages </digest>
+			<description>Output messages </description>
 		</attribute>
 
 	</attributelist>

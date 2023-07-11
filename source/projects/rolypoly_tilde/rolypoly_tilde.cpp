@@ -4,7 +4,7 @@
 #define DEBUG false
 
 #ifndef VERSION
-#define VERSION "2.0b1"
+#define VERSION "2.0b2"
 #endif
 
 // midi stuff
@@ -76,6 +76,8 @@ public:
 	// INLETS OUTLETS
 	std::vector<std::unique_ptr<inlet<>>> m_inlets;
 	std::vector<std::unique_ptr<outlet<>>> m_outlets;
+  atoms m_note;
+  const int playableNotes[9] = {36, 38, 42, 46, 43, 45, 48, 57, 47};
 
 	rolypoly(const atoms &args = {});
 	~rolypoly();
@@ -557,8 +559,6 @@ rolypoly::rolypoly(const atoms &args)
 
   for (int i(0); i < m_out_dim; i++) {
     std::string output_label = "(signal) ";
-    if (i == 0)
-      output_label = "(message) noteout or (signal) ";
     try {
       output_label = m_model.get_model().attr(m_method + "_output_labels").toList().get(i).toStringRef();
     } catch (...) {
@@ -567,6 +567,12 @@ rolypoly::rolypoly(const atoms &args)
     m_outlets.push_back(std::make_unique<outlet<>>(
         this, output_label, "signal"));
   }
+  // thread_check::scheduler, thread_action::fifo
+  m_outlets.push_back(std::make_unique<outlet<>>(
+    this, "(list) notes out"));
+
+  m_note.reserve(2); // note, velocity
+
   cout << "Running warmup, please wait (Max will freeze for a few seconds) ..." << endl;
   // "play must be set to true in the python module for this to work"
   warmup.delay(500);
@@ -920,11 +926,20 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         double vel = play_notes[t_play][c];
         // cout << "vel: " << vel << " at t: " << t_play << endl;
         if (c < 9) {
-          if (vel > 0)
-            out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
+          if (vel > 0) {
+            if (signal_out) // OUTPUT NOTE SIGNALS
+              out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
+            if (message_out) { // OUTPUT MESSAGES
+              short msg_index = output.channel_count();
+              m_note[0] = playableNotes[c];
+              m_note[1] = vel;
+              m_outlets[msg_index].get()->send(m_note[0], m_note[1]);
+            }
+          }
         }
         else
-          out[micro_index] = vel;
+          if (signal_out) // OUTPUT META SIGNALS (bpm, tsig..)
+            out[micro_index] = vel;
       }
       bool done = incrementPlayIndexes();
       if (done) break;
