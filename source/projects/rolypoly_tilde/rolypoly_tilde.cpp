@@ -41,12 +41,6 @@ unsigned power_ceil(unsigned x) {
 c74::min::path get_latest_model(std::string model_path) {
   if (model_path.substr(model_path.length() - 3) != ".ts")
     model_path = model_path + ".ts";
-  // namespace max = c74::max;
-  // char          m_filename[max::MAX_PATH_CHARS];
-  // max::t_fourcc m_type;
-  // short         m_path;
-  // strncpy(m_filename, model_path.c_str(), max::MAX_PATH_CHARS);
-  // auto err = max::locatefile_extended(m_filename, &m_path, &m_type, NULL, 0);
   return path(model_path);
 }
 
