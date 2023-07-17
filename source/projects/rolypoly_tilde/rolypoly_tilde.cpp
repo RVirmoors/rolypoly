@@ -77,6 +77,7 @@ public:
 	std::vector<std::unique_ptr<inlet<>>> m_inlets;
 	std::vector<std::unique_ptr<outlet<>>> m_outlets;
   atoms m_note;
+  // kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride
   const int playableNotes[9] = {36, 38, 42, 46, 43, 45, 48, 57, 47};
 
 	rolypoly(const atoms &args = {});

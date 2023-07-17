@@ -286,6 +286,7 @@ if __name__ == '__main__':
     test1 = torch.tensor([[[36, 60, 120, 1, 0.5]]])
     x = readScore(test)
     print("readScore shape =", x.shape)
+    # append random tau_d, tau_g
     x = torch.cat((x, torch.randn(x.shape[0], x.shape[1], 2)), dim=2)
 
     x_original = x.clone().detach()

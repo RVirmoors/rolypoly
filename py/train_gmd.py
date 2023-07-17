@@ -199,7 +199,6 @@ def main(argv):
     config = model.Config()
     config.block_size = FLAGS.block_size
     m = model.Transformer(config)
-
     train.train(m, config, FLAGS.load_model, FLAGS.epochs, train_data, val_data, FLAGS.batch_size)
 
 
