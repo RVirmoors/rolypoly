@@ -34,7 +34,7 @@ flags.DEFINE_integer("batch_size", 512,
     "Batch size: how many minibatches to process at a time.")
 flags.DEFINE_integer("block_size", 16,
     "Block / minibatch size: how many notes to look at.")
-flags.DEFINE_integer("epochs", 100, "Number of epochs to train.")
+flags.DEFINE_integer("epochs", 1000, "Number of epochs to train.")
 flags.DEFINE_bool("final", False, "Final training, using all data.")
 
 
