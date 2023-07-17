@@ -115,9 +115,9 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
     output: X_take (len, feat_vec_size)
     """
     hit_index = 0
+    hit = torch.zeros(feat_vec_size)
 
     for index, note in enumerate(drumtrack.notes):
-        hit = torch.zeros(feat_vec_size)
         if index < len(drumtrack.notes) - 1:
             duration = H[index + 1] - H[index]
             if duration < 0: # if at end of bar, then add barlength
@@ -138,6 +138,7 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
                 X_take = torch.cat((X_take, hit.unsqueeze(0)), 0)
             hit_index += 1
             duration = 0
+            hit = torch.zeros(feat_vec_size)
     return X_take
 
 def getTrainDataFromX_take(X_take: torch.Tensor):
@@ -204,3 +205,8 @@ def main(argv):
 
 if __name__ == '__main__':
     app.run(main)
+    # csv_filename = "gmd.csv"
+    # x_take = midifileToX_take("gmd.mid")
+    # print(x_take[:5])
+    # rows = data.saveTakeToCSV(x_take, filename=csv_filename)
+    # print("Saved", csv_filename, ": ", rows, "rows.")
