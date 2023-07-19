@@ -115,30 +115,36 @@ def parseHO(drumtrack, pitch_class_map, tempos, timesigs, H, O) -> torch.Tensor:
     output: X_take (len, feat_vec_size)
     """
     hit_index = 0
-    hit = torch.zeros(feat_vec_size)
+    hit = torch.zeros(9)
+    off = torch.zeros(9)
+    pos = torch.zeros(3)
 
     for index, note in enumerate(drumtrack.notes):
+        # print("index", index, "hit_index", hit_index, ":", note.pitch, "- offset:", O[index])
         if index < len(drumtrack.notes) - 1:
             duration = H[index + 1] - H[index]
             if duration < 0: # if at end of bar, then add barlength
                 duration += timesigs[index][0] / timesigs[index][1]
         hit[pitch_class_map[note.pitch]] = note.velocity
+        off[pitch_class_map[note.pitch]] = O[index]
         if duration:
             # done adding notes at this timestep, process it
-            hit[9] = tempos[hit_index]
-            hit[10] = timesigs[hit_index][0] / timesigs[hit_index][1]
-            hit[11] = H[index]          # bar position, [0 - # of bars]
-            hit[12] = (O[index] + O[hit_index]) / 2 # tau_drums
-            # hit[13] remains zero (tau_guitar)
+            pos[0] = tempos[index]
+            pos[1] = timesigs[index][0] / timesigs[index][1]
+            pos[2] = H[index] # bar position, [0 - # of bars]
+            # tau_guitar remains zero
 
             # add hit to X_take
+            new_row = torch.cat((hit.unsqueeze(0), off.unsqueeze(0), pos.unsqueeze(0)), dim=1)
             if hit_index == 0:
-                X_take = hit.unsqueeze(0)
+                X_take = new_row
             else:
-                X_take = torch.cat((X_take, hit.unsqueeze(0)), 0)
+                X_take = torch.cat((X_take, new_row), 0)
             hit_index += 1
             duration = 0
-            hit = torch.zeros(feat_vec_size)
+            hit = torch.zeros(9)
+            off = torch.zeros(9)
+            pos = torch.zeros(3)
     return X_take
 
 def getTrainDataFromX_take(X_take: torch.Tensor):
@@ -204,9 +210,9 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    app.run(main)
-    # csv_filename = "gmd.csv"
-    # x_take = midifileToX_take("gmd.mid")
-    # print(x_take[:5])
-    # rows = data.saveTakeToCSV(x_take, filename=csv_filename)
-    # print("Saved", csv_filename, ": ", rows, "rows.")
+    # app.run(main)
+    csv_filename = "gmd.csv"
+    x_take = midifileToX_take("gmd.mid")
+    print(x_take[:5])
+    rows = data.saveTakeToCSV(x_take, filename=csv_filename)
+    print("Saved", csv_filename, ": ", rows, "rows.")

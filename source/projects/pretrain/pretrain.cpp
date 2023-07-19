@@ -64,5 +64,7 @@ int main() {
     // std::cout << "data:" << std::endl << data << std::endl;
 
     train(model, data, input_seq, output, "model.pt", device);
+    
+    std::cout << model->forward(data[0], input_seq[0]) << std::endl;
     return 0;
 }

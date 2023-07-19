@@ -47,7 +47,6 @@ void train(TransformerModel model,
         }
     }
 
-    std::cout << model->forward(data[0], input_seq[0]) << std::endl;
 }
 
 } // end namespace backend
