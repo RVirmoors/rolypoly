@@ -16,7 +16,7 @@ target_include_directories(
 )
 
 target_link_libraries(backend INTERFACE "${TORCH_LIBRARIES}")
-set_property(TARGET backend PROPERTY CXX_STANDARD 17)
+set_property(TARGET backend PROPERTY CXX_STANDARD 17) # need c++17 for <filesystem> etc
 
 add_executable(backend_test test/test.cpp)
 target_include_directories(backend_test PRIVATE ${PROJECT_SOURCE_DIR}/include)
