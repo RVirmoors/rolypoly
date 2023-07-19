@@ -20,8 +20,7 @@ include_directories(
 
 link_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/lib
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/Release
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../nn_tilde/build/backend/Release
+	${CMAKE_CURRENT_SOURCE_DIR}/../backend/Release
 )
 
 link_libraries(
@@ -40,7 +39,6 @@ set( SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../midifile/src/MidiEventList.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../midifile/src/Binasc.cpp
 )
-
 
 add_library( 
 	${PROJECT_NAME} 
