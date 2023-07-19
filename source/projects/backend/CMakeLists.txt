@@ -16,12 +16,12 @@ target_include_directories(
 )
 
 target_link_libraries(backend INTERFACE "${TORCH_LIBRARIES}")
-set_property(TARGET backend PROPERTY CXX_STANDARD 14)
+set_property(TARGET backend PROPERTY CXX_STANDARD 17)
 
 add_executable(backend_test test/test.cpp)
 target_include_directories(backend_test PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(backend_test "${TORCH_LIBRARIES}")
-set_property(TARGET backend_test PROPERTY CXX_STANDARD 14)
+set_property(TARGET backend_test PROPERTY CXX_STANDARD 17)
 
 target_precompile_headers(${PROJECT_NAME} 
 	INTERFACE 
