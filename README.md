@@ -28,10 +28,19 @@ ltt install torch
 make sure you're in the `py` folder:
 - `cd py`
 
-and run the train script to train on your data (coming soon)
 
-and then export it to a `.ts` file which `rolypoly~` can use in Max:
-- `python export.py`
+...
+
+
+```
+cd source/projects/pretrain/build
+cmake --build . --config Release
+cd Release
+```
+download GMD and extract into Release/groove
+```
+pretrain
+```
 
 
 ## build the Max object from source (windows)
