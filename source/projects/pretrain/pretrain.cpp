@@ -1,3 +1,10 @@
+// Rolypoly C++ implementation
+// 2023 rvirmoors
+//
+// Train network using Groove MIDI Dataset (GMD) from Magenta:
+// https://magenta.tensorflow.org/datasets/groove
+
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -97,12 +104,14 @@ void takeToTrainData(torch::Tensor& take, torch::Tensor& input_encode, torch::Te
     input_encode = take;
     auto sum_non_zero = torch::sum(input_encode.slice(1, 0, 9), 0);
     auto count_non_zero = (input_encode.narrow(1, 0, 9) != 0).sum(0);
-    std::cout << count_non_zero << std::endl;
+    //std::cout << count_non_zero << std::endl;
     auto mean = sum_non_zero / count_non_zero;
-    std::cout << mean << std::endl;
+    //std::cout << mean << std::endl;
     input_encode.index_put_({ torch::indexing::Slice(), torch::indexing::Slice(0,9)}, torch::where(input_encode.narrow(1, 0, 9) != 0, mean, input_encode.narrow(1, 0, 9)));
-    std::cout << input_encode << std::endl;
-    return;
+    // std::cout << input_encode << std::endl;
+
+    input_decode = take.slice(0, 0, take.size(0) - 1);
+    output_decode = take.slice(0, 1, take.size(0));
 }
 
 int main() {
@@ -117,7 +126,7 @@ int main() {
     getMeta(meta);
 
     for (const auto& data : meta) {
-        std::cout << data.values.at("split")._Equal("validation") << std::endl;
+        std::cout << "train? " << data.values.at("split")._Equal("train") << std::endl;
         std::string csv_filename = "groove/" + data.values.at("midi_filename").substr(0, data.values.at("midi_filename").size() - 4) + ".csv";
         std::cout << csv_filename << " - ";
         torch::Tensor take;
@@ -126,6 +135,13 @@ int main() {
         std::cout << take.sizes() << std::endl;
         torch::Tensor xe, xd, y;
         takeToTrainData(take, xe, xd, y);
+
+        auto split = data.values.at("split");
+        if (split._Equal("train")) {
+            std::cout << "add train" << std::endl;
+        } else {
+            std::cout << "add validation" << std::endl;
+        }
     }
     std::cin.get();
     return 0;
