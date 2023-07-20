@@ -5,8 +5,6 @@ namespace backend {
 
 using namespace torch;
 
-// TODO normalize all features
-
 struct TransformerModelImpl : nn::Module {
     TransformerModelImpl(int input_dim, int output_dim, int d_model, int nhead, torch::Device device) :
     device(device),

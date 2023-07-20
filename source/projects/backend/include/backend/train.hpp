@@ -5,10 +5,21 @@ namespace backend {
 
 using namespace torch;
 
+struct TrainConfig {
+    int batch_size; // Batch size: how many minibatches to process at a time
+    int block_size; // Block / minibatch size: how many notes to look at.
+    int epochs;     // How many epochs to train for.
+    bool final;     // Final training, using all data.
+};
+
+void getBatch() {
+
+}
+
 void train(TransformerModel model,
-            torch::Tensor data,
-            torch::Tensor input_seq,
-            torch::Tensor output,
+            TrainConfig config,
+            std::map<std::string, std::vector<torch::Tensor>> train_data,
+            std::map<std::string, std::vector<torch::Tensor>> val_data,
             std::string save_model = "model.pt",
             torch::Device device = torch::kCPU) 
 {
