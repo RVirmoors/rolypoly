@@ -15,15 +15,6 @@
 #include <torch/torch.h>
 #include "backend.hpp"
 
-#define OUTPUT_DIM 21 // 9 drum channel velocities+offsets, bpm, tsig, bar_pos
-#define INPUT_DIM 22 // above + tau_guitar
-#define INX_BPM 18
-#define INX_TSIG 19
-#define INX_BAR_POS 20
-#define INX_TAU_G 21
-#define IN_DRUM_CHANNELS 5 // hit, vel, bpm, tsig, bar_pos
-#define IN_ONSET_CHANNELS 5 // 666, tau_guitar, bpm, tsig, bar_pos
-
 const double weight_decay = 1e-1;
 const double beta1 = 0.9;
 const double beta2 = 0.95;
@@ -38,7 +29,7 @@ struct MetaData {
 void getMeta(std::vector<MetaData>& meta) {
     std::vector<std::string> headerKeys; // Vector to store the header keys
 
-    std::ifstream file("groove/info.csv");
+    std::ifstream file("groove/miniinfo.csv");
     if (!file.is_open()) {
         std::cerr << "Error opening file." << std::endl;
         return;
@@ -66,7 +57,7 @@ void getMeta(std::vector<MetaData>& meta) {
     }
 }
 
-void csvToTensor(const std::string& filename, torch::Tensor& take) {
+void csvToTensor(const std::string& filename, torch::Tensor& take, int minRows = 16) {
     std::ifstream file(filename);
     std::vector<std::vector<float>> data;
 
@@ -74,7 +65,7 @@ void csvToTensor(const std::string& filename, torch::Tensor& take) {
         std::cerr << "Error opening file: " << filename << std::endl;
         return;
     } else {
-        std::cout << "Opened file: " << filename << std::endl;
+        std::cout << "Opened file: " << filename;
     }
 
     std::string line;
@@ -90,6 +81,11 @@ void csvToTensor(const std::string& filename, torch::Tensor& take) {
     }
 
     file.close();
+
+    if (data.size() < minRows + 1) {
+        std::cout << ", too short, discarding." << std::endl;
+        return;
+    }
 
     take = torch::zeros({ int(data.size()), int(data[0].size()) });
     for (int i = 0; i < int(data.size()); i++) {
@@ -124,32 +120,38 @@ int main() {
     std::vector<MetaData> meta;
     getMeta(meta);
 
+    backend::TrainConfig config;
+    config.batch_size = 5; // 512
+    config.block_size = 16;
+    config.epochs = 1000;
+    config.final = false;
     std::map<std::string, std::vector<torch::Tensor>> train_data, val_data;
 
-    // for (const auto& data : meta) {
-    //     std::cout << "train? " << data.values.at("split")._Equal("train") << std::endl;
-    //     std::string csv_filename = "groove/" + data.values.at("midi_filename").substr(0, data.values.at("midi_filename").size() - 4) + ".csv";
-    //     std::cout << csv_filename << " - ";
-    //     torch::Tensor take;
-    //     csvToTensor(csv_filename, take);
-    //     take = take.to(device);
-    //     std::cout << take.sizes() << std::endl;
-    //     torch::Tensor xe, xd, y;
-    //     takeToTrainData(take, xe, xd, y);
+    for (const auto& data : meta) {
+        std::cout << "train? " << data.values.at("split")._Equal("train") << std::endl;
+        std::string csv_filename = "groove/" + data.values.at("midi_filename").substr(0, data.values.at("midi_filename").size() - 4) + ".csv";
+        torch::Tensor take;
+        csvToTensor(csv_filename, take, config.block_size);
+        if (take.size(0) == 0)
+            break;
+        take = take.to(device);
+        std::cout << ": " << take.sizes() << std::endl;
+        torch::Tensor xe, xd, y;
+        takeToTrainData(take, xe, xd, y);
 
-    //     auto split = data.values.at("split");
-    //     if (split._Equal("train")) {
-    //         std::cout << "add train" << std::endl;
-    //         train_data["X_enc"].push_back(xe);
-    //         train_data["X_dec"].push_back(xd);
-    //         train_data["Y"].push_back(y);
-    //     } else {
-    //         std::cout << "add validation" << std::endl;
-    //         val_data["X_enc"].push_back(xe);
-    //         val_data["X_dec"].push_back(xd);
-    //         val_data["Y"].push_back(y);
-    //     }
-    // }
+        auto split = data.values.at("split");
+        if (split._Equal("train")) {
+            std::cout << "add train" << std::endl;
+            train_data["X_enc"].push_back(xe);
+            train_data["X_dec"].push_back(xd);
+            train_data["Y"].push_back(y);
+        } else {
+            std::cout << "add validation" << std::endl;
+            val_data["X_enc"].push_back(xe);
+            val_data["X_dec"].push_back(xd);
+            val_data["Y"].push_back(y);
+        }
+    }
 
     backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 128, 8, device);
     
@@ -162,12 +164,6 @@ int main() {
             std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;
         }
     }
-
-    backend::TrainConfig config;
-    config.batch_size = 512;
-    config.block_size = 16;
-    config.epochs = 1000;
-    config.final = false;
 
     backend::train(model, config, train_data, val_data, load_model, device);
 

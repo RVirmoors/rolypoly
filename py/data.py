@@ -155,7 +155,7 @@ def saveTakeToCSV(X_take, filename: str) -> int:
     output: number of rows written
     """
     with open(filename, 'w') as f:
-        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, bpm, tsig, bar_pos, tau_d, tau_g\n")
+        f.write("kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride, tau_kick, tau_snar, tau_hcls, tau_hopn, tau_ltom, tau_mtom, tau_htom, tau_cras, tau_ride, bpm, tsig, bar_pos, tau_g\n")
         rows = X_take.shape[0]
         for row in range(rows):
             f.write(', '.join([str(x) for x in X_take[row].tolist()]) + '\n')

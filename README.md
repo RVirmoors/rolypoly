@@ -20,8 +20,6 @@ you need the following Python modules:
 python -m pip install light-the-torch
 ltt install torch
 ```
-- nn_tilde:
-`pip install nn_tilde`
 - others:
 `pip install numpy`
 

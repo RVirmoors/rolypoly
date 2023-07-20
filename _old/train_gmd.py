@@ -93,7 +93,6 @@ def midifileToX_take(filename: str) -> torch.Tensor:
 def quantizeDrumTrack(positions_in_bar, steps=16):
     """
     Start from live-played drumtrack. Return Hit, Offset matrices.
-    TODO: normalize offsets according to average offset?
     """
     live = positions_in_bar * steps
     H = live.round() / steps
