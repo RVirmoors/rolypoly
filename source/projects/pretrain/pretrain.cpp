@@ -56,14 +56,14 @@ void getMeta(std::vector<MetaData>& meta) {
 
     while (std::getline(file, line)) {
         std::istringstream iss(line);
-        MetaData MetaData;
+        MetaData metaData;
         std::string column;
         size_t columnIndex = 0;
         while (std::getline(iss, column, ',')) {
-            MetaData.values[headerKeys[columnIndex]] = column;
+            metaData.values[headerKeys[columnIndex]] = column;
             columnIndex++;
         }
-        meta.push_back(MetaData);
+        meta.push_back(metaData);
     }
 }
 
@@ -125,6 +125,8 @@ int main() {
     std::vector<MetaData> meta;
     getMeta(meta);
 
+    std::map<std::string, std::vector<torch::Tensor>> train_data, val_data;
+
     for (const auto& data : meta) {
         std::cout << "train? " << data.values.at("split")._Equal("train") << std::endl;
         std::string csv_filename = "groove/" + data.values.at("midi_filename").substr(0, data.values.at("midi_filename").size() - 4) + ".csv";
@@ -139,10 +141,17 @@ int main() {
         auto split = data.values.at("split");
         if (split._Equal("train")) {
             std::cout << "add train" << std::endl;
+            train_data["X_enc"].push_back(xe);
+            train_data["X_dec"].push_back(xd);
+            train_data["Y"].push_back(y);
         } else {
             std::cout << "add validation" << std::endl;
+            val_data["X_enc"].push_back(xe);
+            val_data["X_dec"].push_back(xd);
+            val_data["Y"].push_back(y);
         }
     }
+
     std::cin.get();
     return 0;
 
