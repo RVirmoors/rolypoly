@@ -126,11 +126,11 @@ int main() {
     // TODO: make these command-line configurable
     config.batch_size = 512; // 12;
     config.block_size = 16; // 16;
-    config.epochs = 1000;
+    config.epochs = 10000;
     config.final = false;
     config.eval_interval = 25;
     config.eval_iters = 40; // 200
-    config.lr = 4e-5;
+    config.lr = 4e-4;
     std::map<std::string, std::vector<torch::Tensor>> train_data, val_data;
 
     for (const auto& data : meta) {
