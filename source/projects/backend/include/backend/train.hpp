@@ -1,3 +1,8 @@
+// Rolypoly C++ implementation
+// 2023 rvirmoors
+//
+// Backend: training the network
+
 #pragma once
 
 #include <iostream>

@@ -1,3 +1,8 @@
+// Rolypoly C++ implementation
+// 2023 rvirmoors
+//
+// Backend: model definition and forward pass
+
 #pragma once
 
 #include <iostream>
