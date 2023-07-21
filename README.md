@@ -35,7 +35,8 @@ cd source/projects/pretrain/build
 cmake --build . --config Release
 cd Release
 ```
-download GMD and extract into Release/groove
+- download GMD and extract to `pretrain/build/Release/groove`
+run:
 ```
 pretrain
 ```

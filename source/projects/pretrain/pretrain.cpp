@@ -15,10 +15,6 @@
 #include <torch/torch.h>
 #include "backend.hpp"
 
-const double weight_decay = 1e-1;
-const double beta1 = 0.9;
-const double beta2 = 0.95;
-
 using namespace torch;
 namespace fs = std::filesystem;
 
@@ -29,7 +25,7 @@ struct MetaData {
 void getMeta(std::vector<MetaData>& meta) {
     std::vector<std::string> headerKeys; // Vector to store the header keys
 
-    std::ifstream file("groove/miniinfo.csv");
+    std::ifstream file("groove/info.csv");
     if (!file.is_open()) {
         std::cerr << "Error opening file." << std::endl;
         return;
@@ -62,7 +58,7 @@ void csvToTensor(const std::string& filename, torch::Tensor& take, int minRows =
     std::vector<std::vector<float>> data;
 
     if (!file.is_open()) {
-        std::cerr << "Error opening file: " << filename << std::endl;
+        std::cerr << "No file (too short?): " << filename << std::endl;
         return;
     } else {
         std::cout << "Opened file: " << filename;
@@ -87,7 +83,7 @@ void csvToTensor(const std::string& filename, torch::Tensor& take, int minRows =
         return;
     }
 
-    take = torch::zeros({ int(data.size()), int(data[0].size()) });
+    take = torch::zeros({ int(data.size()), INPUT_DIM });
     for (int i = 0; i < int(data.size()); i++) {
         for (int j = 0; j < int(data[0].size()); j++) {
             take[i][j] = data[i][j];
@@ -96,20 +92,26 @@ void csvToTensor(const std::string& filename, torch::Tensor& take, int minRows =
 }
 
 void takeToTrainData(torch::Tensor& take, torch::Tensor& input_encode, torch::Tensor& input_decode, torch::Tensor& output_decode) {
-    input_encode = take;
-    auto sum_non_zero = torch::sum(input_encode.slice(1, 0, 9), 0);
-    auto count_non_zero = (input_encode.narrow(1, 0, 9) != 0).sum(0);
-    //std::cout << count_non_zero << std::endl;
-    auto mean = sum_non_zero / count_non_zero;
-    //std::cout << mean << std::endl;
-    input_encode.index_put_({ torch::indexing::Slice(), torch::indexing::Slice(0,9)}, torch::where(input_encode.narrow(1, 0, 9) != 0, mean, input_encode.narrow(1, 0, 9)));
-    // std::cout << input_encode << std::endl;
+    input_encode = take; // (num_samples, INPUT_DIM)
 
-    input_decode = take.slice(0, 0, take.size(0) - 1);
-    output_decode = take.slice(0, 1, take.size(0));
+    // replace velocities with mean vel of that hit
+    // TODO: decide if this is necessary
+    // auto sum_non_zero = torch::sum(input_encode.slice(1, 0, 9), 0);
+    // auto count_non_zero = (input_encode.narrow(1, 0, 9) != 0).sum(0);
+    // auto mean = sum_non_zero / count_non_zero;
+    // input_encode.index_put_({ torch::indexing::Slice(), torch::indexing::Slice(0,9)}, 
+    //     torch::where(input_encode.narrow(1, 0, 9) != 0, mean, input_encode.narrow(1, 0, 9)));
+
+    input_decode = take.slice(0, 0, take.size(0) - 1);                      // (num_samples-1, INPUT_DIM)
+    output_decode = take.slice(0, 1, take.size(0)).slice(1, 0, OUTPUT_DIM); // (num_samples-1, OUTPUT_DIM)
 }
 
 int main() {
+
+    std::string outDir = "out";
+    std::string load_model = "out/model.pt";
+    if (!fs::exists(outDir))
+        fs::create_directory(outDir);
 
     torch::Device device = torch::kCPU;
     if (torch::cuda::is_available()) {
@@ -121,41 +123,44 @@ int main() {
     getMeta(meta);
 
     backend::TrainConfig config;
-    config.batch_size = 5; // 512
-    config.block_size = 16;
+    // TODO: make these command-line configurable
+    config.batch_size = 512; // 12;
+    config.block_size = 16; // 16;
     config.epochs = 1000;
     config.final = false;
+    config.eval_interval = 25;
+    config.eval_iters = 40; // 200
+    config.lr = 4e-5;
     std::map<std::string, std::vector<torch::Tensor>> train_data, val_data;
 
     for (const auto& data : meta) {
-        std::cout << "train? " << data.values.at("split")._Equal("train") << std::endl;
+        //std::cout << "train? " << data.values.at("split")._Equal("train") << std::endl;
         std::string csv_filename = "groove/" + data.values.at("midi_filename").substr(0, data.values.at("midi_filename").size() - 4) + ".csv";
         torch::Tensor take;
         csvToTensor(csv_filename, take, config.block_size);
-        if (take.size(0) == 0)
-            break;
-        take = take.to(device);
-        std::cout << ": " << take.sizes() << std::endl;
-        torch::Tensor xe, xd, y;
-        takeToTrainData(take, xe, xd, y);
+        if (take.size(0)) {
+            take = take.to(device);
+            std::cout << ": " << take.sizes() << std::endl;
+            torch::Tensor xe, xd, y;
+            takeToTrainData(take, xe, xd, y);
 
-        auto split = data.values.at("split");
-        if (split._Equal("train")) {
-            std::cout << "add train" << std::endl;
-            train_data["X_enc"].push_back(xe);
-            train_data["X_dec"].push_back(xd);
-            train_data["Y"].push_back(y);
-        } else {
-            std::cout << "add validation" << std::endl;
-            val_data["X_enc"].push_back(xe);
-            val_data["X_dec"].push_back(xd);
-            val_data["Y"].push_back(y);
+            auto split = data.values.at("split");
+            if (split._Equal("train")) {
+                //std::cout << "add train" << std::endl;
+                train_data["X_enc"].push_back(xe);
+                train_data["X_dec"].push_back(xd);
+                train_data["Y"].push_back(y);
+            } else {
+                //std::cout << "add validation" << std::endl;
+                val_data["X_enc"].push_back(xe);
+                val_data["X_dec"].push_back(xd);
+                val_data["Y"].push_back(y);
+            }
         }
     }
 
     backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 128, 8, device);
-    
-    std::string load_model = "out/model.pt";
+
     if (fs::exists(load_model)) {
         try {
             torch::load(model, load_model);
@@ -167,9 +172,16 @@ int main() {
 
     backend::train(model, config, train_data, val_data, load_model, device);
 
+    std::cout << "EXAMPLE EVAL:\n=============\n  y_hat     y" << std::endl;
+    model->eval();
+    torch::Tensor xe = val_data["X_enc"][0].slice(0, 0, config.block_size).unsqueeze(0);
+    torch::Tensor xd = val_data["X_dec"][0].slice(0, 0, config.block_size).unsqueeze(0);
+    backend::dataScaleDown(xe);
+    backend::dataScaleDown(xd);
+    torch::Tensor y = val_data["Y"][0].slice(0, 0, config.block_size).unsqueeze(0);
+    torch::Tensor y_hat = model->forward(xe, xd);
+    backend::dataScaleDown(y);
+    std::cout << torch::stack({y_hat[0][config.block_size-1], y[0][config.block_size-1]}, 1 )  << std::endl;
     std::cin.get();
-    return 0;
-
-    // std::cout << model->forward(data[0], input_seq[0]) << std::endl;
     return 0;
 }
