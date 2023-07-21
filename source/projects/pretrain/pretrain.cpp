@@ -99,7 +99,7 @@ void takeToTrainData(torch::Tensor& take, torch::Tensor& input_encode, torch::Te
     // auto sum_non_zero = torch::sum(input_encode.slice(1, 0, 9), 0);
     // auto count_non_zero = (input_encode.narrow(1, 0, 9) != 0).sum(0);
     // auto mean = sum_non_zero / count_non_zero;
-    // input_encode.index_put_({ torch::indexing::Slice(), torch::indexing::Slice(0,9)}, 
+    // input_encode.index_put_({ Slice(), Slice(0,9)}, 
     //     torch::where(input_encode.narrow(1, 0, 9) != 0, mean, input_encode.narrow(1, 0, 9)));
 
     input_decode = take.slice(0, 0, take.size(0) - 1);                      // (num_samples-1, INPUT_DIM)

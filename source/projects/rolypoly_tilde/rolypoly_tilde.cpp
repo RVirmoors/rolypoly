@@ -1,5 +1,8 @@
+// Rolypoly C++ implementation
 // 2023 rvirmoors
-// based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
+// v2.0b1 initially based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
+//
+// Frontend: Max external object
 
 #define DEBUG false
 
@@ -11,15 +14,14 @@
 #include "MidiFile.h"
 #define MAX_SCORE_LENGTH 100000
 #define SCORE_DIM 6 // hit, vel, bpm, tsig, pos_in_bar, TIME_MS
+#define INX_TIME_MS 5
 #define IN_DIM 5    // hit, vel, bpm, tsig, pos_in_bar
-#define OUT_DIM 14  // 9 hits, bpm, tsig, pos_in_bar, TAU_drum, TAU_guitar
-#define TIME_MS 5
-#define TAU 12
+#define OUT_DIM 12  // 9 hits, bpm, tsig, pos_in_bar
 
-// nn~
+// Max & Torch
 #include "c74_min.h"
 #include "torch/torch.h"
-#include "../../../nn_tilde/src/backend/backend.h"
+#include "backend.hpp"
 #include <string>
 #include <thread>
 #include <vector>
@@ -44,7 +46,6 @@ c74::min::path get_latest_model(std::string model_path) {
   return path(model_path);
 }
 
-// function to read a tensor and return a csv string
 std::string tensor_to_csv(at::Tensor tensor) {
   // in: tensor of shape (length, channels)
   // out: csv string of shape (length, channels)
@@ -72,7 +73,7 @@ public:
 	std::vector<std::unique_ptr<outlet<>>> m_outlets;
   atoms m_note;
   // kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride
-  const int playableNotes[9] = {36, 38, 42, 46, 43, 45, 48, 57, 47};
+  const int playableNotes[9] = {36, 38, 42, 46, 43, 45, 48, 57, 51};
 
 	rolypoly(const atoms &args = {});
 	~rolypoly();
@@ -113,7 +114,7 @@ public:
   int current_timesig_index;
   double barStart = 0, barEnd = 0;
 
-  double m_follow; // [0 ... 1] how much to finetune the model to follow the guitar
+  double m_follow; // [0 ... 1] how much to direct the model to follow the guitar
 
   void loadFinetuned(std::string path);
   void initialiseScore();
@@ -129,26 +130,18 @@ public:
   void processLiveOnsets(audio_bundle input);
 
 	// BACKEND RELATED MEMBERS
-	Backend m_model;
-	std::string m_method;
-	std::vector<std::string> settable_attributes;
-	bool has_settable_attribute(std::string attribute);
+	backend::TransformerModel m_model(INPUT_DIM, OUTPUT_DIM, 128, 8);
 	c74::min::path m_path;
-  int m_in_dim, m_out_dim;
 
 	// AUDIO PERFORM
-  bool m_use_thread;
 	std::unique_ptr<std::thread> m_compute_thread;
 	void operator()(audio_bundle input, audio_bundle output);
-	void buffered_perform(audio_bundle input, audio_bundle output);
 	void perform(audio_bundle input, audio_bundle output);
 
 
   // ONLY FOR DOCUMENTATION
   argument<symbol> path_arg{this, "model path",
                             "Absolute path to the pretrained model."};
-  argument<symbol> method_arg{this, "method",
-                              "Name of the method to call during synthesis."};
   argument<int> buffer_arg{
       this, "buffer size",
       "Size of the internal buffer (can't be lower than the method's ratio)."};
@@ -538,9 +531,6 @@ rolypoly::rolypoly(const atoms &args)
   if (!params.size()) {
     error("method " + m_method + " not found !");
   }
-
-  m_in_dim = params[0];
-  m_out_dim = params[2];
 
   // Calling forward in a thread causes memory leak in windows.
   // See https://github.com/pytorch/pytorch/issues/24237

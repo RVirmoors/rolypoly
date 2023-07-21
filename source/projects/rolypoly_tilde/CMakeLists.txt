@@ -16,6 +16,7 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../midifile/include
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include/torch/csrc/api/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../backend/include
 )
 
 link_directories(

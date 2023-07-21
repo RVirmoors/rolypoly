@@ -109,6 +109,17 @@ void getBatch(
     dataScaleDown(y);
 }
 
+torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
+    // discard zero note offsets from y
+    auto mask = (y.index({ Slice(), Slice(), Slice(0, 9) }) == 0.0);
+
+    y_hat.narrow(2, 9, 9).index_put_(
+        { mask.to(torch::kBool) }, 
+        y_hat.narrow(2, 9, 9).index({ mask.to(torch::kBool) }) * 0.0);
+
+    return torch::mse_loss(y_hat, y);
+}
+
 float estimateLoss(TransformerModel model,
             TrainConfig config,
             std::map<std::string, std::vector<torch::Tensor>>& val_data,
@@ -121,14 +132,13 @@ float estimateLoss(TransformerModel model,
         torch::Tensor x_enc, x_dec, y;
         getBatch(val_data, config.batch_size, config.block_size, x_enc, x_dec, y);
         torch::Tensor y_hat = model->forward(x_enc, x_dec);
-        torch::Tensor loss = torch::mse_loss(y_hat, y);
+        torch::Tensor loss = computeLoss(y_hat, y);
         losses[i] = loss.item<float>();
     }
     eval_loss = losses.mean().item<float>();
     model->train();
     return eval_loss;
 }
-
 
 void train(TransformerModel model,
             TrainConfig config,
@@ -153,7 +163,7 @@ void train(TransformerModel model,
             x_enc, x_dec, y);
                 
         torch::Tensor y_hat = model->forward(x_enc, x_dec);
-        torch::Tensor loss = torch::mse_loss(y_hat, y);
+        torch::Tensor loss = computeLoss(y_hat, y);
 
         loss.backward();
         optimizer.step();
