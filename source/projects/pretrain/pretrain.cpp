@@ -124,7 +124,7 @@ int main() {
 
     backend::TrainConfig config;
     // TODO: make these command-line configurable
-    config.batch_size = 512; // 12;
+    config.batch_size = 512; // 512;
     config.block_size = 16; // 16;
     config.epochs = 10000;
     config.final = false;

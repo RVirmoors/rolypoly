@@ -16,7 +16,7 @@ using namespace at::indexing;
 struct TransformerModelImpl : nn::Module {
     TransformerModelImpl(int input_dim, int output_dim, int d_model, int nhead, torch::Device device) :
     device(device),
-    pos_linLayer(nn::Linear(1, d_model)),
+    pos_linLayer(nn::Linear(3, d_model)),
     embedding(nn::Linear(input_dim, d_model)),
     transformer(nn::Transformer(nn::TransformerOptions(d_model, nhead))),
     fc(nn::Linear(d_model, output_dim))
@@ -32,7 +32,7 @@ struct TransformerModelImpl : nn::Module {
     }
 
     torch::Tensor generatePE(torch::Tensor x) {
-        return pos_linLayer(x.index({Slice(), Slice(), INX_BAR_POS}).unsqueeze(2));
+        return pos_linLayer(x.index({Slice(), Slice(), Slice(INX_BPM, INX_TAU_G)}));
     }
 
     torch::Tensor forward(torch::Tensor src, torch::Tensor tgt) {
