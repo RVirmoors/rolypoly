@@ -159,7 +159,7 @@ int main() {
         }
     }
 
-    backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 128, 8, device);
+    backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 64, 16, device);
 
     if (fs::exists(load_model)) {
         try {
