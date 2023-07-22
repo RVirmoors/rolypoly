@@ -14,11 +14,11 @@ using namespace torch;
 using namespace at::indexing;
 
 struct TransformerModelImpl : nn::Module {
-    TransformerModelImpl(int input_dim, int output_dim, int d_model, int nhead, torch::Device device) :
+    TransformerModelImpl(int input_dim, int output_dim, int d_model, int nhead, int enc_layers, int dec_layers, torch::Device device) :
     device(device),
     pos_linLayer(nn::Linear(3, d_model)),
     embedding(nn::Linear(input_dim, d_model)),
-    transformer(nn::Transformer(nn::TransformerOptions(d_model, nhead))),
+    transformer(nn::Transformer(nn::TransformerOptions(d_model, nhead, enc_layers, dec_layers))),
     fc(nn::Linear(d_model, output_dim))
     {   
         register_module("pos_linLayer", pos_linLayer);

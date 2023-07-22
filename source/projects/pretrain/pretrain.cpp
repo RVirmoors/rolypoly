@@ -159,7 +159,7 @@ int main() {
         }
     }
 
-    backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 64, 16, device);
+    backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 256, 32, 6, 6, device);
 
     if (fs::exists(load_model)) {
         try {
@@ -169,6 +169,7 @@ int main() {
             std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;
         }
     }
+    std::cout << model << std::endl;
 
     backend::train(model, config, train_data, val_data, load_model, device);
 
