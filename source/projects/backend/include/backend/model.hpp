@@ -46,12 +46,16 @@ struct TransformerModelImpl : nn::Module {
         torch::Tensor tgt_posenc = generatePE(tgt);
         src = embedding(src) + src_posenc;
         tgt = embedding(tgt) + tgt_posenc;
-        torch::Tensor src_mask = transformer->generate_square_subsequent_mask(src.size(1)).to(device);
+
+        torch::Tensor src_mask = torch::zeros({src.size(1),src.size(1)});
+        torch::Tensor tgt_mask = transformer->generate_square_subsequent_mask(tgt.size(1)).to(device);
+            
         // (B, T, C) -> (T, B, C)
         src.transpose_(0, 1);
         tgt.transpose_(0, 1);
 
-        torch::Tensor output = transformer(src, tgt, src_mask);
+        torch::Tensor output = transformer(src, tgt, src_mask, tgt_mask);     
+
         if (noBatch)
             output.squeeze_(1); // remove batch dimension
         else 
