@@ -1,5 +1,6 @@
 #pragma once
 
+#define ENCODER_DIM 12 // 9 drum hits, bpm, tsig, bar_pos
 #define OUTPUT_DIM 21 // 9 drum channel velocities+offsets, bpm, tsig, bar_pos
 #define INPUT_DIM 22 // above + tau_guitar
 #define INX_BPM 18

@@ -25,7 +25,7 @@ struct MetaData {
 void getMeta(std::vector<MetaData>& meta) {
     std::vector<std::string> headerKeys; // Vector to store the header keys
 
-    std::ifstream file("groove/info.csv");
+    std::ifstream file("groove/miniinfo.csv");
     if (!file.is_open()) {
         std::cerr << "Error opening file." << std::endl;
         return;
@@ -159,7 +159,14 @@ int main() {
         }
     }
 
-    backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 256, 32, 6, 6, device);
+    #define HITGEN
+    #ifdef HITGEN          
+        backend::HitsTransformer model(8, 4, 1, device);
+    #else
+        backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 256, 32, 6, 6, device);
+    #endif
+
+
 
     if (fs::exists(load_model)) {
         try {

@@ -140,6 +140,16 @@ float estimateLoss(TransformerModel model,
     return eval_loss;
 }
 
+void train(HitsTransformer model,
+            TrainConfig config,
+            std::map<std::string, std::vector<torch::Tensor>>& train_data,
+            std::map<std::string, std::vector<torch::Tensor>>& val_data,
+            std::string save_model = "hit_model.pt",
+            torch::Device device = torch::kCPU) 
+{
+
+}
+
 void train(TransformerModel model,
             TrainConfig config,
             std::map<std::string, std::vector<torch::Tensor>>& train_data,
