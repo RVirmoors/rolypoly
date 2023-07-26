@@ -14,6 +14,14 @@ namespace backend {
 using namespace torch;
 using namespace at::indexing;
 
+torch::Tensor threshToOnes(torch::Tensor src, float thresh = 0.0) {
+    return torch::where(
+                src.index({Slice(), Slice(), Slice(0, 9)}) > thresh,
+                1.0,
+                0.0
+            ); // replace all hits with 1
+}
+
 struct HitsTransformerImpl : nn::Module {
 // predicting upcoming hits
     HitsTransformerImpl(int d_model, int nhead, int enc_layers, torch::Device device) :
@@ -43,34 +51,21 @@ struct HitsTransformerImpl : nn::Module {
 
     torch::Tensor oneHotToInt(torch::Tensor src) {
         // convert one hot to ints
-        torch::Tensor output = torch::zeros({src.size(0), src.size(1), 1},
-            torch::dtype(torch::kInt32));
-        for (int i = 0; i < src.size(0); i++) {
-            for (int j = 0; j < src.size(1); j++) {
-                for (int k = 0; k < src.size(2); k++) {
-                    if (src[i][j][k].item<float>() == 1.0) {
-                        output[i][j][0] += (int)std::pow(2, k);
-                    }
-                }
-            }
-        }
-        return output;
+        torch::Tensor mask = torch::pow(2, torch::arange(9, device = src.device()));
+        return torch::sum(src * mask, 2).to(torch::kInt32);
     }
 
-    torch::Tensor forward(torch::Tensor src, torch::Tensor tgt) {
+    torch::Tensor forward(torch::Tensor src, torch::Tensor tgt /*not used*/) {
         torch::Tensor pos = src.index({Slice(), Slice(), Slice(INX_BPM, INX_TAU_G)});
-
-        src = torch::where(
-            src.index({Slice(), Slice(), Slice(0, 9)}) > 0,
-            1.0,
-            0.0
-        ); // replace all hits with 1
-
-        src = oneHotToInt(src).squeeze(2).to(device);// torch::cat({src, pos}, 2);
+        
+        src = threshToOnes(src);
+        
+        std::cout <<"START-" <<std::endl;
+        src = oneHotToInt(src).to(device);// torch::cat({src, pos}, 2);
+        std::cout <<"END" <<std::endl;
         
         torch::Tensor src_posenc = generatePE(pos);
         src = hitsEmbedding(src) + src_posenc;
-
         torch::Tensor src_mask = masker->generate_square_subsequent_mask(src.size(1)).to(device);
             
         src.transpose_(0, 1);    // (B, T, C) -> (T, B, C)

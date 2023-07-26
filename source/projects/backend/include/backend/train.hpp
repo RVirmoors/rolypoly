@@ -120,6 +120,15 @@ torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
     return torch::mse_loss(y_hat, y);
 }
 
+torch::Tensor hitsLoss(torch::Tensor y_hat, torch::Tensor y) {
+    torch::Tensor y_hits = threshToOnes(y.index({ Slice(), Slice(), Slice(0, 9) }));
+    torch::Tensor y_pos = y.index({Slice(), Slice(), Slice(9, 12)});
+    torch::Tensor y_hat_hits = threshToOnes(y_hat.index({ Slice(), Slice(), Slice(0, 9) }));
+    torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), Slice(9, 12)});
+
+    return torch::cross_entropy_loss(y_hat_hits, y_hits) + torch::mse_loss(y_hat_pos, y_pos);
+}
+
 float estimateLoss(TransformerModel model,
             TrainConfig config,
             std::map<std::string, std::vector<torch::Tensor>>& val_data,
@@ -140,6 +149,26 @@ float estimateLoss(TransformerModel model,
     return eval_loss;
 }
 
+float estimateLoss(HitsTransformer model,
+            TrainConfig config,
+            std::map<std::string, std::vector<torch::Tensor>>& val_data,
+            torch::Device device = torch::kCPU) {
+
+    model->eval();
+    float eval_loss = 0.0;
+    torch::Tensor losses = torch::zeros({config.eval_iters});
+    for (int i = 0; i < config.eval_iters; i++) {
+        torch::Tensor x_enc, x_dec, y;
+        getBatch(val_data, config.batch_size, config.block_size, x_enc, x_dec, y);
+        torch::Tensor y_hat = model->forward(x_enc, x_dec);
+        torch::Tensor loss = hitsLoss(y_hat, y);
+        losses[i] = loss.item<float>();
+    }
+    eval_loss = losses.mean().item<float>();
+    model->train();
+    return eval_loss;
+}
+
 void train(HitsTransformer model,
             TrainConfig config,
             std::map<std::string, std::vector<torch::Tensor>>& train_data,
@@ -147,7 +176,41 @@ void train(HitsTransformer model,
             std::string save_model = "hit_model.pt",
             torch::Device device = torch::kCPU) 
 {
+    torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
+    double min_loss = std::numeric_limits<double>::infinity();
 
+    std::cout << "Training Hits Generator..." << std::endl;
+    model->train();
+
+    for (int epoch = 0; epoch < config.epochs; epoch++) {
+        optimizer.zero_grad();
+
+        torch::Tensor x_enc, x_dec, y;
+        getBatch(train_data, 
+            config.batch_size, 
+            config.block_size,
+            x_enc, x_dec, y);
+        
+        torch::Tensor y_hat = model->forward(x_enc, x_dec);
+        torch::Tensor loss = hitsLoss(y_hat, y);
+
+        loss.backward();
+        optimizer.step();
+
+        // if (epoch % config.eval_interval == 0) {
+        //     float eval_loss = estimateLoss(model, config, val_data, device);  
+        //     if (eval_loss < min_loss) {
+        //         min_loss = eval_loss;
+        //         std::cout << "New min val loss: " << min_loss << std::endl;
+        //         // Save the model checkpoint.
+        //         torch::save(model, save_model);
+        //     }
+        // }
+
+        if (epoch % 10 == 0) {
+            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
+        }
+    }
 }
 
 void train(TransformerModel model,
@@ -191,9 +254,7 @@ void train(TransformerModel model,
         if (epoch % 10 == 0) {
             std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
         }
-
     }
-
 }
 
 } // end namespace backend
