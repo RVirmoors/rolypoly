@@ -203,6 +203,11 @@ void train(HitsTransformer model,
             if (eval_loss < min_loss) {
                 min_loss = eval_loss;
                 std::cout << "New min val loss: " << min_loss << std::endl;
+                
+                torch::Tensor y_hits = threshToOnes(y.index({ Slice(), Slice(), Slice(0, 9) }));
+                torch::Tensor y_hat_hits = threshToOnes(y_hat.index({ Slice(), Slice(), Slice(0, 9) }));
+                std::cout << y_hits[0] << "\n HAT:" << y_hat_hits[0] << "\n LOSS: " << torch::cross_entropy_loss(y_hat_hits, y_hits) << std::endl;
+                
                 // Save the model checkpoint.
                 torch::save(model, save_model);
             }
