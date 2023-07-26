@@ -78,10 +78,6 @@ struct HitsTransformerImpl : nn::Module {
         output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
 
         output = hitsFc(output);
-
-        std::cout << output << output.sizes() << std::endl;
-        std::cin.get();
-
         return output;
     }
 

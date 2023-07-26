@@ -189,6 +189,10 @@ int main() {
     torch::Tensor y = val_data["Y"][0].slice(0, 0, config.block_size).unsqueeze(0);
     torch::Tensor y_hat = model->forward(xe, xd);
     backend::dataScaleDown(y);
+    #ifdef HITGEN 
+        y = y.slice(2, 0, 12);
+    #endif
+
     std::cout << torch::stack({y_hat[0][config.block_size-1], y[0][config.block_size-1]}, 1 )  << std::endl;
     std::cin.get();
     return 0;
