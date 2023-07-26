@@ -59,10 +59,7 @@ struct HitsTransformerImpl : nn::Module {
         torch::Tensor pos = src.index({Slice(), Slice(), Slice(INX_BPM, INX_TAU_G)});
         
         src = threshToOnes(src);
-        
-        std::cout <<"START-" <<std::endl;
         src = oneHotToInt(src).to(device);// torch::cat({src, pos}, 2);
-        std::cout <<"END" <<std::endl;
         
         torch::Tensor src_posenc = generatePE(pos);
         src = hitsEmbedding(src) + src_posenc;

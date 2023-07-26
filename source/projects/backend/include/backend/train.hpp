@@ -177,6 +177,7 @@ void train(HitsTransformer model,
             torch::Device device = torch::kCPU) 
 {
     torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
+    //torch::optim::SGD optimizer(model->parameters(), torch::optim::SGDOptions(0.01));
     double min_loss = std::numeric_limits<double>::infinity();
 
     std::cout << "Training Hits Generator..." << std::endl;
@@ -197,15 +198,15 @@ void train(HitsTransformer model,
         loss.backward();
         optimizer.step();
 
-        // if (epoch % config.eval_interval == 0) {
-        //     float eval_loss = estimateLoss(model, config, val_data, device);  
-        //     if (eval_loss < min_loss) {
-        //         min_loss = eval_loss;
-        //         std::cout << "New min val loss: " << min_loss << std::endl;
-        //         // Save the model checkpoint.
-        //         torch::save(model, save_model);
-        //     }
-        // }
+        if (epoch % config.eval_interval == 0) {
+            float eval_loss = estimateLoss(model, config, val_data, device);  
+            if (eval_loss < min_loss) {
+                min_loss = eval_loss;
+                std::cout << "New min val loss: " << min_loss << std::endl;
+                // Save the model checkpoint.
+                torch::save(model, save_model);
+            }
+        }
 
         if (epoch % 10 == 0) {
             std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
