@@ -161,7 +161,7 @@ int main() {
 
     #define HITGEN
     #ifdef HITGEN          
-        backend::HitsTransformer model(256, 32, 6, device);
+        backend::HitsTransformer model(512, 32, 6, device);
     #else
         backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 256, 32, 6, 6, device);
     #endif
