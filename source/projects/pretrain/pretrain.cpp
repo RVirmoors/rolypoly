@@ -130,7 +130,7 @@ int main() {
     config.final = false;
     config.eval_interval = 25;
     config.eval_iters = 50; // 200
-    config.lr = 6e-4;
+    config.lr = 6e-3;
     std::map<std::string, std::vector<torch::Tensor>> train_data, val_data;
 
     for (const auto& data : meta) {

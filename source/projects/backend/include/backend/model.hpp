@@ -86,15 +86,18 @@ struct TransformerModelImpl : nn::Module {
     device(device),
     pos_linLayer(nn::Linear(3, d_model)),
     embedding(nn::Linear(input_dim, d_model)),
+    embeddingEnc(nn::Linear(9, d_model)),
     transformer(nn::Transformer(nn::TransformerOptions(d_model, nhead, enc_layers, dec_layers))),
     fc(nn::Linear(d_model, output_dim))
     {   
         register_module("pos_linLayer", pos_linLayer);
         register_module("embedding", embedding);
+        register_module("embeddingEnc", embeddingEnc);
         register_module("transformer", transformer);
         register_module("fc", fc);
         pos_linLayer->to(device);
         embedding->to(device);
+        embeddingEnc->to(device);
         transformer->to(device);
         fc->to(device);
     }
@@ -104,15 +107,15 @@ struct TransformerModelImpl : nn::Module {
     }
 
     torch::Tensor forward(torch::Tensor src, torch::Tensor tgt) {
-        bool noBatch = false;        
-        if (src.sizes().size() == 2) {
-            src.unsqueeze_(0); // add batch dimension, needed for transformer
-            tgt.unsqueeze_(0); // (B, T, C)
-            noBatch = true;
-        }
         torch::Tensor src_posenc = generatePE(src);
         torch::Tensor tgt_posenc = generatePE(tgt);
-        src = embedding(src) + src_posenc;
+
+        src = threshToOnes(src);
+        std::cout << "SRC: " << src[0][0] << std::endl;
+        std::cout << "TGT: " << tgt[0][0] << std::endl;
+        std::cin.get();
+
+        src = embeddingEnc(src) + src_posenc;
         tgt = embedding(tgt) + tgt_posenc;
 
         torch::Tensor src_mask = torch::zeros({src.size(1),src.size(1)}).to(device);
@@ -123,17 +126,14 @@ struct TransformerModelImpl : nn::Module {
         tgt.transpose_(0, 1);
 
         torch::Tensor output = transformer(src, tgt, src_mask, tgt_mask);
-
-        if (noBatch)
-            output.squeeze_(1); // remove batch dimension
-        else 
-            output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
+        
+        output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
         
         output = fc(output);
         return output;
     }
 
-    nn::Linear pos_linLayer, embedding, fc;
+    nn::Linear pos_linLayer, embedding, embeddingEnc, fc;
     nn::Transformer transformer;
     torch::Device device;
 };
