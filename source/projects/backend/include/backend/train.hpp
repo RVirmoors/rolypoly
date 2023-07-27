@@ -196,6 +196,7 @@ void train(HitsTransformer model,
         torch::Tensor loss = hitsLoss(y_hat, y);
 
         loss.backward();
+        nn::utils::clip_grad_norm_(model->parameters(), 0.5);
         optimizer.step();
 
         if (epoch % config.eval_interval == 0) {

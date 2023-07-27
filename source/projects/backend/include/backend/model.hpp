@@ -26,6 +26,7 @@ struct HitsTransformerImpl : nn::Module {
 // predicting upcoming hits
     HitsTransformerImpl(int d_model, int nhead, int enc_layers, torch::Device device) :
     device(device),
+    d_model(d_model),
     pos_linLayer(nn::Linear(3, d_model)),
     hitsEmbedding(nn::Embedding(512, d_model)), // 2^9 possible hit combinations
     hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
@@ -62,7 +63,7 @@ struct HitsTransformerImpl : nn::Module {
         src = oneHotToInt(src).to(device);// torch::cat({src, pos}, 2);
         
         torch::Tensor src_posenc = generatePE(pos);
-        src = hitsEmbedding(src) + src_posenc;
+        src = hitsEmbedding(src) * sqrt(d_model) + src_posenc;
         torch::Tensor src_mask = masker->generate_square_subsequent_mask(src.size(1)).to(device);
             
         src.transpose_(0, 1);    // (B, T, C) -> (T, B, C)
@@ -78,6 +79,7 @@ struct HitsTransformerImpl : nn::Module {
     nn::Transformer masker; // just to generate mask
     nn::Linear pos_linLayer, hitsFc;
     torch::Device device;
+    double d_model;
 };
 TORCH_MODULE(HitsTransformer);
 
