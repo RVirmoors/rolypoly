@@ -30,22 +30,19 @@ struct HitsTransformerImpl : nn::Module {
     hitsEmbedding(nn::Embedding(512, d_model)), // 2^9 possible hit combinations
     hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
     masker(nn::Transformer(nn::TransformerOptions())), // just to generate mask
-    hitsFc(nn::Linear(d_model, ENCODER_DIM)),
-    softMax(nn::Softmax(nn::SoftmaxOptions(2)))
+    hitsFc(nn::Linear(d_model, ENCODER_DIM))    
     {
         register_module("pos_linLayer", pos_linLayer);
         register_module("hitsEmbedding", hitsEmbedding);
         register_module("hitsTransformer", hitsTransformer);
         register_module("masker", masker);
         register_module("hitsFc", hitsFc);
-        register_module("softMax", softMax);
 
         pos_linLayer->to(device);
         hitsEmbedding->to(device);
         hitsTransformer->to(device);
         masker->to(device);
         hitsFc->to(device);
-        softMax->to(device);
     }
 
     torch::Tensor generatePE(torch::Tensor pos) {
@@ -73,7 +70,6 @@ struct HitsTransformerImpl : nn::Module {
         output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
 
         output = hitsFc(output);
-        output = softMax(output);
         return output;
     }
 
@@ -81,7 +77,6 @@ struct HitsTransformerImpl : nn::Module {
     nn::TransformerEncoder hitsTransformer;
     nn::Transformer masker; // just to generate mask
     nn::Linear pos_linLayer, hitsFc;
-    nn::Softmax softMax;
     torch::Device device;
 };
 TORCH_MODULE(HitsTransformer);
