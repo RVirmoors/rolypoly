@@ -121,9 +121,9 @@ torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
 }
 
 torch::Tensor hitsLoss(torch::Tensor y_hat, torch::Tensor y) {
-    torch::Tensor y_hits = threshToOnes(y.index({ Slice(), Slice(), Slice(0, 9) }));
+    torch::Tensor y_hits = y.index({ Slice(), Slice(), Slice(0, 9) });
     torch::Tensor y_pos = y.index({Slice(), Slice(), Slice(9, 12)});
-    torch::Tensor y_hat_hits = threshToOnes(y_hat.index({ Slice(), Slice(), Slice(0, 9) }));
+    torch::Tensor y_hat_hits = y_hat.index({ Slice(), Slice(), Slice(0, 9) });
     torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), Slice(9, 12)});
 
     return torch::cross_entropy_loss(y_hat_hits, y_hits) + torch::mse_loss(y_hat_pos, y_pos);
