@@ -133,7 +133,7 @@ int main() {
     }
 
     // backend::TransformerModel model(5, 5, 64, 8, 1, 1, device);
-    ToyHitsTransformer model(64, 16, 1, device);
+    ToyHitsTransformer model(128, 12, 12, device);
 
     std::string load_model = "model.pt";
     if (fs::exists(load_model)) {
@@ -147,13 +147,11 @@ int main() {
 
     backend::TrainConfig config;
     // TODO: make these command-line configurable
-    config.batch_size = 1; // 512;
-    config.block_size = 1; // 16;
-    config.epochs = 10000;
+    config.epochs = 2000;
     config.final = false;
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
-    config.lr = 1e-5;
+    config.lr = 6e-5;
 
     torch::Tensor data = torch::tensor({
         {0., 0.8, 0., 0.8, 0.},
@@ -194,9 +192,16 @@ int main() {
             std::cin.get();
     }
 
+    model->eval();
+
     std::cout << "INPUT: " << input_seq_list[1] << std::endl;
     std::cout << "TARGET: " << output_list[1] << std::endl;
     std::cout << "PREDICTION: " << model(input_seq_list[1].unsqueeze(0), input_seq_list[1].unsqueeze(0)) << std::endl;
+    std::cin.get();
+
+    std::cout << "INPUT: " << input_seq_list[3] << std::endl;
+    std::cout << "TARGET: " << output_list[3] << std::endl;
+    std::cout << "PREDICTION: " << model(input_seq_list[3].unsqueeze(0), input_seq_list[3].unsqueeze(0)) << std::endl;
     std::cin.get();
 
     return 0;
