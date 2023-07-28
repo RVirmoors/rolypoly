@@ -4,7 +4,6 @@
 #include "backend.hpp"
 
 using namespace torch;
-using namespace backend;
 namespace fs = std::filesystem;
 
 int main() {
@@ -15,8 +14,9 @@ int main() {
         device = torch::kCUDA;
     }
 
-    TransformerModel model(5, 5, 64, 8, device);
-    
+    // backend::TransformerModel model(5, 5, 64, 8, 1, 1, device);
+    backend::ToyHitsTransformer model(64, 8, 1, device);
+
     std::string load_model = "model.pt";
     if (fs::exists(load_model)) {
         try {
@@ -26,6 +26,16 @@ int main() {
             std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;
         }
     }
+
+    backend::TrainConfig config;
+    // TODO: make these command-line configurable
+    config.batch_size = 1; // 512;
+    config.block_size = 1; // 16;
+    config.epochs = 1000;
+    config.final = false;
+    config.eval_interval = 5;
+    config.eval_iters = 10; // 200
+    config.lr = 6e-3;
 
     torch::Tensor data = torch::tensor({
         {0., 0.8, 0., 0.8, 0.},
@@ -39,30 +49,37 @@ int main() {
         {0.5, 0.2, 0.9, 0.8, 0.005},
         {0.75, 0.5, 0., 0.6, 0.002}
     }).to(device);
-    // std::cout << data << std::endl;
-
-    data = torch::stack({data, data, data, data, data, data, data, data}); // 8 batches -> ENCODER
 
     std::vector<torch::Tensor> input_seq_list, output_list;
     for (int i = 0; i < data.size(1) - 2; ++i) {
-        torch::Tensor input = torch::stack({data[i].slice(0, i, i + 2)});
-        torch::Tensor output = torch::stack({data[i].slice(0, i + 1, i + 3)});
+        torch::Tensor input = data.slice(0, i, i + 2);
+        torch::Tensor output = data.slice(0, i + 1, i + 3);
         input_seq_list.push_back(input);
         output_list.push_back(output);
     }
 
-    // Stack the list of tensors to create input_seq and output tensors.
-    torch::Tensor input_seq = torch::stack(input_seq_list);
-    torch::Tensor output = torch::stack(output_list);
+    std::map<std::string, std::vector<torch::Tensor>> train_data;
 
-    input_seq = input_seq.squeeze(1);
-    output = output.squeeze(1);
+    for (int i = 0; i < 3; i++)
+        train_data["X_enc"].push_back(data);
+    train_data["X_dec"] = input_seq_list;
+    train_data["Y"] = output_list;
 
-    // std::cout << data.sizes() << " " << input_seq.sizes() << " " << output.sizes() << std::endl;
-    // std::cout << "input_seq:" << std::endl << input_seq << std::endl;
-    // std::cout << "output:" << std::endl << output << std::endl;
-    // std::cout << "data:" << std::endl << data << std::endl;
+    std::cout << "X_enc size: " << train_data["X_enc"].size() << " x " << train_data["X_enc"][0].sizes() <<
+        "\nX_dec size: " << train_data["X_dec"].size() << " x " << train_data["X_dec"][0].sizes() <<
+        "\n  Y   size: " << train_data["Y"].size() << " x " << train_data["Y"][0].sizes() << std::endl;
+    
+    try {
+        backend::train(model, config, train_data, train_data, "model.pt", device);
+    } catch (const std::exception& e) {
+            std::cout << e.what();
+            std::cin.get();
+    }
 
-    train(model, data, input_seq, output, "model.pt", device);
+    std::cout << "INPUT: " << input_seq_list[1] << std::endl;
+    std::cout << "TARGET: " << output_list[1] << std::endl;
+    std::cout << "PREDICTION: " << model(input_seq_list[1].unsqueeze(0), output_list[0].unsqueeze(0)) << std::endl;
+    std::cin.get();
+
     return 0;
 }

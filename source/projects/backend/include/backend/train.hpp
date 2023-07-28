@@ -70,7 +70,7 @@ void getBatch(
     torch::Tensor takes = torch::randint(0, num_samples, {batch_size}); // torch::zeros({batch_size});//
     int take_ix = takes[0].item<int>();
     torch::Tensor start_ixs = torch::randint(0, 
-        data["X_enc"][take_ix].size(0) - block_size, {1});
+        data["X_dec"][take_ix].size(0) - block_size, {1});
     x_enc = data["X_enc"][take_ix].slice(
         0, start_ixs[0].item<int>(), start_ixs[0].item<int>() + block_size).
         unsqueeze(0);
@@ -102,11 +102,13 @@ void getBatch(
                 unsqueeze(0)
             });
     }
-    // std::cout << "take number: " << takes[0].item<int>() << std::endl;
-    // std::cout << "start index: " << start_ixs[0].item<int>() << std::endl;
-    dataScaleDown(x_enc);
-    dataScaleDown(x_dec);
-    dataScaleDown(y);
+    std::cout << "take number: " << takes[0].item<int>() << std::endl;
+    std::cout << "start index: " << start_ixs[0].item<int>() << std::endl;
+    if (x_enc.size(2) >= 9) { // GMD data
+        dataScaleDown(x_enc);
+        dataScaleDown(x_dec);
+        dataScaleDown(y);
+    }
 }
 
 torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
@@ -125,6 +127,17 @@ torch::Tensor hitsLoss(torch::Tensor y_hat, torch::Tensor y) {
     y_hits = threshToOnes(y_hits);
     y_hits = oneHotToInt(y_hits);
     y_hits = nn::functional::one_hot(y_hits, 512).to(torch::kFloat);
+    return torch::cross_entropy_loss(y_hat, y_hits);
+}
+
+torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
+    torch::Tensor y_hits = y.index({ Slice(), Slice(), Slice(1, 4) });
+    y_hits = threshToOnes(y_hits);
+    y_hits = oneHotToInt(y_hits, 3);
+    y_hits = nn::functional::one_hot(y_hits, 8).to(torch::kFloat);
+
+    // std::cout << y_hits.sizes() << " " << y_hat.sizes() << std::endl;
+
     return torch::cross_entropy_loss(y_hat, y_hits);
 }
 
@@ -190,7 +203,6 @@ void train(HitsTransformer model,
             config.batch_size, 
             config.block_size,
             x_enc, x_dec, y);
-        
         torch::Tensor y_hat = model->forward(x_enc, x_dec);
         torch::Tensor loss = hitsLoss(y_hat, y);
         loss.backward();
@@ -217,6 +229,43 @@ void train(HitsTransformer model,
         }
     }
 }
+
+void train(ToyHitsTransformer model,
+            TrainConfig config,
+            std::map<std::string, std::vector<torch::Tensor>>& train_data,
+            std::map<std::string, std::vector<torch::Tensor>>& val_data,
+            std::string save_model = "hit_model.pt",
+            torch::Device device = torch::kCPU) 
+{
+    torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
+    //torch::optim::SGD optimizer(model->parameters(), torch::optim::SGDOptions(0.01));
+    double min_loss = std::numeric_limits<double>::infinity();
+
+    std::cout << "Training Hits Generator..." << std::endl;
+    model->train();
+
+    for (int epoch = 0; epoch < config.epochs; epoch++) {
+        optimizer.zero_grad();
+
+        torch::Tensor x_enc, x_dec, y;
+        x_enc = torch::stack(train_data["X_enc"]);
+        x_dec = torch::stack(train_data["X_dec"]);
+        y = torch::stack(train_data["Y"]);
+
+        //std::cout << x_enc.sizes() << " " << x_dec.sizes() << " " << y.sizes() << std::endl;
+
+        torch::Tensor y_hat = model->forward(x_dec, x_dec);
+        torch::Tensor loss = toyHitsLoss(y_hat, y);
+        loss.backward();
+        nn::utils::clip_grad_norm_(model->parameters(), 0.5);
+        optimizer.step();
+
+        if (epoch % 5 == 0) {
+            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
+        }
+    }
+}
+
 
 void train(TransformerModel model,
             TrainConfig config,

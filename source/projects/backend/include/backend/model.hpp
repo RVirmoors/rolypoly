@@ -22,15 +22,23 @@ torch::Tensor threshToOnes(torch::Tensor src, float thresh = 0.0) {
             ); // replace all hits with 1
 }
 
-torch::Tensor oneHotToInt(torch::Tensor src) {
+torch::Tensor toyThreshToOnes(torch::Tensor src, float thresh = 0.0) {
+    return torch::where(
+                src.index({Slice(), Slice(), Slice(1, 4)}) > thresh,
+                1.0,
+                0.0
+            ); // replace all hits with 1
+}
+
+torch::Tensor oneHotToInt(torch::Tensor src, int bits = 9) {
     // convert one hot to ints
-    torch::Tensor mask = torch::pow(2, torch::arange(9).to(src.device()));
+    torch::Tensor mask = torch::pow(2, torch::arange(bits).to(src.device()));
     return torch::sum(src * mask, 2).to(torch::kInt64);
 }
 
-torch::Tensor intToOneHot(torch::Tensor out) {
+torch::Tensor intToOneHot(torch::Tensor out, int bits = 9) {
     // convert ints to one hot
-    torch::Tensor mask = torch::pow(2, torch::arange(9).to(out.device()));
+    torch::Tensor mask = torch::pow(2, torch::arange(bits).to(out.device()));
     return out.unsqueeze(2).bitwise_and(mask).ne(0).to(torch::kFloat);
 }
 
@@ -90,6 +98,64 @@ struct HitsTransformerImpl : nn::Module {
     double d_model;
 };
 TORCH_MODULE(HitsTransformer);
+
+struct ToyHitsTransformerImpl : nn::Module {
+// predicting upcoming hits
+    ToyHitsTransformerImpl(int d_model, int nhead, int enc_layers, torch::Device device) :
+    device(device),
+    d_model(d_model),
+    pos_linLayer(nn::Linear(1, d_model)),
+    hitsEmbedding(nn::Embedding(8, d_model)), // 2^9 possible hit combinations
+    hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
+    masker(nn::Transformer(nn::TransformerOptions())), // just to generate mask
+    hitsFc(nn::Linear(d_model, 8))    
+    {
+        register_module("pos_linLayer", pos_linLayer);
+        register_module("hitsEmbedding", hitsEmbedding);
+        register_module("hitsTransformer", hitsTransformer);
+        register_module("masker", masker);
+        register_module("hitsFc", hitsFc);
+
+        pos_linLayer->to(device);
+        hitsEmbedding->to(device);
+        hitsTransformer->to(device);
+        masker->to(device);
+        hitsFc->to(device);
+    }
+
+    torch::Tensor generatePE(torch::Tensor pos) {
+        return pos_linLayer(pos);
+    }
+
+    torch::Tensor forward(torch::Tensor src, torch::Tensor tgt /*not used*/) {
+        torch::Tensor pos = src.index({Slice(), Slice(), Slice(0, 1)});
+        
+        src = threshToOnes(src).index({Slice(), Slice(), Slice(1,4)});
+        src = oneHotToInt(src, 3).to(device);// torch::cat({src, pos}, 2);
+
+        torch::Tensor src_posenc = generatePE(pos);
+        src = hitsEmbedding(src) * sqrt(d_model) + src_posenc;
+        torch::Tensor src_mask = masker->generate_square_subsequent_mask(src.size(1)).to(device);
+            
+        src.transpose_(0, 1);    // (B, T, C) -> (T, B, C)
+        torch::Tensor output = hitsTransformer(src, src_mask);
+        output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
+
+        output = hitsFc(output);
+        //output = torch::argmax(output, 2);
+        //output = intToOneHot(output);
+        return output;
+    }
+
+    nn::Embedding hitsEmbedding;
+    nn::TransformerEncoder hitsTransformer;
+    nn::Transformer masker; // just to generate mask
+    nn::Linear pos_linLayer, hitsFc;
+    torch::Device device;
+    double d_model;
+};
+TORCH_MODULE(ToyHitsTransformer);
+
 
 struct TransformerModelImpl : nn::Module {
     TransformerModelImpl(int input_dim, int output_dim, int d_model, int nhead, int enc_layers, int dec_layers, torch::Device device) :
