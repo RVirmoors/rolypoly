@@ -85,7 +85,7 @@ float get_lr(int ep, backend::TrainConfig config) {
     if (ep > config.lr_decay_iters) {
         return config.min_lr;
     }
-    float decay_ratio = (ep - config.warmup_iters) / (config.lr_decay_iters - config.warmup_iters);
+    float decay_ratio = (float)(ep - config.warmup_iters) / (config.lr_decay_iters - config.warmup_iters);
     _ASSERT(0 <= decay_ratio);
     _ASSERT(decay_ratio <= 1);
     float coeff = 0.5 * (1.0 + cos(M_PI * decay_ratio));
@@ -168,11 +168,10 @@ int main() {
 
     backend::TrainConfig config;
     // TODO: make these command-line configurable
-    config.epochs = 2000;
+    config.epochs = 3000;
     config.final = false;
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
-    config.lr = 6e-5;
 
     torch::Tensor data = torch::tensor({
         {0., 0.8, 0., 0.8, 0.},
