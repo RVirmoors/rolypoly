@@ -130,17 +130,6 @@ torch::Tensor hitsLoss(torch::Tensor y_hat, torch::Tensor y) {
     return torch::cross_entropy_loss(y_hat, y_hits);
 }
 
-torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
-    torch::Tensor y_hits = y.index({ Slice(), Slice(), Slice(1, 4) });
-    y_hits = threshToOnes(y_hits);
-    y_hits = oneHotToInt(y_hits, 3);
-    y_hits = nn::functional::one_hot(y_hits, 8).to(torch::kFloat);
-
-    // std::cout << y_hits.sizes() << " " << y_hat.sizes() << std::endl;
-
-    return torch::cross_entropy_loss(y_hat, y_hits);
-}
-
 float estimateLoss(TransformerModel model,
             TrainConfig config,
             std::map<std::string, std::vector<torch::Tensor>>& val_data,
@@ -229,43 +218,6 @@ void train(HitsTransformer model,
         }
     }
 }
-
-void train(ToyHitsTransformer model,
-            TrainConfig config,
-            std::map<std::string, std::vector<torch::Tensor>>& train_data,
-            std::map<std::string, std::vector<torch::Tensor>>& val_data,
-            std::string save_model = "hit_model.pt",
-            torch::Device device = torch::kCPU) 
-{
-    torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
-    //torch::optim::SGD optimizer(model->parameters(), torch::optim::SGDOptions(0.01));
-    double min_loss = std::numeric_limits<double>::infinity();
-
-    std::cout << "Training Hits Generator..." << std::endl;
-    model->train();
-
-    for (int epoch = 0; epoch < config.epochs; epoch++) {
-        optimizer.zero_grad();
-
-        torch::Tensor x_enc, x_dec, y;
-        x_enc = torch::stack(train_data["X_enc"]);
-        x_dec = torch::stack(train_data["X_dec"]);
-        y = torch::stack(train_data["Y"]);
-
-        //std::cout << x_enc.sizes() << " " << x_dec.sizes() << " " << y.sizes() << std::endl;
-
-        torch::Tensor y_hat = model->forward(x_dec, x_dec);
-        torch::Tensor loss = toyHitsLoss(y_hat, y);
-        loss.backward();
-        nn::utils::clip_grad_norm_(model->parameters(), 0.5);
-        optimizer.step();
-
-        if (epoch % 5 == 0) {
-            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
-        }
-    }
-}
-
 
 void train(TransformerModel model,
             TrainConfig config,
