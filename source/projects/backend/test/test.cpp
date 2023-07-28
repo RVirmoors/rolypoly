@@ -1,4 +1,5 @@
 #include <iostream>
+#include <math.h>
 #include <filesystem>
 #include <torch/torch.h>
 #include "backend.hpp"
@@ -76,6 +77,21 @@ TORCH_MODULE(ToyHitsTransformer);
 
 // ========== TRAIN ===============
 
+float get_lr(int ep, backend::TrainConfig config) {
+// https://github.com/karpathy/nanoGPT/blob/master/train.py#L228C5-L228C5
+    if (ep < config.warmup_iters) {
+        return config.lr * ep / config.warmup_iters;
+    }
+    if (ep > config.lr_decay_iters) {
+        return config.min_lr;
+    }
+    float decay_ratio = (ep - config.warmup_iters) / (config.lr_decay_iters - config.warmup_iters);
+    _ASSERT(0 <= decay_ratio);
+    _ASSERT(decay_ratio <= 1);
+    float coeff = 0.5 * (1.0 + cos(M_PI * decay_ratio));
+    return config.min_lr + coeff * (config.lr - config.min_lr);
+}
+
 torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
     torch::Tensor y_hits = toyThreshToOnes(y);    
     y_hits = backend::oneHotToInt(y_hits, 3);
@@ -103,6 +119,9 @@ void train(ToyHitsTransformer model,
     for (int epoch = 0; epoch < config.epochs; epoch++) {
         optimizer.zero_grad();
 
+        float lr = get_lr(epoch, config);
+        static_cast<torch::optim::AdamOptions&>(optimizer.param_groups()[0].options()).lr(lr); // set lr: https://stackoverflow.com/questions/62415285/updating-learning-rate-with-libtorch-1-5-and-optimiser-options-in-c
+
         torch::Tensor x_enc, x_dec, y;
         x_enc = torch::stack(train_data["X_enc"]);
         x_dec = torch::stack(train_data["X_dec"]);
@@ -117,7 +136,7 @@ void train(ToyHitsTransformer model,
         optimizer.step();
 
         if (epoch % 10 == 0) {
-            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
+            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << " | lr: " << lr << std::endl;
         }
     }
 }

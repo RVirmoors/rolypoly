@@ -20,7 +20,11 @@ struct TrainConfig {
     int eval_interval; // How often to evaluate the model.
     int eval_iters; // How many random batches to evaluate over.
     bool final;     // Final training, using all data.
-    float lr;       // Learning rate for Adam optimizer.
+    float lr = 6e-4;  // Maximum learning rate for Adam optimizer.
+    bool decay_lr = true;
+    int warmup_iters = 2000;
+    int lr_decay_iters = 600000; // should be ~= total epochs
+    float min_lr = 6e-5; // should be max_rate / 10
 };
 
 void dataScaleDown(torch::Tensor& data) {
