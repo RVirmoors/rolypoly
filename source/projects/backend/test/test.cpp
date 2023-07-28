@@ -120,7 +120,9 @@ void train(ToyHitsTransformer model,
         optimizer.zero_grad();
 
         float lr = get_lr(epoch, config);
-        static_cast<torch::optim::AdamOptions&>(optimizer.param_groups()[0].options()).lr(lr); // set lr: https://stackoverflow.com/questions/62415285/updating-learning-rate-with-libtorch-1-5-and-optimiser-options-in-c
+        for (auto param_group : optimizer.param_groups()) {
+            static_cast<torch::optim::AdamOptions &>(param_group.options()).lr(lr);
+        } // set lr: https://stackoverflow.com/questions/62415285/updating-learning-rate-with-libtorch-1-5-and-optimiser-options-in-c
 
         torch::Tensor x_enc, x_dec, y;
         x_enc = torch::stack(train_data["X_enc"]);
