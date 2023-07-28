@@ -27,7 +27,7 @@ struct ToyHitsTransformerImpl : nn::Module {
     hitsEmbedding(nn::Embedding(8, d_model)), // 2^9 possible hit combinations
     hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
     masker(nn::Transformer(nn::TransformerOptions())), // just to generate mask
-    hitsFc(nn::Linear(d_model, 8))    
+    hitsFc(nn::Linear(d_model, 8+1))    
     {
         register_module("pos_linLayer", pos_linLayer);
         register_module("hitsEmbedding", hitsEmbedding);
@@ -93,13 +93,17 @@ float get_lr(int ep, backend::TrainConfig config) {
 }
 
 torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
+    torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(0,8)});
     torch::Tensor y_hits = toyThreshToOnes(y);    
     y_hits = backend::oneHotToInt(y_hits, 3);
     y_hits = nn::functional::one_hot(y_hits, 8).to(torch::kFloat);
 
+    torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), 8});
+    torch::Tensor y_pos = y.index({Slice(), Slice(), 0});
+
     // std::cout << y_hits.sizes() << " " << y_hat.sizes() << std::endl;
 
-    return torch::cross_entropy_loss(y_hat, y_hits);
+    return torch::cross_entropy_loss(y_hat_hits, y_hits) + torch::mse_loss(y_hat_pos, y_pos);
 }
 
 void train(ToyHitsTransformer model,
