@@ -133,7 +133,7 @@ int main() {
     }
 
     // backend::TransformerModel model(5, 5, 64, 8, 1, 1, device);
-    ToyHitsTransformer model(16, 4, 1, device);
+    ToyHitsTransformer model(64, 16, 1, device);
 
     std::string load_model = "model.pt";
     if (fs::exists(load_model)) {
@@ -149,11 +149,11 @@ int main() {
     // TODO: make these command-line configurable
     config.batch_size = 1; // 512;
     config.block_size = 1; // 16;
-    config.epochs = 1000;
+    config.epochs = 10000;
     config.final = false;
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
-    config.lr = 6e-3;
+    config.lr = 1e-5;
 
     torch::Tensor data = torch::tensor({
         {0., 0.8, 0., 0.8, 0.},
@@ -169,7 +169,7 @@ int main() {
     }).to(device);
 
     std::vector<torch::Tensor> input_seq_list, output_list;
-    for (int i = 0; i < data.size(1) - 2; ++i) {
+    for (int i = 0; i < data.size(0) - 2; ++i) {
         torch::Tensor input = data.slice(0, i, i + 2);
         torch::Tensor output = data.slice(0, i + 1, i + 3);
         input_seq_list.push_back(input);
@@ -178,7 +178,7 @@ int main() {
 
     std::map<std::string, std::vector<torch::Tensor>> train_data;
 
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 8; i++)
         train_data["X_enc"].push_back(data);
     train_data["X_dec"] = input_seq_list;
     train_data["Y"] = output_list;
@@ -196,7 +196,7 @@ int main() {
 
     std::cout << "INPUT: " << input_seq_list[1] << std::endl;
     std::cout << "TARGET: " << output_list[1] << std::endl;
-    std::cout << "PREDICTION: " << model(input_seq_list[1].unsqueeze(0), output_list[0].unsqueeze(0)) << std::endl;
+    std::cout << "PREDICTION: " << model(input_seq_list[1].unsqueeze(0), input_seq_list[1].unsqueeze(0)) << std::endl;
     std::cin.get();
 
     return 0;
