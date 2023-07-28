@@ -8,11 +8,52 @@ using namespace torch;
 using namespace at::indexing;
 namespace fs = std::filesystem;
 
+// ========== DATA ================
+
+void csvToTensor(const std::string& filename, torch::Tensor& take) {
+    std::ifstream file(filename);
+    std::vector<std::vector<float>> data;
+
+    if (!file.is_open()) {
+        std::cerr << "No file (too short?): " << filename << std::endl;
+        return;
+    } else {
+        std::cout << "Opened file: " << filename;
+    }
+
+    std::string line;
+    std::getline(file, line); // skip the header line
+    while (std::getline(file, line)) {
+        std::vector<float> row;
+        std::stringstream ss(line);
+        std::string value;
+        while (std::getline(ss, value, ',')) {
+            row.push_back(std::stof(value));
+        }
+        data.push_back(row);
+    }
+
+    file.close();
+
+    take = torch::zeros({ int(data.size()), INPUT_DIM });
+    for (int i = 0; i < int(data.size()); i++) {
+        for (int j = 0; j < int(data[0].size()); j++) {
+            take[i][j] = data[i][j];
+        }
+    }
+}
+
+void takeToTrainData(torch::Tensor& take, torch::Tensor& input_encode, torch::Tensor& input_decode, torch::Tensor& output_decode) {
+    input_encode = take; // (num_samples, INPUT_DIM)
+    input_decode = take.slice(0, 0, take.size(0) - 1); // (num_samples-1, INPUT_DIM)
+    output_decode = take.slice(0, 1, take.size(0)).slice(1, 0, OUTPUT_DIM); // (num_samples-1, OUTPUT_DIM)
+}
+
 // ========== MODEL ===============
 
 torch::Tensor toyThreshToOnes(torch::Tensor src, float thresh = 0.0) {
     return torch::where(
-                src.index({Slice(), Slice(), Slice(1, 4)}) > thresh,
+                src.index({Slice(), Slice(), Slice(0, 9)}) > thresh,
                 1.0,
                 0.0
             ); // replace all hits with 1
@@ -24,10 +65,10 @@ struct ToyHitsTransformerImpl : nn::Module {
     device(device),
     d_model(d_model),
     pos_linLayer(nn::Linear(1, d_model)),
-    hitsEmbedding(nn::Embedding(8, d_model)), // 2^9 possible hit combinations
+    hitsEmbedding(nn::Embedding(512, d_model)), // 2^9 possible hit combinations
     hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
     masker(nn::Transformer(nn::TransformerOptions())), // just to generate mask
-    hitsFc(nn::Linear(d_model, 8+1))    
+    hitsFc(nn::Linear(d_model, 1+512))    
     {
         register_module("pos_linLayer", pos_linLayer);
         register_module("hitsEmbedding", hitsEmbedding);
@@ -47,10 +88,9 @@ struct ToyHitsTransformerImpl : nn::Module {
     }
 
     torch::Tensor forward(torch::Tensor src, torch::Tensor tgt /*not used*/) {
-        torch::Tensor pos = src.index({Slice(), Slice(), Slice(0, 1)});
-        
+        torch::Tensor pos = src.index({Slice(), Slice(), Slice(20, 21)});        
         src = toyThreshToOnes(src);
-        src = backend::oneHotToInt(src, 3).to(device);// torch::cat({src, pos}, 2);
+        src = backend::oneHotToInt(src).to(device);// torch::cat({src, pos}, 2);
 
         torch::Tensor src_posenc = generatePE(pos);
         src = hitsEmbedding(src) * sqrt(d_model) + src_posenc;
@@ -93,13 +133,13 @@ float get_lr(int ep, backend::TrainConfig config) {
 }
 
 torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
-    torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(1,9)});
+    torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(1,513)});
     torch::Tensor y_hits = toyThreshToOnes(y);
-    y_hits = backend::oneHotToInt(y_hits, 3);
-    y_hits = nn::functional::one_hot(y_hits, 8).to(torch::kFloat);
+    y_hits = backend::oneHotToInt(y_hits);
+    y_hits = nn::functional::one_hot(y_hits, 512).to(torch::kFloat);
 
     torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), 0});
-    torch::Tensor y_pos = y.index({Slice(), Slice(), 0});
+    torch::Tensor y_pos = y.index({Slice(), Slice(), INX_BAR_POS});
 
     // std::cout << y_hits.sizes() << " " << y_hat.sizes() << std::endl;
 
@@ -172,38 +212,29 @@ int main() {
 
     backend::TrainConfig config;
     // TODO: make these command-line configurable
+    config.batch_size = 5; // 512;
+    config.block_size = 16; // 16;
     config.epochs = 3000;
     config.final = false;
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
 
-    torch::Tensor data = torch::tensor({
-        {0., 0.8, 0., 0.8, 0.},
-        {0.5, 0., 1., 0.9, 0.007},
-        {0., 0.6, 0., 0.8, 0.002},
-        {0.25, 0., 0., 0.4, -0.01},
-        {0.5, 0., 1., 0.7, 0.002},
-        {0.75, 0., 0., 0.45, -0.005},
-        {0., 0.7, 0., 0.9, 0.001},
-        {0.25, 0.6, 0., 0.8, -0.002},
-        {0.5, 0.2, 0.9, 0.8, 0.005},
-        {0.75, 0.5, 0., 0.6, 0.002}
-    }).to(device);
+    torch::Tensor take;
+    csvToTensor("groovae.csv", take);
+    take = take.to(device);
+    std::cout << ": " << take.sizes() << std::endl;
 
-    std::vector<torch::Tensor> input_seq_list, output_list;
-    for (int i = 0; i < data.size(0) - 2; ++i) {
-        torch::Tensor input = data.slice(0, i, i + 2);
-        torch::Tensor output = data.slice(0, i + 1, i + 3);
-        input_seq_list.push_back(input);
-        output_list.push_back(output);
-    }
-
+    torch::Tensor xe, xd, y;
+    takeToTrainData(take, xe, xd, y);
+    
     std::map<std::string, std::vector<torch::Tensor>> train_data;
 
-    for (int i = 0; i < 8; i++)
-        train_data["X_enc"].push_back(data);
-    train_data["X_dec"] = input_seq_list;
-    train_data["Y"] = output_list;
+    int bs = config.block_size;
+    for (int i = 0; i < xd.size(0) / bs - 1; i++) {
+        train_data["X_enc"].push_back(xe);
+        train_data["X_dec"].push_back(xd.index({Slice(i * bs, (i+1) * bs)}));
+        train_data["Y"].push_back(y.index({Slice(i * bs, (i+1) * bs)}));
+    }
 
     std::cout << "X_enc size: " << train_data["X_enc"].size() << " x " << train_data["X_enc"][0].sizes() <<
         "\nX_dec size: " << train_data["X_dec"].size() << " x " << train_data["X_dec"][0].sizes() <<
@@ -218,14 +249,11 @@ int main() {
 
     model->eval();
 
-    std::cout << "INPUT: " << input_seq_list[1] << std::endl;
-    std::cout << "TARGET: " << output_list[1] << std::endl;
-    std::cout << "PREDICTION: " << model(input_seq_list[1].unsqueeze(0), input_seq_list[1].unsqueeze(0)) << std::endl;
-    std::cin.get();
-
-    std::cout << "INPUT: " << input_seq_list[3] << std::endl;
-    std::cout << "TARGET: " << output_list[3] << std::endl;
-    std::cout << "PREDICTION: " << model(input_seq_list[3].unsqueeze(0), input_seq_list[3].unsqueeze(0)) << std::endl;
+    // std::cout << "INPUT: " << train_data["X_dec"][0][15] << std::endl;
+    auto target = train_data["Y"][0][15];
+    std::cout << "TARGET: " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    auto pred = model(train_data["X_dec"][0].unsqueeze(0), train_data["X_dec"][0].unsqueeze(0))[0][15];
+    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << torch::argmax(pred).item<int>() << std::endl;
     std::cin.get();
 
     return 0;
