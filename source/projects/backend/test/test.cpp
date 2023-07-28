@@ -133,7 +133,7 @@ int main() {
     }
 
     // backend::TransformerModel model(5, 5, 64, 8, 1, 1, device);
-    ToyHitsTransformer model(128, 12, 12, device);
+    ToyHitsTransformer model(128, 16, 12, device);
 
     std::string load_model = "model.pt";
     if (fs::exists(load_model)) {
