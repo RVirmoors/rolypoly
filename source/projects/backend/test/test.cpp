@@ -93,12 +93,12 @@ float get_lr(int ep, backend::TrainConfig config) {
 }
 
 torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
-    torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(0,8)});
-    torch::Tensor y_hits = toyThreshToOnes(y);    
+    torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(1,9)});
+    torch::Tensor y_hits = toyThreshToOnes(y);
     y_hits = backend::oneHotToInt(y_hits, 3);
     y_hits = nn::functional::one_hot(y_hits, 8).to(torch::kFloat);
 
-    torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), 8});
+    torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), 0});
     torch::Tensor y_pos = y.index({Slice(), Slice(), 0});
 
     // std::cout << y_hits.sizes() << " " << y_hat.sizes() << std::endl;
