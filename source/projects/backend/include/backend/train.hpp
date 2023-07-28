@@ -122,11 +122,10 @@ torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
 
 torch::Tensor hitsLoss(torch::Tensor y_hat, torch::Tensor y) {
     torch::Tensor y_hits = y.index({ Slice(), Slice(), Slice(0, 9) });
-    torch::Tensor y_pos = y.index({Slice(), Slice(), Slice(INX_BPM, None)});
-    torch::Tensor y_hat_hits = y_hat.index({ Slice(), Slice(), Slice(0, 9) });
-    torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), Slice(9, 12)});
-
-    return torch::cross_entropy_loss(y_hat_hits, y_hits) + torch::mse_loss(y_hat_pos, y_pos);
+    y_hits = threshToOnes(y_hits);
+    y_hits = oneHotToInt(y_hits);
+    y_hits = nn::functional::one_hot(y_hits, 512).to(torch::kFloat);
+    return torch::cross_entropy_loss(y_hat, y_hits);
 }
 
 float estimateLoss(TransformerModel model,
@@ -194,19 +193,18 @@ void train(HitsTransformer model,
         
         torch::Tensor y_hat = model->forward(x_enc, x_dec);
         torch::Tensor loss = hitsLoss(y_hat, y);
-
         loss.backward();
         nn::utils::clip_grad_norm_(model->parameters(), 0.5);
         optimizer.step();
 
         if (epoch % config.eval_interval == 0) {
-            float eval_loss = estimateLoss(model, config, val_data, device);  
+            float eval_loss = estimateLoss(model, config, val_data, device); 
             if (eval_loss < min_loss) {
                 min_loss = eval_loss;
                 std::cout << "New min val loss: " << min_loss << std::endl;
                 
-                torch::Tensor y_hits = threshToOnes(y.index({ Slice(), Slice(), Slice(0, 9) }));
-                torch::Tensor y_hat_hits = threshToOnes(y_hat.index({ Slice(), Slice(), Slice(0, 9) }), 0.15);
+                torch::Tensor y_hits = (y.index({ Slice(), Slice(), Slice(0, 9) }));
+                torch::Tensor y_hat_hits = (y_hat.index({ Slice(), Slice(), Slice(0, 9) }));
                 std::cout << y_hits[0] << "\n HAT:" << y_hat_hits[0] << "\n LOSS: " << torch::cross_entropy_loss(y_hat_hits, y_hits) << std::endl;
 
                 // Save the model checkpoint.

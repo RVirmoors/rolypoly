@@ -22,6 +22,18 @@ torch::Tensor threshToOnes(torch::Tensor src, float thresh = 0.0) {
             ); // replace all hits with 1
 }
 
+torch::Tensor oneHotToInt(torch::Tensor src) {
+    // convert one hot to ints
+    torch::Tensor mask = torch::pow(2, torch::arange(9).to(src.device()));
+    return torch::sum(src * mask, 2).to(torch::kInt64);
+}
+
+torch::Tensor intToOneHot(torch::Tensor out) {
+    // convert ints to one hot
+    torch::Tensor mask = torch::pow(2, torch::arange(9).to(out.device()));
+    return out.unsqueeze(2).bitwise_and(mask).ne(0).to(torch::kFloat);
+}
+
 struct HitsTransformerImpl : nn::Module {
 // predicting upcoming hits
     HitsTransformerImpl(int d_model, int nhead, int enc_layers, torch::Device device) :
@@ -31,7 +43,7 @@ struct HitsTransformerImpl : nn::Module {
     hitsEmbedding(nn::Embedding(512, d_model)), // 2^9 possible hit combinations
     hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
     masker(nn::Transformer(nn::TransformerOptions())), // just to generate mask
-    hitsFc(nn::Linear(d_model, ENCODER_DIM))    
+    hitsFc(nn::Linear(d_model, 512))    
     {
         register_module("pos_linLayer", pos_linLayer);
         register_module("hitsEmbedding", hitsEmbedding);
@@ -50,12 +62,6 @@ struct HitsTransformerImpl : nn::Module {
         return pos_linLayer(pos);
     }
 
-    torch::Tensor oneHotToInt(torch::Tensor src) {
-        // convert one hot to ints
-        torch::Tensor mask = torch::pow(2, torch::arange(9, device = src.device()));
-        return torch::sum(src * mask, 2).to(torch::kInt32);
-    }
-
     torch::Tensor forward(torch::Tensor src, torch::Tensor tgt /*not used*/) {
         torch::Tensor pos = src.index({Slice(), Slice(), Slice(INX_BPM, INX_TAU_G)});
         
@@ -71,6 +77,8 @@ struct HitsTransformerImpl : nn::Module {
         output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
 
         output = hitsFc(output);
+        //output = torch::argmax(output, 2);
+        //output = intToOneHot(output);
         return output;
     }
 
