@@ -183,6 +183,10 @@ void train(ToyHitsTransformer model,
 
         if (epoch % 10 == 0) {
             std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << " | lr: " << lr << std::endl;
+            if (loss.item<float>() < min_loss) {
+                min_loss = loss.item<float>();
+                torch::save(model, save_model);
+            }
         }
     }
 }
@@ -251,7 +255,7 @@ int main() {
 
     // std::cout << "INPUT: " << train_data["X_dec"][0][15] << std::endl;
     auto target = train_data["Y"][0][15];
-    std::cout << "TARGET: " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    std::cout << "TARGET:     " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
     auto pred = model(train_data["X_dec"][0].unsqueeze(0), train_data["X_dec"][0].unsqueeze(0))[0][15];
     std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << torch::argmax(pred).item<int>() << std::endl;
     std::cin.get();
