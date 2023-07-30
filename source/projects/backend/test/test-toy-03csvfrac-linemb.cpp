@@ -65,10 +65,10 @@ struct ToyHitsTransformerImpl : nn::Module {
     device(device),
     d_model(d_model),
     pos_linLayer(nn::Linear(1, d_model)),
-    hitsEmbedding(nn::Embedding(512, d_model)), // 2^9 possible hit combinations
+    hitsEmbedding(nn::Linear(9, d_model)), // 2^9 possible hit combinations
     hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
     masker(nn::Transformer(nn::TransformerOptions())), // just to generate mask
-    hitsFc(nn::Linear(d_model, 1+512))    
+    hitsFc(nn::Linear(d_model, 1+9))    
     {
         register_module("pos_linLayer", pos_linLayer);
         register_module("hitsEmbedding", hitsEmbedding);
@@ -90,8 +90,7 @@ struct ToyHitsTransformerImpl : nn::Module {
 
     torch::Tensor forward(torch::Tensor src, torch::Tensor tgt /*not used*/) {
         torch::Tensor pos = src.index({Slice(), Slice(), Slice(20, 21)});        
-        src = toyThreshToOnes(src);
-        src = backend::oneHotToInt(src).to(device);// torch::cat({src, pos}, 2);
+        src = toyThreshToOnes(src).to(device);
 
         torch::Tensor src_posenc = generatePE(pos);
         src = hitsEmbedding(src) * sqrt(d_model) + src_posenc;
@@ -102,12 +101,10 @@ struct ToyHitsTransformerImpl : nn::Module {
         output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
 
         output = hitsFc(output);
-        //output = torch::argmax(output, 2);
-        //output = intToOneHot(output);
         return output;
     }
 
-    nn::Embedding hitsEmbedding;
+    nn::Linear hitsEmbedding;
     nn::TransformerEncoder hitsTransformer;
     nn::Transformer masker; // just to generate mask
     nn::Linear pos_linLayer, hitsFc;
@@ -137,10 +134,8 @@ float get_lr(int ep, backend::TrainConfig config) {
 }
 
 torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
-    torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(1,513)});
-    torch::Tensor y_hits = toyThreshToOnes(y);
-    y_hits = backend::oneHotToInt(y_hits);
-    y_hits = nn::functional::one_hot(y_hits, 512).to(torch::kFloat);
+    torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(1,10)});
+    torch::Tensor y_hits = toyThreshToOnes(y).to(torch::kFloat);
 
     torch::Tensor y_hat_pos = y_hat.index({Slice(), Slice(), 0});
     torch::Tensor y_pos = torch::frac(y.index({Slice(), Slice(), INX_BAR_POS}));
@@ -263,19 +258,19 @@ int main() {
     auto target = train_data["Y"][0][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
     auto pred = model(train_data["X_dec"][0].unsqueeze(0), train_data["X_dec"][0].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << torch::argmax(pred).item<int>() << std::endl;
+    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(pred.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
     std::cin.get();
 
     target = train_data["Y"][1][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
     pred = model(train_data["X_dec"][1].unsqueeze(0), train_data["X_dec"][1].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << torch::argmax(pred).item<int>() << std::endl;
+    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(pred.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
     std::cin.get();
 
     target = train_data["Y"][2][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
     pred = model(train_data["X_dec"][2].unsqueeze(0), train_data["X_dec"][2].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << torch::argmax(pred).item<int>() << std::endl;
+    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(pred.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
     std::cin.get();
 
     return 0;

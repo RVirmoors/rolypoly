@@ -78,6 +78,9 @@ TORCH_MODULE(ToyHitsTransformer);
 
 float get_lr(int ep, backend::TrainConfig config) {
 // https://github.com/karpathy/nanoGPT/blob/master/train.py#L228C5-L228C5
+    if (!config.decay_lr) {
+        return config.lr;
+    }
     if (ep < config.warmup_iters) {
         return config.lr * ep / config.warmup_iters;
     }
@@ -169,7 +172,7 @@ int main() {
     config.final = false;
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
-    config.lr = 6e-4;
+    config.lr = 1e-4;
     config.decay_lr = false;
 
     torch::Tensor data = torch::tensor({

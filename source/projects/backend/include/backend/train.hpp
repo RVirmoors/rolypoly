@@ -24,7 +24,7 @@ struct TrainConfig {
     bool decay_lr = true;
     int warmup_iters = 150;
     int lr_decay_iters = 10000; // should be ~= total epochs
-    float min_lr = 4e-6; // should be max_rate / 10
+    float min_lr = 1e-7; // should be max_rate / 10
 };
 
 void dataScaleDown(torch::Tensor& data) {

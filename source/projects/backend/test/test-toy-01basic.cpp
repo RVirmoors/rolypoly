@@ -79,6 +79,9 @@ TORCH_MODULE(ToyHitsTransformer);
 
 float get_lr(int ep, backend::TrainConfig config) {
 // https://github.com/karpathy/nanoGPT/blob/master/train.py#L228C5-L228C5
+    if (!config.decay_lr) {
+        return config.lr;
+    }
     if (ep < config.warmup_iters) {
         return config.lr * ep / config.warmup_iters;
     }
@@ -156,15 +159,15 @@ int main() {
     // backend::TransformerModel model(5, 5, 64, 8, 1, 1, device);
     ToyHitsTransformer model(128, 16, 12, device);
 
-    std::string load_model = "model.pt";
-    if (fs::exists(load_model)) {
-        try {
-            torch::load(model, load_model);
-            std::cout << "Model checkpoint loaded successfully from: " << load_model << std::endl;
-        } catch (const std::exception& e) {
-            std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;
-        }
-    }
+    // std::string load_model = "model.pt";
+    // if (fs::exists(load_model)) {
+    //     try {
+    //         torch::load(model, load_model);
+    //         std::cout << "Model checkpoint loaded successfully from: " << load_model << std::endl;
+    //     } catch (const std::exception& e) {
+    //         std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;
+    //     }
+    // }
 
     backend::TrainConfig config;
     // TODO: make these command-line configurable
@@ -173,6 +176,7 @@ int main() {
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
     config.lr = 6e-5;
+    config.decay_lr = false;
 
     torch::Tensor data = torch::tensor({
         {0., 0.8, 0., 0.8, 0.},
