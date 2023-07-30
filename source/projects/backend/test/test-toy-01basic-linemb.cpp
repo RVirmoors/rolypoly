@@ -170,7 +170,7 @@ int main() {
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
     config.lr = 6e-4;
-    config.decat_rate = false;
+    config.decay_lr = false;
 
     torch::Tensor data = torch::tensor({
         {0., 0.8, 0., 0.8, 0.},
