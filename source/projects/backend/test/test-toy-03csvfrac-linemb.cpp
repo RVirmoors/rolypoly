@@ -101,6 +101,7 @@ struct ToyHitsTransformerImpl : nn::Module {
         output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
 
         output = hitsFc(output);
+        output = torch::sigmoid(output);
         return output;
     }
 
@@ -217,12 +218,12 @@ int main() {
     // TODO: make these command-line configurable
     config.batch_size = 64; // 512;
     config.block_size = 16; // 16;
-    config.epochs = 2000;
+    config.epochs = 12000;
     config.final = false;
     config.eval_interval = 5;
     config.eval_iters = 10; // 200
-    config.decay_lr = false;
-    config.lr = 4e-5;
+    config.decay_lr = true;
+    config.lr = 4e-6;
 
     torch::Tensor take;
     csvToTensor("groovae.csv", take);
@@ -256,21 +257,21 @@ int main() {
 
     // std::cout << "INPUT: " << train_data["X_dec"][0][15] << std::endl;
     auto target = train_data["Y"][0][15];
-    std::cout << "TARGET:     " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
     auto pred = model(train_data["X_dec"][0].unsqueeze(0), train_data["X_dec"][0].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(pred.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
     std::cin.get();
 
     target = train_data["Y"][1][15];
-    std::cout << "TARGET:     " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
     pred = model(train_data["X_dec"][1].unsqueeze(0), train_data["X_dec"][1].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(pred.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
     std::cin.get();
 
     target = train_data["Y"][2][15];
-    std::cout << "TARGET:     " << target[20].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
     pred = model(train_data["X_dec"][2].unsqueeze(0), train_data["X_dec"][2].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << backend::oneHotToInt(toyThreshToOnes(pred.unsqueeze(0).unsqueeze(0))).item<int>() << std::endl;
+    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
     std::cin.get();
 
     return 0;
