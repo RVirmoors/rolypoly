@@ -100,9 +100,9 @@ struct TransformerModelImpl : nn::Module {
         torch::Tensor src = input.index({Slice(), Slice(), Slice(0, 9)});
         torch::Tensor tgt = input.index({Slice(), Slice(), Slice(9, None)});
 
-        std::cout << "SRC: " << src[0][0] << std::endl;
-        std::cout << "TGT: " << tgt[0][0] << std::endl;
-        std::cin.get();
+        // std::cout << "SRC: " << src[0][0] << std::endl;
+        // std::cout << "TGT: " << tgt[0][0] << std::endl;
+        // std::cin.get();
 
         src = encEmbedding(src) + posenc;
         tgt = decEmbedding(tgt) + posenc;
@@ -237,20 +237,25 @@ void train(ToyHitsTransformer hitsModel,
             torch::Device device = torch::kCPU) 
 {
     bool trainHits = false;
-    if (hitsModel)
+    if (hitsModel) {
         trainHits = true;
-    else
+        std::cout << "Training Ensemble..." << std::endl;
+    }
+    else {
         hitsModel = ToyHitsTransformer(1,1,1,device); // dummy
+        std::cout << "Training Main Transformer..." << std::endl;
+    }
 
     torch::optim::Adam hitsOptimizer(hitsModel->parameters(), torch::optim::AdamOptions(config.lr));
     torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
     double min_loss = std::numeric_limits<double>::infinity();
 
-    std::cout << "Training Ensemble..." << std::endl;
     hitsModel->train();
+    model->train();
 
     for (int epoch = 0; epoch < config.epochs; epoch++) {
         optimizer.zero_grad();
+        hitsOptimizer.zero_grad();
 
         float lr = get_lr(epoch, config);
         for (auto param_group : hitsOptimizer.param_groups()) {
@@ -371,24 +376,31 @@ int main() {
     }
 
     hitsModel->eval();
+    model->eval();
 
     // std::cout << "INPUT: " << train_data["X"][0][15] << std::endl;
     auto target = train_data["Y"][0][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
     auto pred = hitsModel(train_data["X"][0].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
+    std::cout << "HIT PREDICTION: " << pred << std::endl;
+    pred = model(train_data["X"][0].unsqueeze(0))[0][15];
+    std::cout << "MODEL PREDICTION: " << pred << std::endl;
     std::cin.get();
 
     target = train_data["Y"][1][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
     pred = hitsModel(train_data["X"][1].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
+    std::cout << "HIT PREDICTION: " << pred << std::endl;
+    pred = model(train_data["X"][0].unsqueeze(0))[0][15];
+    std::cout << "MODEL PREDICTION: " << pred << std::endl;
     std::cin.get();
 
     target = train_data["Y"][2][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
     pred = hitsModel(train_data["X"][2].unsqueeze(0))[0][15];
-    std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
+    std::cout << "HIT PREDICTION: " << pred << std::endl;
+    pred = model(train_data["X"][0].unsqueeze(0))[0][15];
+    std::cout << "MODEL PREDICTION: " << pred << std::endl;
     std::cin.get();
 
     return 0;
