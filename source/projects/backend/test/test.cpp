@@ -43,21 +43,92 @@ void csvToTensor(const std::string& filename, torch::Tensor& take) {
     }
 }
 
-void takeToTrainData(torch::Tensor& take, torch::Tensor& input_encode, torch::Tensor& input_decode, torch::Tensor& output_decode) {
-    input_encode = take; // (num_samples, INPUT_DIM)
-    input_decode = take.slice(0, 0, take.size(0) - 1); // (num_samples-1, INPUT_DIM)
-    output_decode = take.slice(0, 1, take.size(0)).slice(1, 0, OUTPUT_DIM); // (num_samples-1, OUTPUT_DIM)
+void takeToTrainData(torch::Tensor& take, torch::Tensor& input, torch::Tensor& output) {
+    torch::Tensor input_enc = take.index({
+        Slice(1, take.size(0)), 
+        Slice(0, 9)});
+    torch::Tensor input_dec = take.index({
+        Slice(0, take.size(0)-1), 
+        Slice(9, None)});
+    input = torch::cat({input_enc, input_dec}, 1); // (num_samples-1, INPUT_DIM)
+    output = take.index({
+        Slice(1, take.size(0)),
+        Slice(0, OUTPUT_DIM)}); // (num_samples-1, OUTPUT_DIM)
 }
 
 // ========== MODEL ===============
 
-torch::Tensor toyThreshToOnes(torch::Tensor src, float thresh = 0.0) {
+torch::Tensor toyThreshToOnes(torch::Tensor src, float startIndex = 9, float thresh = 0.0) {
     return torch::where(
-                src.index({Slice(), Slice(), Slice(0, 9)}) > thresh,
+                src.index({Slice(), Slice(), Slice(startIndex, startIndex+9)}) > thresh,
                 1.0,
                 0.0
             ); // replace all hits with 1
 }
+
+struct TransformerModelImpl : nn::Module {
+    TransformerModelImpl(int input_dim, int output_dim, int d_model, int nhead, int enc_layers, int dec_layers, torch::Device device) :
+    device(device),
+    d_model(d_model),
+    pos_linLayer(nn::Linear(1, d_model)),
+    encEmbedding(nn::Linear(9, d_model)),
+    decEmbedding(nn::Linear(input_dim-9, d_model)),
+    transformer(nn::Transformer(nn::TransformerOptions(d_model, nhead, enc_layers, dec_layers))),
+    fc(nn::Linear(d_model, output_dim))
+    {   
+        register_module("pos_linLayer", pos_linLayer);
+        register_module("encEmbedding", encEmbedding);
+        register_module("decEmbedding", decEmbedding);
+        register_module("transformer", transformer);
+        register_module("fc", fc);
+        pos_linLayer->to(device);
+        encEmbedding->to(device);
+        decEmbedding->to(device);
+        transformer->to(device);
+        fc->to(device);
+    }
+
+    torch::Tensor generatePE(torch::Tensor pos) {
+        torch::frac_(pos);
+        return pos_linLayer(pos);
+    }
+
+    torch::Tensor forward(torch::Tensor input) {
+        torch::Tensor pos = input.index({Slice(), Slice(), Slice(INX_BAR_POS, INX_BAR_POS+1)}); 
+        torch::Tensor posenc = generatePE(pos);
+
+        torch::Tensor src = input.index({Slice(), Slice(), Slice(0, 9)});
+        torch::Tensor tgt = input.index({Slice(), Slice(), Slice(9, None)});
+
+        std::cout << "SRC: " << src[0][0] << std::endl;
+        std::cout << "TGT: " << tgt[0][0] << std::endl;
+        std::cin.get();
+
+        src = encEmbedding(src) + posenc;
+        tgt = decEmbedding(tgt) + posenc;
+
+        torch::Tensor src_mask = transformer->generate_square_subsequent_mask(src.size(1)).to(device);
+        torch::Tensor tgt_mask = transformer->generate_square_subsequent_mask(tgt.size(1)).to(device);
+            
+        // (B, T, C) -> (T, B, C)
+        src.transpose_(0, 1);
+        tgt.transpose_(0, 1);
+
+        torch::Tensor output = transformer(src, tgt, src_mask, tgt_mask);
+        
+        output.transpose_(0, 1); // (T, B, C) -> (B, T, C)
+        
+        output = fc(output);
+        return output;
+    }
+
+    nn::Linear pos_linLayer, encEmbedding, decEmbedding, fc;
+    nn::Transformer transformer;
+    torch::Device device;
+    int d_model;
+};
+TORCH_MODULE(TransformerModel);
+
 
 struct ToyHitsTransformerImpl : nn::Module {
 // predicting upcoming hits
@@ -65,7 +136,7 @@ struct ToyHitsTransformerImpl : nn::Module {
     device(device),
     d_model(d_model),
     pos_linLayer(nn::Linear(1, d_model)),
-    hitsEmbedding(nn::Linear(9, d_model)), // 2^9 possible hit combinations
+    hitsEmbedding(nn::Linear(9, d_model)), 
     hitsTransformer(nn::TransformerEncoder(nn::TransformerEncoderOptions(nn::TransformerEncoderLayerOptions(d_model, nhead), enc_layers))),
     masker(nn::Transformer(nn::TransformerOptions())), // just to generate mask
     hitsFc(nn::Linear(d_model, 1+9))    
@@ -75,7 +146,6 @@ struct ToyHitsTransformerImpl : nn::Module {
         register_module("hitsTransformer", hitsTransformer);
         register_module("masker", masker);
         register_module("hitsFc", hitsFc);
-
         pos_linLayer->to(device);
         hitsEmbedding->to(device);
         hitsTransformer->to(device);
@@ -88,8 +158,8 @@ struct ToyHitsTransformerImpl : nn::Module {
         return pos_linLayer(pos);
     }
 
-    torch::Tensor forward(torch::Tensor src, torch::Tensor tgt /*not used*/) {
-        torch::Tensor pos = src.index({Slice(), Slice(), Slice(20, 21)});        
+    torch::Tensor forward(torch::Tensor src) {
+        torch::Tensor pos = src.index({Slice(), Slice(), Slice(INX_BAR_POS, INX_BAR_POS+1)});        
         src = toyThreshToOnes(src).to(device);
 
         torch::Tensor src_posenc = generatePE(pos);
@@ -110,7 +180,7 @@ struct ToyHitsTransformerImpl : nn::Module {
     nn::Transformer masker; // just to generate mask
     nn::Linear pos_linLayer, hitsFc;
     torch::Device device;
-    double d_model;
+    int d_model;
 };
 TORCH_MODULE(ToyHitsTransformer);
 
@@ -146,37 +216,75 @@ torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
     return torch::cross_entropy_loss(y_hat_hits, y_hits) + torch::mse_loss(y_hat_pos, y_pos);
 }
 
-void train(ToyHitsTransformer model,
+torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
+    // discard zero note offsets from y
+    auto mask = (y.index({ Slice(), Slice(), Slice(0, 9) }) == 0.0);
+
+    y_hat.narrow(2, 9, 9).index_put_(
+        { mask.to(torch::kBool) }, 
+        y_hat.narrow(2, 9, 9).index({ mask.to(torch::kBool) }) * 0.0);
+
+    return torch::mse_loss(y_hat, y);
+}
+
+void train(ToyHitsTransformer hitsModel,
+            TransformerModel model,
             backend::TrainConfig config,
             std::map<std::string, std::vector<torch::Tensor>>& train_data,
             std::map<std::string, std::vector<torch::Tensor>>& val_data,
-            std::string save_model = "hit_model.pt",
+            std::string save_hits_model = "hitsModel.pt",
+            std::string save_model = "model.pt",
             torch::Device device = torch::kCPU) 
 {
+    bool trainHits = false;
+    if (hitsModel)
+        trainHits = true;
+    else
+        hitsModel = ToyHitsTransformer(1,1,1,device); // dummy
+
+    torch::optim::Adam hitsOptimizer(hitsModel->parameters(), torch::optim::AdamOptions(config.lr));
     torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
-    //torch::optim::SGD optimizer(model->parameters(), torch::optim::SGDOptions(0.01));
     double min_loss = std::numeric_limits<double>::infinity();
 
-    std::cout << "Training Hits Generator..." << std::endl;
-    model->train();
+    std::cout << "Training Ensemble..." << std::endl;
+    hitsModel->train();
 
     for (int epoch = 0; epoch < config.epochs; epoch++) {
         optimizer.zero_grad();
 
         float lr = get_lr(epoch, config);
+        for (auto param_group : hitsOptimizer.param_groups()) {
+            static_cast<torch::optim::AdamOptions &>(param_group.options()).lr(lr);
+        }
         for (auto param_group : optimizer.param_groups()) {
             static_cast<torch::optim::AdamOptions &>(param_group.options()).lr(lr);
         } // set lr: https://stackoverflow.com/questions/62415285/updating-learning-rate-with-libtorch-1-5-and-optimiser-options-in-c
 
-        torch::Tensor x_enc, x_dec, y;
-        x_enc = torch::stack(train_data["X_enc"]);
-        x_dec = torch::stack(train_data["X_dec"]);
+        torch::Tensor x, y;
+        x = torch::stack(train_data["X"]);
         y = torch::stack(train_data["Y"]);
+        backend::dataScaleDown(x);
+        backend::dataScaleDown(y);
+        torch::Tensor x_hits;
+        torch::Tensor loss;
 
-        //std::cout << x_enc.sizes() << " " << x_dec.sizes() << " " << y.sizes() << std::endl;
+        if (trainHits) {
+            x_hits = hitsModel->forward(x);
+            loss = toyHitsLoss(x_hits, y);
+            loss.backward();
+            nn::utils::clip_grad_norm_(hitsModel->parameters(), 0.5);
+            hitsOptimizer.step();
+            // update encoder input with predicted hits
+            x.index_put_({Slice(), Slice(), INX_BAR_POS},
+                x_hits.index({Slice(), Slice(), 0})
+                ); 
+            x.index_put_({Slice(), Slice(), Slice(0, 9)},
+                x_hits.index({Slice(), Slice(), Slice(1, 10)})
+                );
+        }
 
-        torch::Tensor y_hat = model->forward(x_dec, x_dec);
-        torch::Tensor loss = toyHitsLoss(y_hat, y);
+        torch::Tensor out = model->forward(x);
+        loss = computeLoss(out, y);
         loss.backward();
         nn::utils::clip_grad_norm_(model->parameters(), 0.5);
         optimizer.step();
@@ -186,6 +294,8 @@ void train(ToyHitsTransformer model,
             if (loss.item<float>() < min_loss) {
                 min_loss = loss.item<float>();
                 torch::save(model, save_model);
+                if (trainHits)
+                    torch::save(hitsModel, save_hits_model);
             }
         }
     }
@@ -201,10 +311,19 @@ int main() {
         device = torch::kCUDA;
     }
 
-    // backend::TransformerModel model(5, 5, 64, 8, 1, 1, device);
-    ToyHitsTransformer model(128, 16, 12, device);
+    TransformerModel model(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
+    ToyHitsTransformer hitsModel(128, 16, 12, device);
 
-    std::string load_model = "model.pt";
+    std::string load_model = "hitsModel.pt";
+    if (fs::exists(load_model)) {
+        try {
+            torch::load(hitsModel, load_model);
+            std::cout << "Model checkpoint loaded successfully from: " << load_model << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;
+        }
+    }
+    load_model = "model.pt";
     if (fs::exists(load_model)) {
         try {
             torch::load(model, load_model);
@@ -216,7 +335,7 @@ int main() {
 
     backend::TrainConfig config;
     // TODO: make these command-line configurable
-    config.batch_size = 64; // 512;
+    config.batch_size = 32; // 512;
     config.block_size = 16; // 16;
     config.epochs = 12000;
     config.final = false;
@@ -230,47 +349,45 @@ int main() {
     take = take.to(device);
     std::cout << ": " << take.sizes() << std::endl;
 
-    torch::Tensor xe, xd, y;
-    takeToTrainData(take, xe, xd, y);
+    torch::Tensor x, y;
+    takeToTrainData(take, x, y);
     
     std::map<std::string, std::vector<torch::Tensor>> train_data;
 
     int bs = config.block_size;
-    for (int i = 0; i < xd.size(0) / bs - 1; i++) {
-        train_data["X_enc"].push_back(xe);
-        train_data["X_dec"].push_back(xd.index({Slice(i * bs, (i+1) * bs)}));
+    for (int i = 0; i < x.size(0) / bs - 1; i++) {
+        train_data["X"].push_back(x.index({Slice(i * bs, (i+1) * bs)}));
         train_data["Y"].push_back(y.index({Slice(i * bs, (i+1) * bs)}));
     }
 
-    std::cout << "X_enc size: " << train_data["X_enc"].size() << " x " << train_data["X_enc"][0].sizes() <<
-        "\nX_dec size: " << train_data["X_dec"].size() << " x " << train_data["X_dec"][0].sizes() <<
-        "\n  Y   size: " << train_data["Y"].size() << " x " << train_data["Y"][0].sizes() << std::endl;
+    std::cout << "X size: " << train_data["X"].size() << " x " << train_data["X"][0].sizes() <<
+        "\nY size: " << train_data["Y"].size() << " x " << train_data["Y"][0].sizes() << std::endl;
     
     try {
-        train(model, config, train_data, train_data, "model.pt", device);
+        train(nullptr, model, config, train_data, train_data, "hitsModel.pt", "model.pt", device);
     } catch (const std::exception& e) {
             std::cout << e.what();
             std::cin.get();
     }
 
-    model->eval();
+    hitsModel->eval();
 
-    // std::cout << "INPUT: " << train_data["X_dec"][0][15] << std::endl;
+    // std::cout << "INPUT: " << train_data["X"][0][15] << std::endl;
     auto target = train_data["Y"][0][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
-    auto pred = model(train_data["X_dec"][0].unsqueeze(0), train_data["X_dec"][0].unsqueeze(0))[0][15];
+    auto pred = hitsModel(train_data["X"][0].unsqueeze(0))[0][15];
     std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
     std::cin.get();
 
     target = train_data["Y"][1][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
-    pred = model(train_data["X_dec"][1].unsqueeze(0), train_data["X_dec"][1].unsqueeze(0))[0][15];
+    pred = hitsModel(train_data["X"][1].unsqueeze(0))[0][15];
     std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
     std::cin.get();
 
     target = train_data["Y"][2][15];
     std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
-    pred = model(train_data["X_dec"][2].unsqueeze(0), train_data["X_dec"][2].unsqueeze(0))[0][15];
+    pred = hitsModel(train_data["X"][2].unsqueeze(0))[0][15];
     std::cout << "PREDICTION: " << pred[0].item<float>() << " : " << pred << std::endl;
     std::cin.get();
 
