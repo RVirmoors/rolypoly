@@ -223,6 +223,9 @@ torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
     y_hat.narrow(2, 9, 9).index_put_(
         { mask.to(torch::kBool) }, 
         y_hat.narrow(2, 9, 9).index({ mask.to(torch::kBool) }) * 0.0);
+    y_hat.narrow(2, 0, 9).index_put_(
+        { mask.to(torch::kBool) }, 
+        y_hat.narrow(2, 0, 9).index({ mask.to(torch::kBool) }) * 0.0);
 
     return torch::mse_loss(y_hat, y);
 }
