@@ -143,6 +143,7 @@ torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
     torch::Tensor y_pos = torch::frac(y.index({Slice(), Slice(), INX_BAR_POS}));
 
     // std::cout << y_hits.sizes() << " " << y_hat.sizes() << std::endl;
+    //std::cout << torch::cross_entropy_loss(y_hat_hits, y_hits).item<float>() << " + " << torch::mse_loss(y_hat_pos, y_pos).item<float>() << std::endl;
 
     return torch::cross_entropy_loss(y_hat_hits, y_hits) + torch::mse_loss(y_hat_pos, y_pos);
 }
