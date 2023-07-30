@@ -383,7 +383,7 @@ int main() {
 
     // std::cout << "INPUT: " << train_data["X"][0][15] << std::endl;
     auto target = train_data["Y"][0][15];
-    std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
+    std::cout << "TARGET:     " << target << std::endl;
     auto pred = hitsModel(train_data["X"][0].unsqueeze(0))[0][15];
     std::cout << "HIT PREDICTION: " << pred << std::endl;
     pred = model(train_data["X"][0].unsqueeze(0))[0][15];
@@ -391,7 +391,7 @@ int main() {
     std::cin.get();
 
     target = train_data["Y"][1][15];
-    std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
+    std::cout << "TARGET:     " << target << std::endl;
     pred = hitsModel(train_data["X"][1].unsqueeze(0))[0][15];
     std::cout << "HIT PREDICTION: " << pred << std::endl;
     pred = model(train_data["X"][0].unsqueeze(0))[0][15];
@@ -399,7 +399,7 @@ int main() {
     std::cin.get();
 
     target = train_data["Y"][2][15];
-    std::cout << "TARGET:     " << target[20].item<float>() << " : " << (toyThreshToOnes(target.unsqueeze(0).unsqueeze(0))) << std::endl;
+    std::cout << "TARGET:     " << target << std::endl;
     pred = hitsModel(train_data["X"][2].unsqueeze(0))[0][15];
     std::cout << "HIT PREDICTION: " << pred << std::endl;
     pred = model(train_data["X"][0].unsqueeze(0))[0][15];
