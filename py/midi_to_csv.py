@@ -12,7 +12,6 @@ import pandas as pd
 import os
 
 import data # data helper methods
-import constants
 
 from absl import app
 from absl import flags

@@ -17,7 +17,7 @@ using namespace at::indexing;
 // modified from https://github.com/tensorflow/magenta/blob/master/magenta/models/music_vae/data.py
 const int NUM_PITCHES = 128;
 const int NUM_CLASSES = 9;
-std::array<std::vector<int>, NUM_CLASSES> classes = {
+std::vector<int> classes[NUM_CLASSES] = {
     // kick drum
     {35, 36},
     // snare drum
@@ -37,6 +37,7 @@ std::array<std::vector<int>, NUM_CLASSES> classes = {
     // ride cymbal
     {51, 53, 59}
 };
+
 std::array<int, NUM_PITCHES> classes_to_map() {
     std::array<int, NUM_PITCHES> class_map = {0};
     for (int cls = 0; cls < NUM_CLASSES; ++cls) {

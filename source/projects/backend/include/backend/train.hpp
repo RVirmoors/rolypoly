@@ -106,7 +106,17 @@ torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
         { mask.to(torch::kBool) }, 
         y_hat.narrow(2, 0, 9).index({ mask.to(torch::kBool) }) * 0.0);
 
-    return torch::mse_loss(y_hat, y.slice(2, 0, y_hat.size(2)));
+    // predict tau_guitar to be the average non-zero offset
+    torch::Tensor y_offsets = y.index({Slice(), Slice(), Slice(9, 18)});
+    torch::Tensor non_zero_mask = (y_offsets != 0).to(torch::kFloat32);
+    torch::Tensor non_zero_sum = (y_offsets * non_zero_mask).sum(2);
+    torch::Tensor non_zero_count = non_zero_mask.sum(2);
+    torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
+
+    y = y.slice(2, 0, y_hat.size(2) - 1);
+    y = torch::cat({y, mean_offsets.unsqueeze(2) }, 2);
+
+    return torch::mse_loss(y_hat, y); // vels, offsets, meanoffset-guitar
 }
 
 torch::Tensor hitsLoss(torch::Tensor y_hat, torch::Tensor y) {

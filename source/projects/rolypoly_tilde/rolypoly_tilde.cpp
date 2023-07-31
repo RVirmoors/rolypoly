@@ -26,6 +26,25 @@
 using namespace c74::min;
 using namespace smf;
 
+// ======= useful functions ==============
+
+c74::min::path get_latest_model(std::string model_path) {
+  if (model_path.substr(model_path.length() - 3) != ".pt")
+    model_path = model_path + ".pt";
+  return path(model_path);
+}
+
+void fill_with_zero(audio_bundle output) {
+  for (int c(0); c < output.channel_count(); c++) {
+    auto out = output.samples(c);
+    for (int i(0); i < output.frame_count(); i++) {
+      out[i] = 0.;
+    }
+  }
+}
+
+// ========= MAIN ROLYPOLY~ CLASS =========
+
 class rolypoly : public object<rolypoly>, public vector_operator<> {
 public:
 	MIN_DESCRIPTION {"Expressive Drum Machine: read MIDI file, listen to audio, output drums"};
@@ -93,6 +112,11 @@ public:
   void processLiveOnsets(audio_bundle input);
 
 	// BACKEND RELATED MEMBERS
+  torch::Device device = torch::kCPU;
+  if (torch::cuda::is_available()) {
+      cout << "Using CUDA." << endl;
+      device = torch::kCUDA;
+  }
   backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
   backend::HitsTransformer hitsModel(128, 16, 12, device);
 	c74::min::path m_path, h_m_path;
@@ -163,7 +187,7 @@ public:
   };
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
-    if (DEBUG) cout << "== M_TIMER == play_ms | t_score | size  :  " << playhead_ms << " | " << t_score << " | " << score.sizes(1) << endl;
+    if (DEBUG) cout << "== M_TIMER == play_ms | t_score | size  :  " << playhead_ms << " | " << t_score << " | " << score.size(1) << endl;
     if (timer_mode == TIMER::READ) {
       //cout << "timer read" << endl;
       read_deferred.set();
@@ -233,13 +257,10 @@ public:
         //m_model.get_model().save("model_pre.pt");
         cout << "Finetuning the model... this could take a while." << endl;
         torch::AutoGradMode enable_grad(true);
-        m_model.get_model().train();
-        // send ones to train & get loss
-        torch::Tensor input_tensor = torch::ones({1, 1, INPUT_DIM});
-        input_tensor[0][0][1] = m_follow;
-        torch::Tensor losses;
         try {
-            losses = model->forward(input_tensor);
+          backend::TrainConfig config;
+          config.block_size = BLOCK_SIZE;
+          backend::finetune(model, config, score, play_notes, m_follow, device);
         }
         catch (std::exception& e)
         {
@@ -265,6 +286,7 @@ public:
         }
         // reset the training flag
         m_train = false;
+        torch::AutoGradMode enable_grad(false);
       }
       return {};
     }
@@ -283,7 +305,7 @@ public:
 
   message<> start {this, "start", "Start playing",
     MIN_FUNCTION {
-      if (!score.sizes(1)) {
+      if (!score.size(1)) {
         cerr << "no score loaded, can't play yet!" << endl;
         return {};
       }
@@ -299,7 +321,7 @@ public:
 
   message<> train {this, "train", "Finetune the model based on the latest run",
     MIN_FUNCTION {
-      if (!score.sizes(1)) {
+      if (!score.size(1)) {
         cerr << "no score loaded, can't train yet!" << endl;
         return {};
       }
@@ -360,7 +382,7 @@ rolypoly::rolypoly(const atoms &args)
   }
   if (args.size() > 0) { // ONE ARGUMENT IS GIVEN
     auto model_path = std::string(args[0]);
-    m_path = utils::get_latest_model(model_path);
+    m_path = get_latest_model(model_path);
   }
   if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
     auto midi_path = std::string(args[1]);
@@ -510,7 +532,7 @@ bool rolypoly::midiNotesToScore() {
         // unless this is the very first hit, add prev hit to score
         score = torch::cat({score, hit}, 1);
         score_ms.push_back(prevTime * 1000.); // ms
-        assert(score.sizes(1) == score_ms.size());
+        assert(score.size(1) == score_ms.size());
       }
       prevTime = midifile[1][i].seconds;
       hit = torch::zeros({1, 1, INPUT_DIM});
@@ -524,7 +546,7 @@ bool rolypoly::midiNotesToScore() {
     i++;
   }
 
-  if (DEBUG) cout << "sent " << counter << " == " << score.sizes(1) << " hits to model" << endl;
+  if (DEBUG) cout << "sent " << counter << " == " << score.size(1) << " hits to model" << endl;
   
   if (i >= midifile[1].size()) {
     return true; // done
@@ -539,7 +561,7 @@ void rolypoly::prepareToPlay() {
   playhead_ms = t_toModel = t_fromModel =
     t_score = t_play = 0;
   play_notes.clear();
-  play_notes.reserve(score.sizes(1));
+  play_notes.reserve(score.size(1));
   
   modelOut = torch::zeros({1, 1, OUTPUT_DIM});
 }
@@ -551,7 +573,7 @@ void rolypoly::advanceReadHead() {
   if (!m_generate) {
     double timestep_ms = score_ms[t_toModel];
     // get all notes in the next lookahead_ms
-    while (timestep_ms < start_ms + lookahead_ms && t_toModel < score.sizes(1)) {
+    while (timestep_ms < start_ms + lookahead_ms && t_toModel < score.size(1)) {
       t_toModel++;
       timestep_ms = score_ms[t_toModel];
     }
@@ -633,7 +655,7 @@ bool rolypoly::incrementPlayIndexes() {
   if (DEBUG) cout << "== PERFORM == just played: " << t_play << " | " << score[t_score][0] << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
   while (score_ms[t_score] == current_time_ms) {
     t_score++;
-    if (t_score >= score.sizes(1)) {
+    if (t_score >= score.size(1)) {
       return true; // done
     }
   }
@@ -673,9 +695,9 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
 
   // is the onset within 1/3 of the closest note duration?
   double closest_note_duration;
-  if (onset_time_ms > closest_note_time && closest_note < score.sizes(1)-1) {
+  if (onset_time_ms > closest_note_time && closest_note < score.size(1)-1) {
     int next_note = closest_note+1;
-    while (score_ms[next_note] == closest_note_time && next_note < score.sizes(1)-1) next_note++;
+    while (score_ms[next_note] == closest_note_time && next_note < score.size(1)-1) next_note++;
     closest_note_duration = score_ms[next_note] - closest_note_time;
   } else if (onset_time_ms < closest_note_time && closest_note > 0) {
     int prev_note = closest_note-1;
@@ -775,7 +797,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       bool done = incrementPlayIndexes();
       if (done) break;
     }
-    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score.sizes(1)) {
+    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score.size(1)) {
       cout << "Done playing. To finetune the model based on this run, send the 'train' message." << endl;
       m_play = false;
       done_playing = true;
