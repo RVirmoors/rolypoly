@@ -13,10 +13,8 @@
 // midi stuff
 #include "MidiFile.h"
 #define MAX_SCORE_LENGTH 100000
-#define SCORE_DIM 6 // hit, vel, bpm, tsig, pos_in_bar, TIME_MS
-#define INX_TIME_MS 5
 #define IN_DIM 5    // hit, vel, bpm, tsig, pos_in_bar
-#define OUT_DIM 12  // 9 hits, bpm, tsig, pos_in_bar
+#define OUT_DIM 21  // 9 vels+offsets, bpm, tsig, pos_in_bar
 
 // Max & Torch
 #include "c74_min.h"
@@ -29,37 +27,6 @@
 
 using namespace c74::min;
 using namespace smf;
-
-unsigned power_ceil(unsigned x) {
-  if (x <= 1)
-    return 1;
-  int power = 2;
-  x--;
-  while (x >>= 1)
-    power <<= 1;
-  return power;
-}
-
-c74::min::path get_latest_model(std::string model_path) {
-  if (model_path.substr(model_path.length() - 3) != ".ts")
-    model_path = model_path + ".ts";
-  return path(model_path);
-}
-
-std::string tensor_to_csv(at::Tensor tensor) {
-  // in: tensor of shape (length, channels)
-  // out: csv string of shape (length, channels)
-  std::string csv = "";
-  for (int i = 0; i < tensor.size(0); i++) {
-    for (int j = 0; j < tensor.size(1); j++) {
-      csv += std::to_string(tensor[i][j].item<double>());
-      if (j < tensor.size(1) - 1)
-        csv += ",";
-    }
-    csv += "\n";
-  }
-  return csv;
-}
 
 class rolypoly : public object<rolypoly>, public vector_operator<> {
 public:
@@ -87,7 +54,8 @@ public:
   // MIDI RELATED MEMBERS
   MidiFile midifile;
   c74::min::path m_midi_path;
-  std::vector<std::array<double, SCORE_DIM>> score;
+  at::Tensor score;
+  vector<double> score_ms;
   long i_toModel; // next timestep to be sent to the model
   long t_score; // next timestep to be played from score
   int reading_midi;
@@ -119,7 +87,7 @@ public:
   void loadFinetuned(std::string path);
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
-  bool midiNotesToModel();
+  bool midiNotesToScore();
 
   void prepareToPlay();
   void playMidiIntoVector();
@@ -130,8 +98,9 @@ public:
   void processLiveOnsets(audio_bundle input);
 
 	// BACKEND RELATED MEMBERS
-	backend::TransformerModel m_model(INPUT_DIM, OUTPUT_DIM, 128, 8);
-	c74::min::path m_path;
+  backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
+  backend::HitsTransformer hitsModel(128, 16, 12, device);
+	c74::min::path m_path, h_m_path;
 
 	// AUDIO PERFORM
 	std::unique_ptr<std::thread> m_compute_thread;
@@ -142,9 +111,8 @@ public:
   // ONLY FOR DOCUMENTATION
   argument<symbol> path_arg{this, "model path",
                             "Absolute path to the pretrained model."};
-  argument<int> buffer_arg{
-      this, "buffer size",
-      "Size of the internal buffer (can't be lower than the method's ratio)."};
+  argument<symbol> hit_path_arg{this, "hit_model path",
+                            "Absolute path to the hit generation model."}; // TODO: implement
 
   // ENABLE / DISABLE ATTRIBUTE
   attribute<bool> enable{this, "enable", true,
@@ -158,97 +126,28 @@ public:
                          description{"Filter out notes not in the score"}}; // TODO: implement
 
   attribute<bool> signal_out{this, "signal_out", true,
-                         description{"Output signals"}};  // TODO: implement
+                         description{"Output signals"}};
 
   attribute<bool> message_out{this, "message_out", true,
-                         description{"Output messages"}}; // TODO: implement
+                         description{"Output messages"}};
 
   // BOOT STAMP
   message<> maxclass_setup{
       this, "maxclass_setup",
       [this](const c74::min::atoms &args, const int inlet) -> c74::min::atoms {
         cout << "rolypoly~ v" << VERSION << " - 2023 Grigore Burloiu - rvirmoors.github.io" << endl;
-        cout << "based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos" << endl;
         return {};
       }};
-
-  message<> anything {this, "anything", "callback for attributes",
-    MIN_FUNCTION {
-      symbol attribute_name = args[0];
-      if (attribute_name == "get_attributes") {
-        for (std::string attr : settable_attributes)
-          cout << attr << endl;
-        return {};
-      } 
-      else if (attribute_name == "get_methods") 
-      {
-        for (std::string method : m_model.get_available_methods()) 
-          cout << method << endl;
-        return {};
-      } 
-      else if (attribute_name == "get") 
-      {
-        if (args.size() < 2) {
-          cerr << "get must be given an attribute name" << endl;
-          return {};
-        }
-        attribute_name = args[1];
-        if (m_model.has_settable_attribute(attribute_name)) {
-          cout << attribute_name << ": " << m_model.get_attribute_as_string(attribute_name) << endl;
-        } else {
-          cerr << "no attribute " << attribute_name << " found in model" << endl;
-        }
-        return {};
-      }
-      else if (attribute_name == "set") 
-      {
-        if (args.size() < 3) {
-          cerr << "set must be given an attribute name and corresponding arguments" << endl;
-          return {};
-        }
-        attribute_name = args[1];
-        std::vector<std::string> attribute_args;
-        if (has_settable_attribute(attribute_name)) {
-          for (int i = 2; i < args.size(); i++) {
-            attribute_args.push_back(args[i]);
-          }
-          try {
-            m_model.set_attribute(attribute_name, attribute_args);
-          } catch (std::string message) {
-            cerr << message << endl;
-          }
-        } else {
-          cerr << "model does not have attribute " << attribute_name << endl;
-        }
-      }
-      else
-      {
-        cerr << "no corresponding method for " << attribute_name << endl;
-      }
-      return {};
-     }};
-
-  std::string attr;
-  std::string attr_value;
-  queue<> set_attr { this,
-      MIN_FUNCTION {
-        // send low-priority messages to the python model
-        std::vector<std::string> v;
-        v.push_back(attr_value);
-        m_model.set_attribute(attr, v);
-        return {};
-      }
-  };
 
   timer<timer_options::defer_delivery> warmup { this,
     MIN_FUNCTION {
       // warmup the model
       std::chrono::microseconds duration;
-      torch::Tensor input_tensor = torch::randn({1, 1, IN_DIM});
+      torch::Tensor input_tensor = torch::randn({1, 1, INPUT_DIM});
       for (int i = 0; i < 7; i++) {
           auto start = std::chrono::high_resolution_clock::now();
           try {
-              m_model.get_model().forward({ input_tensor }).toTensor();
+              m_model->forward({ input_tensor }).toTensor();
           }
           catch (std::exception& e)
           {
@@ -293,24 +192,16 @@ public:
       if (DEBUG) cout << reading_midi << " " << done_reading << endl;
 
       if (reading_midi && !done_reading) {
-        // populate score and place it into m_in_buffer
-        done_reading = midiNotesToModel();
+        // populate score
+        score = torch::zeros({1, 0, INPUT_DIM});
+        score_ms.clear();
+        done_reading = midiNotesToScore();
       }
-      // make a tensor from the score
-      torch::Tensor score_tensor = torch::zeros({1, int(score.size()), IN_DIM});
-      for (int i = 0; i < score.size(); i++) {
-        for (int j = 0; j < IN_DIM; j++) {
-          score_tensor[0][i][j] = score[i][j];
-        }
-      }
-      m_model.get_model().forward({score_tensor}).toTensor();
 
       if (done_reading && reading_midi) {
         cout << "Done reading the score." << endl;
         //cout << modelOut << endl;
         reading_midi = 0;
-        attr = "read"; attr_value = "false"; set_attr();
-        m_read = false;
         prepareToPlay();
       } else {
         m_timer.delay(10);
@@ -462,6 +353,7 @@ void rolypoly::loadFinetuned(std::string path) {
 
 void rolypoly::initialiseScore() {
   score.clear();
+  score_ms.clear();
   score.reserve(MAX_SCORE_LENGTH);
 }
 
@@ -479,7 +371,7 @@ rolypoly::rolypoly(const atoms &args)
   }
   if (args.size() > 0) { // ONE ARGUMENT IS GIVEN
     auto model_path = std::string(args[0]);
-    m_path = get_latest_model(model_path);
+    m_path = utils::get_latest_model(model_path);
   }
   if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
     auto midi_path = std::string(args[1]);
@@ -615,11 +507,14 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
   }
 }
 
-bool rolypoly::midiNotesToModel() {
+bool rolypoly::midiNotesToScore() {
   // populates score with midi data: hit, vel, tempo, timesig, pos_in_bar
 
   int counter = 0;// hit index
   int i = 0;      // note index in midi (a hit can have multiple notes)
+  double prevTime = -1.;
+  at::Tensor hit = torch::zeros({1, 1, INPUT_DIM});
+  auto pitch_class_map = backend::classes_to_map();
 
   while (i < midifile[1].size()) {
 
@@ -654,20 +549,23 @@ bool rolypoly::midiNotesToModel() {
         << ' ' << pos_in_bar
         << ' ' << endl;
 
-    std::array<double, 6> hit;
-    hit[0] = midifile[1][i][1]; // hit
-    hit[1] = midifile[1][i][2]; // vel
-    hit[2] = tempo_map[current_tempo_index].second; // tempo
-    hit[3] = timesig_map[current_timesig_index].second; // timesig
-    hit[4] = pos_in_bar; // pos_in_bar
-    hit[5] = midifile[1][i].seconds * 1000.; // ms
-    score.emplace_back(hit);
+    if (midifile[1][i].seconds > prevTime) {
+      // new hit
+      if (prevTime != -1.) {
+        // unless this is the very first hit, add prev hit to score
+        score = torch::cat({score, hit}, 1);
+        score_ms.push_back(prevTime * 1000.); // ms
+        assert(score.sizes(1) == score_ms.size());
+      }
+      prevTime = midifile[1][i].seconds;
+      hit = torch::zeros({1, 1, INPUT_DIM});
+    }
 
     counter++;
     i++;
   }
 
-  if (DEBUG) cout << "sent " << counter << " == " << score.size() << " hits to model" << endl;
+  if (DEBUG) cout << "sent " << counter << " == " << score.sizes(1) << " hits to model" << endl;
   
   if (i >= midifile[1].size()) {
     return true; // done

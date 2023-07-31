@@ -46,35 +46,6 @@ float get_lr(int ep, TrainConfig config) {
     return config.min_lr + coeff * (config.lr - config.min_lr);
 }
 
-void dataScaleDown(torch::Tensor& data) {
-    /*
-    Scale the input data to range [0, 1].
-
-    9 velocities from [0, 127]
-    9 offsets from [-0.04, 0.04]
-    bpm from [40, 240]
-    bar_pos keep fractional part
-
-    input: (batch, block_size, input_dim)
-    output: (batch, block_size, input_dim)
-    */
-
-    data.index({Slice(), Slice(), Slice(0, 9)}).div_(127);
-    data.index({Slice(), Slice(), Slice(9, 18)}).div_(0.08);
-    data.index({Slice(), Slice(), Slice(INX_BPM, INX_BPM + 1)}).sub_(40).div_(200);
-    data.index({Slice(), Slice(), Slice(INX_BAR_POS, INX_BAR_POS + 1)}).frac_();
-}
-
-void dataScaleUp(torch::Tensor& data) {
-    /*
-    Scale back up from [0, 1]
-    input: (batch, block_size, input_dim)
-    output: (batch, block_size, input_dim)
-    */
-    data.index({Slice(), Slice(), Slice(0, 9)}).mul_(127);
-    data.index({Slice(), Slice(), Slice(9, 18)}).mul_(0.08);
-    data.index({Slice(), Slice(), Slice(INX_BPM, INX_BPM + 1)}).mul_(200).add_(40);
-}
 
 void getBatch(
     std::map<std::string, std::vector<torch::Tensor>>& data,
