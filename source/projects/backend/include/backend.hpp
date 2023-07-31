@@ -2,6 +2,7 @@
 
 #define ENCODER_DIM 10 // bar_pos, 9 drum hits
 #define OUTPUT_DIM 18 // 9 drum channel velocities+offsets
+#define TARGET_DIM 21 // 9 drum channel velocities+offsets, bpm, tsig, bar_pos
 #define INPUT_DIM 22 // 9 drum channel velocities+offsets, bpm, tsig, bar_pos, tau_guitar
 #define INX_BPM 18
 #define INX_TSIG 19
