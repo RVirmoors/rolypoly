@@ -276,7 +276,7 @@ void train(HitsTransformer hitsModel,
         }
 
         if (epoch % 10 == 0) {
-            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
+            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << " | lr: " << lr << std::endl;
         }
     }
 }
