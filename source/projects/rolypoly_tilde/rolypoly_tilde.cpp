@@ -4,7 +4,7 @@
 //
 // Frontend: Max external object
 
-#define DEBUG false
+#define DEBUG true
 
 #ifndef VERSION
 #define VERSION "2.0b2"
@@ -147,7 +147,7 @@ public:
       for (int i = 0; i < 7; i++) {
           auto start = std::chrono::high_resolution_clock::now();
           try {
-              m_model->forward({ input_tensor }).toTensor();
+              m_model->forward(input_tensor);
           }
           catch (std::exception& e)
           {
@@ -246,7 +246,7 @@ public:
         input_tensor[0][0][1] = m_follow;
         torch::Tensor losses;
         try {
-            losses = m_model.get_model().forward({ input_tensor }).toTensor();
+            losses = model->forward(input_tensor);
         }
         catch (std::exception& e)
         {
@@ -262,7 +262,7 @@ public:
           input_tensor = torch::zeros({1, 1, IN_DIM});
           torch::Tensor diag;
           try {
-              diag = m_model.get_model().forward({ input_tensor }).toTensor();
+              diag = model->forward(input_tensor);
           }
           catch (std::exception& e)
           {
@@ -550,12 +550,12 @@ void rolypoly::prepareToPlay() {
 void rolypoly::playMidiIntoVector() {
   // populate vector of arrays with notes that don't have a tau yet
   // taking all the notes in the upcoming lookahead_ms
-  double start_ms = playhead_ms; //score[i_toModel][TIME_MS];
+  double start_ms = playhead_ms;
   if (DEBUG) cout << "== MID2VEC == looking ahead from " << start_ms << " ms" << endl;
   in_notes.clear();
   in_notes.reserve(lookahead_ms / 100); // 10 notes per second
   if (!m_generate) {
-    double timestep_ms = score[i_toModel][TIME_MS];
+    double timestep_ms = score_ms[i_toModel];
     // get all notes in the next lookahead_ms
     while (timestep_ms < start_ms + lookahead_ms && i_toModel < score.sizes(1)) {
       std::array<double, IN_DIM> note;
@@ -565,7 +565,7 @@ void rolypoly::playMidiIntoVector() {
       in_notes.push_back(note);      
       if (DEBUG) cout << "== MID2VEC == score_i_toModel | score_ms  :  " << i_toModel << " | " << timestep_ms << " ms" << endl;
       i_toModel++;
-      timestep_ms = score[i_toModel][TIME_MS];
+      timestep_ms = score_ms[i_toModel];
     }
   } // TODO: "generate" == "true" -> play latest note from play_notes
     // TODO: if pos_in_bar < previous pos_in_bar, then we have a new bar
@@ -632,9 +632,9 @@ double rolypoly::computeNextNoteTimeMs() {
   if (!m_generate && !done_playing) { 
     if (t_play >= play_notes.size()) {
       //cout << "no tau yet" << endl;
-      return score[t_score][TIME_MS];
+      return score_ms[t_score];
     }
-    return score[t_score][TIME_MS] + play_notes[t_play][TAU];
+    return score_ms[t_score] + play_notes[t_play][TAU];
   } else {
     // TODO: "generate" == "true" -> use latest notes from play_notes
   }
@@ -643,9 +643,9 @@ double rolypoly::computeNextNoteTimeMs() {
 
 bool rolypoly::incrementPlayIndexes() {
   // increment t_score and t_play
-  double current_time_ms = score[t_score][TIME_MS];
+  double current_time_ms = score_ms[t_score];
   if (DEBUG) cout << "== PERFORM == just played: " << t_play << " | " << score[t_score][0] << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
-  while (score[t_score][TIME_MS] == current_time_ms) {
+  while (score_ms[t_score] == current_time_ms) {
     t_score++;
     if (t_score >= score.sizes(1)) {
       return true; // done
@@ -674,9 +674,9 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
 
   // find the closest note in the score
   int closest_note = 0;
-  double closest_note_time = score[0][TIME_MS];
+  double closest_note_time = score_ms[0];
   for (int i = 0; i < t_score+1; i++) { // for all notes played so far
-    double note_time = score[i][TIME_MS];
+    double note_time = score_ms[i];
     if (abs(note_time - onset_time_ms) < abs(closest_note_time - onset_time_ms)) {
       closest_note = i;
       closest_note_time = note_time;
@@ -689,12 +689,12 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   double closest_note_duration;
   if (onset_time_ms > closest_note_time && closest_note < score.sizes(1)-1) {
     int next_note = closest_note+1;
-    while (score[next_note][TIME_MS] == closest_note_time && next_note < score.sizes(1)-1) next_note++;
-    closest_note_duration = score[next_note][TIME_MS] - closest_note_time;
+    while (score_ms[next_note] == closest_note_time && next_note < score.sizes(1)-1) next_note++;
+    closest_note_duration = score_ms[next_note] - closest_note_time;
   } else if (onset_time_ms < closest_note_time && closest_note > 0) {
     int prev_note = closest_note-1;
-    while (score[prev_note][TIME_MS] == closest_note_time && prev_note > 0) prev_note--;
-    closest_note_duration = closest_note_time - score[prev_note][TIME_MS];
+    while (score_ms[prev_note] == closest_note_time && prev_note > 0) prev_note--;
+    closest_note_duration = closest_note_time - score_ms[prev_note];
   } else return; // no duration to compare to
 
   double tau_guitar = onset_time_ms - closest_note_time;
@@ -715,7 +715,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   // send the onset to the model
   // if (DEBUG) {
       try {
-          auto output = m_model.get_model().forward({ input_tensor }).toTensor();
+          auto output = model->forward(input_tensor);
           // cout << "ONSET x_dec:\n" << output << endl;
       } catch (std::exception& e)
       {
@@ -755,7 +755,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
     double next_ms; // usually it's the next note that doesn't have a tau yet
     // but at the end of the score, it can be the final note (computeNext...)
-    next_ms = std::max(score[i_toModel][TIME_MS], computeNextNoteTimeMs() );
+    next_ms = std::max(score_ms[i_toModel], computeNextNoteTimeMs() );
     if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 
