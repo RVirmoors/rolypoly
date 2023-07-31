@@ -13,8 +13,6 @@
 // midi stuff
 #include "MidiFile.h"
 #define MAX_SCORE_LENGTH 100000
-#define IN_DIM 5    // hit, vel, bpm, tsig, pos_in_bar
-#define OUT_DIM 21  // 9 vels+offsets, bpm, tsig, pos_in_bar
 
 // Max & Torch
 #include "c74_min.h"
@@ -56,7 +54,7 @@ public:
   c74::min::path m_midi_path;
   at::Tensor score;
   vector<double> score_ms;
-  long i_toModel; // next timestep to be sent to the model
+  long t_toModel; // next timestep to be sent to the model
   long t_score; // next timestep to be played from score
   int reading_midi;
   int skip; // used to skip everything but NoteOn events
@@ -64,13 +62,11 @@ public:
 
   // PLAY RELATED MEMBERS
   double playhead_ms;  // in ms
-  long i_fromModel; // next timestep to be read from the model  
+  long t_fromModel; // next timestep to be read from the model  
   long t_play; // next timestep to be played from play_notes
   long last_onset; // last timestep with an onset detected
-  std::vector<std::array<double, IN_DIM>> in_notes; // notes to be sent to the model
-  std::array<double, IN_DIM> in_onset; // onset to be sent to the model
-  at::Tensor modelOut; // result from calling model.forward()
-  std::vector<std::array<double, OUT_DIM>> play_notes; // hits to be played
+  at::Tensor modelOut; // result from calling model->forward()
+  std::vector<std::array<double, TARGET_DIM>> play_notes; // hits to be played
   bool done_playing;
   int lookahead_ms; // in ms
   short timer_mode; // 0 inactive, 1 read, 2 play
@@ -90,9 +86,8 @@ public:
   bool midiNotesToScore();
 
   void prepareToPlay();
-  void playMidiIntoVector();
-  void vectorToModel(std::vector<std::array<double, IN_DIM>> &v);
-  void getTauFromModel();
+  void advanceReadHead();
+  void tensorToModel();
   double computeNextNoteTimeMs();
   bool incrementPlayIndexes();
   void processLiveOnsets(audio_bundle input);
@@ -200,7 +195,6 @@ public:
 
       if (done_reading && reading_midi) {
         cout << "Done reading the score." << endl;
-        //cout << modelOut << endl;
         reading_midi = 0;
         prepareToPlay();
       } else {
@@ -219,14 +213,13 @@ public:
         if (DEBUG) cout << "joined at " << playhead_ms << " ms"<< endl;
       }
 
-      // send midi notes
-      // to the in_notes buffer, to later get the model output
+      // look for notes up to lookahead_ms
       if (!done_playing)
-        playMidiIntoVector();
+        advanceReadHead();
 
-      // run the model on the in_notes buffer
+      // run the model on notes found
       if (m_use_thread && !done_playing && in_notes.size()) {
-        m_compute_thread = std::make_unique<std::thread>(&rolypoly::vectorToModel, this, in_notes);
+        m_compute_thread = std::make_unique<std::thread>(&rolypoly::tensorToModel, this);
         //if (DEBUG) cout << "started thread" << endl;
       }
       return {};
@@ -242,7 +235,7 @@ public:
         torch::AutoGradMode enable_grad(true);
         m_model.get_model().train();
         // send ones to train & get loss
-        torch::Tensor input_tensor = torch::ones({1, 1, IN_DIM});
+        torch::Tensor input_tensor = torch::ones({1, 1, INPUT_DIM});
         input_tensor[0][0][1] = m_follow;
         torch::Tensor losses;
         try {
@@ -259,7 +252,7 @@ public:
         loadFinetuned("model.pt");
         if (DEBUG) {
           // send zeros to get diag info
-          input_tensor = torch::zeros({1, 1, IN_DIM});
+          input_tensor = torch::zeros({1, 1, INPUT_DIM});
           torch::Tensor diag;
           try {
               diag = model->forward(input_tensor);
@@ -385,7 +378,7 @@ rolypoly::rolypoly(const atoms &args)
 
     initialiseScore();
     done_playing = false;
-    playhead_ms = i_fromModel = i_toModel = 
+    playhead_ms = t_fromModel = t_toModel = 
       t_score = t_play =
       current_tempo_index = current_timesig_index = 
       skip = 0;
@@ -472,7 +465,7 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
 bool rolypoly::midiNotesToScore() {
   // populates score with midi data: hit, vel, tempo, timesig, pos_in_bar
 
-  int counter = 0;// hit index
+  int counter = 0;// hit index TODO remove, this is used just for debug
   int i = 0;      // note index in midi (a hit can have multiple notes)
   double prevTime = -1.;
   at::Tensor hit = torch::zeros({1, 1, INPUT_DIM});
@@ -522,6 +515,10 @@ bool rolypoly::midiNotesToScore() {
       prevTime = midifile[1][i].seconds;
       hit = torch::zeros({1, 1, INPUT_DIM});
     }
+    hit[pitch_class_map[midifile[1][i][1]]] = midifile[1][i][2]; // hit, vel
+    hit[INX_BPM] = tempo_map[current_tempo_index].second; // tempo
+    hit[INX_TSIG] = timesig_map[current_timesig_index].second; // timesig
+    hit[INX_BAR_POS] = pos_in_bar; // pos_in_bar
 
     counter++;
     i++;
@@ -539,93 +536,82 @@ void rolypoly::prepareToPlay() {
   if (m_compute_thread && m_compute_thread->joinable()) {\
     m_compute_thread->join();
   }
-  playhead_ms = i_toModel = i_fromModel =
+  playhead_ms = t_toModel = t_fromModel =
     t_score = t_play = 0;
   play_notes.clear();
   play_notes.reserve(score.sizes(1));
   
-  modelOut = torch::zeros({1, 1, OUT_DIM});
+  modelOut = torch::zeros({1, 1, OUTPUT_DIM});
 }
 
-void rolypoly::playMidiIntoVector() {
-  // populate vector of arrays with notes that don't have a tau yet
-  // taking all the notes in the upcoming lookahead_ms
+void rolypoly::advanceReadHead() {
+  // advance t_toModel over all the notes in the upcoming lookahead_ms
   double start_ms = playhead_ms;
   if (DEBUG) cout << "== MID2VEC == looking ahead from " << start_ms << " ms" << endl;
-  in_notes.clear();
-  in_notes.reserve(lookahead_ms / 100); // 10 notes per second
   if (!m_generate) {
-    double timestep_ms = score_ms[i_toModel];
+    double timestep_ms = score_ms[t_toModel];
     // get all notes in the next lookahead_ms
-    while (timestep_ms < start_ms + lookahead_ms && i_toModel < score.sizes(1)) {
-      std::array<double, IN_DIM> note;
-      for (int c = 0; c < IN_DIM; c++) {
-        note[c] = score[i_toModel][c];
-      }
-      in_notes.push_back(note);      
-      if (DEBUG) cout << "== MID2VEC == score_i_toModel | score_ms  :  " << i_toModel << " | " << timestep_ms << " ms" << endl;
-      i_toModel++;
-      timestep_ms = score_ms[i_toModel];
+    while (timestep_ms < start_ms + lookahead_ms && t_toModel < score.sizes(1)) {
+      t_toModel++;
+      timestep_ms = score_ms[t_toModel];
     }
   } // TODO: "generate" == "true" -> play latest note from play_notes
     // TODO: if pos_in_bar < previous pos_in_bar, then we have a new bar
 }
 
-void rolypoly::vectorToModel(std::vector<std::array<double, IN_DIM>> &v) {
-  // in: vector v (1, len, IN_DIM=5)
-  // out: tensor modelOut (1, len, OUT_DIM=14)
-  int length = v.size();
-  if (!length) {
-    modelOut = torch::zeros({1, 1, OUT_DIM});
+void rolypoly::tensorToModel() {
+  // read from score up to t_toModel, and return the model output
+  // in: tensor score (1, ...t_toModel, INPUT_DIM=22)
+  // out: tensor modelOut (1, ...t_toModel, OUTPUT_DIM=18)
+
+  int newNotes = t_toModel - t_fromModel;
+
+  if (!newNotes) { // no new notes
+    modelOut = torch::zeros({1, 1, OUTPUT_DIM});
     return;
   }
-  
-  if (v[0][2] < 1) { // note with BPM is zero (should never happen)
-    modelOut = torch::zeros({1, 1, OUT_DIM});
-    cout << "HUH WHAT" << endl;
-    return;    
-  }
 
-  // create a tensor from the vector
-  torch::Tensor input_tensor = torch::zeros({1, length, IN_DIM});
-  for (int c = 0; c < IN_DIM; c++) {
-    for (int i = 0; i < length; i++) {
-      input_tensor[0][i][c] = v[i][c];
+  if (newNotes > BLOCK_SIZE-1) {
+    cout << "WARNING: more than " << BLOCK_SIZE-1 << " notes need processing. Only considering the latest " << BLOCK_SIZE-1 << ".";
+    while (newNotes > BLOCK_SIZE - 1) {
+      // copy notes from score into play_notes
+      play_notes.emplace_back(std::array<double, TARGET_DIM>());
+      for (int c = 0; c < modelOut.size(2); c++) {
+        play_notes[t_fromModel][c] = score[0][t_fromModel][c].item<double>();
+      }
+      play_notes[t_fromModel][INX_BPM] = score[0][t_fromModel][INX_BPM];
+      play_notes[t_fromModel][INX_TSIG] = score[0][t_fromModel][INX_TSIG];
+      play_notes[t_fromModel][INX_BAR_POS] = score[0][t_fromModel][INX_BAR_POS];
+      t_fromModel++;                      
+      newNotes--;
     }
   }
- // if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
+
+  long start = std::max(0, t_toModel - BLOCK_SIZE);
+  torch::Tensor input_tensor = score.index({Slice(), Slice(start, t_toModel)});
+
+  if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
   // send the notes to the model
-  if (m_model.is_loaded()) {
-    try {
-      modelOut = m_model.get_model().forward({input_tensor}).toTensor();
-      // if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
-    } catch (const std::exception& e) {
-      std::cerr << e.what() << std::endl;
-    }
+  try {
+    modelOut = model->forward(input_tensor);
+    if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
+  } catch (const std::exception& e) {
+    std::cerr << e.what() << std::endl;
   }
-  getTauFromModel();
-}
 
-void rolypoly::getTauFromModel() {
-  // populate play_notes[...i_toModel][TAU]
-  if (modelOut[0][0][9].item<double>() < 0.1) {
-    // not ready to play yet (THIS SHOULD NEVER HAPPEN)
-    if (DEBUG) cout << "== TAUfromMOD == zero bpm from model" << endl;
-    return;
-  }
-  long writeTo = i_fromModel;
-  int i = 0;
-  if (DEBUG) cout << "== TAUfromMOD == notes from model: " << modelOut.size(1) << endl;
+  // populate play_notes[...t_toModel]
+  if (DEBUG) cout << "== TAUfromMOD == notes from model: " << newNotes << endl;
 
-  while (i < modelOut.size(1)) {
-    play_notes.emplace_back(std::array<double, OUT_DIM>());
+  for (int i = BLOCK_SIZE - newNotes; i > BLOCK_SIZE; i++) {
+    play_notes.emplace_back(std::array<double, TARGET_DIM>());
     for (int c = 0; c < modelOut.size(2); c++) {
-      play_notes[writeTo][c] = modelOut[0][i][c].item<double>();
-      if (DEBUG && c==TAU) cout << "== TAUfromMOD == play_note " << writeTo << " got tau: " << play_notes[writeTo][TAU] << endl;
+      play_notes[t_fromModel][c] = modelOut[0][i][c].item<double>();
     }
-    writeTo++; i++;
+    play_notes[t_fromModel][INX_BPM] = input_tensor[0][i-1][INX_BPM];
+    play_notes[t_fromModel][INX_TSIG] = input_tensor[0][i-1][INX_TSIG];
+    play_notes[t_fromModel][INX_BAR_POS] = input_tensor[0][i-1][INX_BAR_POS];
+    t_fromModel++;
   }
-  i_fromModel = writeTo; // next time continue from here
 }
 
 double rolypoly::computeNextNoteTimeMs() {
@@ -706,10 +692,10 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   }
 
 
-  torch::Tensor input_tensor = torch::zeros({1, 1, IN_DIM});
+  torch::Tensor input_tensor = torch::zeros({1, 1, INPUT_DIM});
   input_tensor[0][0][0] = 666; // mark this as a live onset
   input_tensor[0][0][1] = tau_guitar; // in ms
-  for (int c = 2; c < IN_DIM; c++) {
+  for (int c = 2; c < INPUT_DIM; c++) {
     input_tensor[0][0][c] = score[closest_note][c]; // bpm, tsig, pos_in_bar
   }
   // send the onset to the model
@@ -755,7 +741,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
     double next_ms; // usually it's the next note that doesn't have a tau yet
     // but at the end of the score, it can be the final note (computeNext...)
-    next_ms = std::max(score_ms[i_toModel], computeNextNoteTimeMs() );
+    next_ms = std::max(score_ms[t_toModel], computeNextNoteTimeMs() );
     if (playhead_ms < next_ms)
       playhead_ms += buf_ms;
 

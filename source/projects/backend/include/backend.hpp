@@ -4,6 +4,7 @@
 #define OUTPUT_DIM 18 // 9 drum channel velocities+offsets
 #define TARGET_DIM 21 // 9 drum channel velocities+offsets, bpm, tsig, bar_pos
 #define INPUT_DIM 22 // 9 drum channel velocities+offsets, bpm, tsig, bar_pos, tau_guitar
+#define BLOCK_SIZE 16 // number of hits in transformer history
 #define INX_BPM 18
 #define INX_TSIG 19
 #define INX_BAR_POS 20
