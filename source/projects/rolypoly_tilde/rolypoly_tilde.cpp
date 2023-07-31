@@ -168,7 +168,7 @@ public:
   };
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
-    if (DEBUG) cout << "== M_TIMER == play_ms | t_score | size  :  " << playhead_ms << " | " << t_score << " | " << score.size() << endl;
+    if (DEBUG) cout << "== M_TIMER == play_ms | t_score | size  :  " << playhead_ms << " | " << t_score << " | " << score.sizes(1) << endl;
     if (timer_mode == TIMER::READ) {
       //cout << "timer read" << endl;
       read_deferred.set();
@@ -272,7 +272,6 @@ public:
         }
         // reset the training flag
         m_train = false;
-        attr = "finetune"; attr_value = "false"; set_attr();
       }
       return {};
     }
@@ -282,7 +281,6 @@ public:
     MIN_FUNCTION {
       done_reading = false;
       initialiseScore();
-      attr = "read"; attr_value = "true"; set_attr();
       m_read = true;
       timer_mode = TIMER::READ;
       m_timer.delay(0);
@@ -292,13 +290,12 @@ public:
 
   message<> start {this, "start", "Start playing",
     MIN_FUNCTION {
-      if (!score.size()) {
+      if (!score.sizes(1)) {
         cerr << "no score loaded, can't play yet!" << endl;
         return {};
       }
       done_playing = false;
       prepareToPlay();
-      attr = "play"; attr_value = "true"; set_attr();
       m_play = true;
       timer_mode = TIMER::PLAY;
       m_timer.delay(0);
@@ -309,7 +306,7 @@ public:
 
   message<> train {this, "train", "Finetune the model based on the latest run",
     MIN_FUNCTION {
-      if (!score.size()) {
+      if (!score.sizes(1)) {
         cerr << "no score loaded, can't train yet!" << endl;
         return {};
       }
@@ -320,7 +317,6 @@ public:
         cout << "Using default Follow: " << m_follow << endl;
       }
 
-      attr = "finetune"; attr_value = "true"; set_attr();
       m_train = true;
       timer_mode = TIMER::TRAIN;
       m_timer.delay(50);
@@ -412,18 +408,6 @@ rolypoly::rolypoly(const atoms &args)
       cout << "No finetuned model found." << endl;
   }
 
-  // GET MODEL'S METHOD PARAMETERS
-  auto params = m_model.get_method_params(m_method);
-
-  // GET MODEL'S SETTABLE ATTRIBUTES
-  try {
-    settable_attributes = m_model.get_settable_attributes();
-  } catch (...) { }
-
-  if (!params.size()) {
-    error("method " + m_method + " not found !");
-  }
-
   // Calling forward in a thread causes memory leak in windows.
   // See https://github.com/pytorch/pytorch/issues/24237
 //#ifdef _WIN32
@@ -434,20 +418,15 @@ rolypoly::rolypoly(const atoms &args)
   m_inlets.push_back(std::make_unique<inlet<>>(
     this, "(signal) musician input", "signal"));
 
-  for (int i(0); i < m_out_dim; i++) {
-    std::string output_label = "(signal) ";
-    try {
-      output_label = m_model.get_model().attr(m_method + "_output_labels").toList().get(i).toStringRef();
-    } catch (...) {
-      output_label = "(signal) model output " + std::to_string(i);
-    }
+  std::array<std::string, 9> labels = {"K", "S", "Hcl", "Hop", "lT", "mT", "hT", "Cr", "Rd"};
+
+  for (std::string output_label : labels) {
     m_outlets.push_back(std::make_unique<outlet<>>(
         this, output_label, "signal"));
   }
-  // thread_check::scheduler, thread_action::fifo
+
   m_outlets.push_back(std::make_unique<outlet<>>(
     this, "(list) notes out"));
-
   m_note.reserve(2); // note, velocity
 
   cout << "Running warmup, please wait (Max will freeze for a few seconds) ..." << endl;
@@ -458,23 +437,6 @@ rolypoly::rolypoly(const atoms &args)
 rolypoly::~rolypoly() {
   if (m_compute_thread && m_compute_thread->joinable())
     m_compute_thread->join();
-}
-
-bool rolypoly::has_settable_attribute(std::string attribute) {
-  for (std::string candidate : settable_attributes) {
-    if (candidate == attribute)
-      return true;
-  }
-  return false;
-}
-
-void fill_with_zero(audio_bundle output) {
-  for (int c(0); c < output.channel_count(); c++) {
-    auto out = output.samples(c);
-    for (int i(0); i < output.frame_count(); i++) {
-      out[i] = 0.;
-    }
-  }
 }
 
 void rolypoly::parseTimeEvents(MidiFile &midifile) {
@@ -580,7 +542,7 @@ void rolypoly::prepareToPlay() {
   playhead_ms = i_toModel = i_fromModel =
     t_score = t_play = 0;
   play_notes.clear();
-  play_notes.reserve(score.size());
+  play_notes.reserve(score.sizes(1));
   
   modelOut = torch::zeros({1, 1, OUT_DIM});
 }
@@ -595,7 +557,7 @@ void rolypoly::playMidiIntoVector() {
   if (!m_generate) {
     double timestep_ms = score[i_toModel][TIME_MS];
     // get all notes in the next lookahead_ms
-    while (timestep_ms < start_ms + lookahead_ms && i_toModel < score.size()) {
+    while (timestep_ms < start_ms + lookahead_ms && i_toModel < score.sizes(1)) {
       std::array<double, IN_DIM> note;
       for (int c = 0; c < IN_DIM; c++) {
         note[c] = score[i_toModel][c];
@@ -685,7 +647,7 @@ bool rolypoly::incrementPlayIndexes() {
   if (DEBUG) cout << "== PERFORM == just played: " << t_play << " | " << score[t_score][0] << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
   while (score[t_score][TIME_MS] == current_time_ms) {
     t_score++;
-    if (t_score >= score.size()) {
+    if (t_score >= score.sizes(1)) {
       return true; // done
     }
   }
@@ -725,9 +687,9 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
 
   // is the onset within 1/3 of the closest note duration?
   double closest_note_duration;
-  if (onset_time_ms > closest_note_time && closest_note < score.size()-1) {
+  if (onset_time_ms > closest_note_time && closest_note < score.sizes(1)-1) {
     int next_note = closest_note+1;
-    while (score[next_note][TIME_MS] == closest_note_time && next_note < score.size()-1) next_note++;
+    while (score[next_note][TIME_MS] == closest_note_time && next_note < score.sizes(1)-1) next_note++;
     closest_note_duration = score[next_note][TIME_MS] - closest_note_time;
   } else if (onset_time_ms < closest_note_time && closest_note > 0) {
     int prev_note = closest_note-1;
@@ -767,7 +729,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
   // CHECK IF MODEL IS LOADED AND ENABLED
   if (!m_model.is_loaded() || !enable) {
-    fill_with_zero(output);
+    utils::fill_with_zero(output);
     return;
   }
 
@@ -786,7 +748,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     // if the "play" attribute is true,
     if (!play_notes.size()) {
       // no notes yet!
-      fill_with_zero(output);
+      utils::fill_with_zero(output);
       return;
     }
     // increment playhead
@@ -798,7 +760,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       playhead_ms += buf_ms;
 
     //if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
-    fill_with_zero(output);
+    utils::fill_with_zero(output);
     while (playhead_ms >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
       // when the time comes, play the microtime-adjusted note(s)
       long micro_index = (computeNextNoteTimeMs() - playhead_ms) / buf_ms * vec_size;
@@ -827,9 +789,8 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       bool done = incrementPlayIndexes();
       if (done) break;
     }
-    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score.size()) {
+    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score.sizes(1)) {
       cout << "Done playing. To finetune the model based on this run, send the 'train' message." << endl;
-      attr = "play"; attr_value = "false"; set_attr();
       m_play = false;
       done_playing = true;
       timer_mode = TIMER::INACTIVE;
@@ -841,7 +802,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       }
     }
   } else {
-    fill_with_zero(output);
+    utils::fill_with_zero(output);
   }
 };
 
