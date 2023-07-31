@@ -24,8 +24,6 @@ struct MetaData {
 };
 
 void getMeta(std::vector<MetaData>& meta) {
-    std::vector<std::string> headerKeys; // Vector to store the header keys
-
     std::ifstream file("groove/info.csv");
     if (!file.is_open()) {
         std::cerr << "Error opening file." << std::endl;
@@ -33,6 +31,7 @@ void getMeta(std::vector<MetaData>& meta) {
     }
 
     std::string line;
+    std::vector<std::string> headerKeys; 
     if (std::getline(file, line)) {
         std::istringstream iss(line);
         std::string column;

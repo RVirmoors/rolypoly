@@ -74,13 +74,13 @@ public:
   at::Tensor score;
   vector<double> score_ms;
   long t_toModel; // next timestep to be sent to the model
-  long t_score; // next timestep to be played from score
   int reading_midi;
   int skip; // used to skip everything but NoteOn events
   bool done_reading;
 
   // PLAY RELATED MEMBERS
   double playhead_ms;  // in ms
+  double played_ms; // latest offset-adjusted note that has been played
   long t_fromModel; // next timestep to be read from the model  
   long t_play; // next timestep to be played from play_notes
   long last_onset; // last timestep with an onset detected
@@ -88,7 +88,7 @@ public:
   std::vector<std::array<double, TARGET_DIM>> play_notes; // hits to be played
   bool done_playing;
   int lookahead_ms; // in ms
-  short timer_mode; // 0 inactive, 1 read, 2 play
+  int timer_mode; // 0 inactive, 1 read, 2 play
   enum TIMER {INACTIVE, READ, PLAY, TRAIN};
 
   std::vector<std::pair<long, double>> tempo_map;
@@ -108,7 +108,6 @@ public:
   void advanceReadHead();
   void tensorToModel();
   double computeNextNoteTimeMs();
-  bool incrementPlayIndexes();
   void processLiveOnsets(audio_bundle input);
 
 	// BACKEND RELATED MEMBERS
@@ -187,7 +186,7 @@ public:
   };
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
-    if (DEBUG) cout << "== M_TIMER == play_ms | t_score | size  :  " << playhead_ms << " | " << t_score << " | " << score.size(1) << endl;
+    if (DEBUG) cout << "== M_TIMER == play_ms  | size  :  " << playhead_ms << " | " << score.size(1) << endl;
     if (timer_mode == TIMER::READ) {
       //cout << "timer read" << endl;
       read_deferred.set();
@@ -401,7 +400,7 @@ rolypoly::rolypoly(const atoms &args)
     initialiseScore();
     done_playing = false;
     playhead_ms = t_fromModel = t_toModel = 
-      t_score = t_play =
+      played_ms = t_play =
       current_tempo_index = current_timesig_index = 
       skip = 0;
   }
@@ -559,7 +558,7 @@ void rolypoly::prepareToPlay() {
     m_compute_thread->join();
   }
   playhead_ms = t_toModel = t_fromModel =
-    t_score = t_play = 0;
+    played_ms = t_play = 0;
   play_notes.clear();
   play_notes.reserve(score.size(1));
   
@@ -597,13 +596,14 @@ void rolypoly::tensorToModel() {
     cout << "WARNING: more than " << BLOCK_SIZE-1 << " notes need processing. Only considering the latest " << BLOCK_SIZE-1 << ".";
     while (newNotes > BLOCK_SIZE - 1) {
       // copy notes from score into play_notes
-      play_notes.emplace_back(std::array<double, TARGET_DIM>());
+      play_notes.emplace_back(std::array<double, INPUT_DIM>());
       for (int c = 0; c < modelOut.size(2); c++) {
         play_notes[t_fromModel][c] = score[0][t_fromModel][c].item<double>();
       }
       play_notes[t_fromModel][INX_BPM] = score[0][t_fromModel][INX_BPM];
       play_notes[t_fromModel][INX_TSIG] = score[0][t_fromModel][INX_TSIG];
       play_notes[t_fromModel][INX_BAR_POS] = score[0][t_fromModel][INX_BAR_POS];
+      play_notes[t_fromModel][INX_TAU_G] = 0;
       t_fromModel++;                      
       newNotes--;
     }
@@ -626,41 +626,44 @@ void rolypoly::tensorToModel() {
 
   for (int i = BLOCK_SIZE - newNotes; i > BLOCK_SIZE; i++) {
     play_notes.emplace_back(std::array<double, TARGET_DIM>());
-    for (int c = 0; c < modelOut.size(2); c++) {
+    for (int c = 0; c < OUTPUT_DIM - 1; c++) {
       play_notes[t_fromModel][c] = modelOut[0][i][c].item<double>();
     }
     play_notes[t_fromModel][INX_BPM] = input_tensor[0][i-1][INX_BPM];
     play_notes[t_fromModel][INX_TSIG] = input_tensor[0][i-1][INX_TSIG];
     play_notes[t_fromModel][INX_BAR_POS] = input_tensor[0][i-1][INX_BAR_POS];
+    play_notes[t_fromModel][INX_TAU_G] = modelOut[0][i][18].item<double>(); // last output channel: tau_g_hat
     t_fromModel++;
   }
 }
 
-double rolypoly::computeNextNoteTimeMs() {
+std::pair<double, int> rolypoly::computeNextNoteTimeMs() {
   if (!m_generate && !done_playing) { 
     if (t_play >= play_notes.size()) {
       //cout << "no tau yet" << endl;
-      return score_ms[t_score];
+      return std::make_pair(score_ms[t_play], -1);
     }
-    return score_ms[t_score] + play_notes[t_play][TAU];
+    // find next earliest hit in play_notes[t_play]
+    // if all hits have been played, increment t_play
+    double earliest_ms = std::numeric_limits<double>::infinity();
+    int earliest_channel = -1;
+    for (int c = 9; c < 18; i++) {
+      double this_ms = score_ms[t_play] + play_notes[t_play][c];
+      if (this_ms < earliest_ms && play_notes[t_play][c] > ) {
+        earliest_ms = this_ms;
+        earliest_channel = c;
+      }
+    }
+    if (earliest_channel != -1)
+      return std::make_pair(earliest_ms, earliest_channel);
+    else {
+      t_play++;
+      return computeNextNoteTimeMs();
+    }
   } else {
     // TODO: "generate" == "true" -> use latest notes from play_notes
   }
-  return 0;
-}
-
-bool rolypoly::incrementPlayIndexes() {
-  // increment t_score and t_play
-  double current_time_ms = score_ms[t_score];
-  if (DEBUG) cout << "== PERFORM == just played: " << t_play << " | " << score[t_score][0] << " | " << current_time_ms << "+" << play_notes[t_play][TAU] << " ms" << endl;
-  while (score_ms[t_score] == current_time_ms) {
-    t_score++;
-    if (t_score >= score.size(1)) {
-      return true; // done
-    }
-  }
-  t_play++;
-  return false; // not done
+  return std::make_pair(0, 0);
 }
 
 void rolypoly::processLiveOnsets(audio_bundle input) {
@@ -683,7 +686,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   // find the closest note in the score
   int closest_note = 0;
   double closest_note_time = score_ms[0];
-  for (int i = 0; i < t_score+1; i++) { // for all notes played so far
+  for (int i = 0; i < t_play+1; i++) { // for all notes played so far
     double note_time = score_ms[i];
     if (abs(note_time - onset_time_ms) < abs(closest_note_time - onset_time_ms)) {
       closest_note = i;
@@ -737,7 +740,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
   // CHECK IF MODEL IS LOADED AND ENABLED
   if (!m_model.is_loaded() || !enable) {
-    utils::fill_with_zero(output);
+    fill_with_zero(output);
     return;
   }
 
@@ -756,48 +759,42 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     // if the "play" attribute is true,
     if (!play_notes.size()) {
       // no notes yet!
-      utils::fill_with_zero(output);
+      fill_with_zero(output);
       return;
     }
     // increment playhead
     double buf_ms = lib::math::samples_to_milliseconds(vec_size, samplerate());
-    double next_ms; // usually it's the next note that doesn't have a tau yet
+    std::pair<double, int> next_note = computeNextNoteTimeMs(); // usually it's the next note that doesn't have a tau yet
     // but at the end of the score, it can be the final note (computeNext...)
-    next_ms = std::max(score_ms[t_toModel], computeNextNoteTimeMs() );
-    if (playhead_ms < next_ms)
+    next_note.first = std::max(score_ms[t_toModel], next_note.first );
+    if (playhead_ms < next_note.first)
       playhead_ms += buf_ms;
 
-    //if (DEBUG) cout << playhead_ms << " " << computeNextNoteTimeMs() << endl;
-    utils::fill_with_zero(output);
-    while (playhead_ms >= computeNextNoteTimeMs() - buf_ms && !done_playing) {
-      // when the time comes, play the microtime-adjusted note(s)
-      long micro_index = (computeNextNoteTimeMs() - playhead_ms) / buf_ms * vec_size;
+    //if (DEBUG) cout << playhead_ms << " " << next_note << endl;
+    fill_with_zero(output);
+    while (playhead_ms >= next_note.first - buf_ms && !done_playing) {
+      // when the time comes, play the microtime-adjusted note
+      long micro_index = (next_note.first - playhead_ms) / buf_ms * vec_size;
       micro_index = std::min(micro_index, vec_size-1);
       micro_index = std::max(micro_index, 0L);
-      for (int c = 0; c < output.channel_count(); c++) {
-        auto out = output.samples(c);
-        double vel = play_notes[t_play][c];
-        // cout << "vel: " << vel << " at t: " << t_play << endl;
-        if (c < 9) {
-          if (vel > 0) {
-            if (signal_out) // OUTPUT NOTE SIGNALS
-              out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
-            if (message_out) { // OUTPUT MESSAGES
-              short msg_index = output.channel_count();
-              m_note[0] = playableNotes[c];
-              m_note[1] = vel;
-              m_outlets[msg_index].get()->send(m_note[0], m_note[1]);
-            }
-          }
+      auto out = output.samples(next_note.second);
+      double vel = play_notes[t_play][next_note.second];
+      // cout << "vel: " << vel << " at t: " << t_play << endl;
+      if (vel > 0) {
+        if (signal_out) // OUTPUT NOTE SIGNALS
+          out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
+        if (message_out) { // OUTPUT MESSAGES
+          int msg_index = output.channel_count();
+          m_note[0] = playableNotes[next_note.second];
+          m_note[1] = vel;
+          m_outlets[msg_index].get()->send(m_note[0], m_note[1]);
         }
-        else
-          if (signal_out) // OUTPUT META SIGNALS (bpm, tsig..)
-            out[micro_index] = vel;
-      }
-      bool done = incrementPlayIndexes();
-      if (done) break;
+      }   
+      next_note = computeNextNoteTimeMs();
+      next_note.first = std::max(score_ms[t_toModel], next_note.first );
     }
-    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_score >= score.size(1)) {
+
+    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_play >= score.size(1)) {
       cout << "Done playing. To finetune the model based on this run, send the 'train' message." << endl;
       m_play = false;
       done_playing = true;
@@ -810,7 +807,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       }
     }
   } else {
-    utils::fill_with_zero(output);
+    fill_with_zero(output);
   }
 };
 
