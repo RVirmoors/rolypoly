@@ -67,6 +67,7 @@ public:
   bool m_play;
   bool m_generate;
   bool m_train;
+  bool m_use_thread;
 
   // MIDI RELATED MEMBERS
   MidiFile midifile;
@@ -85,7 +86,7 @@ public:
   long t_play; // next timestep to be played from play_notes
   long last_onset; // last timestep with an onset detected
   at::Tensor modelOut; // result from calling model->forward()
-  std::vector<std::array<double, TARGET_DIM>> play_notes; // hits to be played
+  std::vector<std::array<double, INPUT_DIM>> play_notes; // hits to be played
   bool done_playing;
   int lookahead_ms; // in ms
   int timer_mode; // 0 inactive, 1 read, 2 play
@@ -112,12 +113,8 @@ public:
 
 	// BACKEND RELATED MEMBERS
   torch::Device device = torch::kCPU;
-  if (torch::cuda::is_available()) {
-      cout << "Using CUDA." << endl;
-      device = torch::kCUDA;
-  }
-  backend::TransformerModel model(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
-  backend::HitsTransformer hitsModel(128, 16, 12, device);
+  backend::TransformerModel model;//(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12);
+  backend::HitsTransformer hitsModel;//(128, 16, 12);
 	c74::min::path m_path, h_m_path;
 
 	// AUDIO PERFORM
@@ -165,7 +162,7 @@ public:
       for (int i = 0; i < 7; i++) {
           auto start = std::chrono::high_resolution_clock::now();
           try {
-              m_model->forward(input_tensor);
+              model->forward(input_tensor);
           }
           catch (std::exception& e)
           {
@@ -241,7 +238,7 @@ public:
         advanceReadHead();
 
       // run the model on notes found
-      if (m_use_thread && !done_playing && in_notes.size()) {
+      if (m_use_thread && !done_playing) {
         m_compute_thread = std::make_unique<std::thread>(&rolypoly::tensorToModel, this);
         //if (DEBUG) cout << "started thread" << endl;
       }
@@ -370,10 +367,14 @@ void rolypoly::initialiseScore() {
 rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr),
       m_read(false), m_play(false), m_generate(false), m_train(false),
-      m_method("forward"),
       m_use_thread(true), lookahead_ms(500), m_follow(0.4) {
 
-  m_model = Backend();
+  if (torch::cuda::is_available()) {
+      cout << "Using CUDA." << endl;
+      device = torch::kCUDA;
+  }
+  model = backend::TransformerModel(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
+  hitsModel = backend::HitsTransformer(128, 16, 12);
 
   // CHECK ARGUMENTS
   if (!args.size()) {
@@ -625,7 +626,7 @@ void rolypoly::tensorToModel() {
   if (DEBUG) cout << "== TAUfromMOD == notes from model: " << newNotes << endl;
 
   for (int i = BLOCK_SIZE - newNotes; i > BLOCK_SIZE; i++) {
-    play_notes.emplace_back(std::array<double, TARGET_DIM>());
+    play_notes.emplace_back(std::array<double, INPUT_DIM>());
     for (int c = 0; c < OUTPUT_DIM - 1; c++) {
       play_notes[t_fromModel][c] = modelOut[0][i][c].item<double>();
     }

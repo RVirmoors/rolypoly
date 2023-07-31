@@ -262,4 +262,14 @@ void train(HitsTransformer hitsModel,
     }
 }
 
+void finetune(TransformerModel model, 
+                TrainConfig config,
+                at::Tensor score,
+                std::vector<std::array<double, INPUT_DIM>> play_notes,
+                bool m_follow,
+                torch::Device device = torch::kCPU)
+{
+    
+}
+
 } // end namespace backend
