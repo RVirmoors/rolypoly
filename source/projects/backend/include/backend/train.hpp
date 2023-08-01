@@ -265,11 +265,25 @@ void train(HitsTransformer hitsModel,
 void finetune(TransformerModel model, 
                 TrainConfig config,
                 at::Tensor score,
-                std::vector<std::array<double, INPUT_DIM>> play_notes,
+                at::Tensor play_notes,
                 bool m_follow,
                 torch::Device device = torch::kCPU)
 {
+    torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
+    double min_loss = std::numeric_limits<double>::infinity();
     
+    model->train();
+
+    std::map<std::string, std::vector<torch::Tensor>> train_data;
+    torch::Tensor x, y;
+    torch::Tensor input_enc = score.index({
+        Slice(1, score.size(0)), 
+        Slice(0, 9)});
+
+
+    for (int epoch = 0; epoch < config.epochs; epoch++) {
+        optimizer.zero_grad();
+    }
 }
 
 } // end namespace backend

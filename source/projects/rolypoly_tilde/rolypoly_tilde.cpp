@@ -87,7 +87,7 @@ public:
   int t_play; // next timestep to be played from play_notes
   int last_onset; // last timestep with an onset detected
   at::Tensor modelOut; // result from calling model->forward()
-  std::vector<std::array<double, INPUT_DIM>> play_notes; // hits to be played
+  at::Tensor play_notes; // hits to be played
   bool done_playing;
   int lookahead_ms; // in ms
   int timer_mode; // 0 inactive, 1 read, 2 play
@@ -185,7 +185,7 @@ public:
   };
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
-    if (DEBUG) cout << "== M_TIMER == play_ms  | size  :  " << playhead_ms << " | " << score.size(1) << endl;
+    if (DEBUG) cout << "== M_TIMER == play_ms  | size  :  " << playhead_ms << " | " << score.size(0) << endl;
     if (timer_mode == TIMER::READ) {
       //cout << "timer read" << endl;
       read_deferred.set();
@@ -257,6 +257,7 @@ public:
         try {
           backend::TrainConfig config;
           config.block_size = BLOCK_SIZE;
+          config.epochs = 20;
           backend::finetune(model, config, score, play_notes, m_follow, device);
         }
         catch (std::exception& e)
@@ -302,7 +303,7 @@ public:
 
   message<> start {this, "start", "Start playing",
     MIN_FUNCTION {
-      if (!score.size(1)) {
+      if (!score.size(0)) {
         cerr << "no score loaded, can't play yet!" << endl;
         return {};
       }
@@ -318,7 +319,7 @@ public:
 
   message<> train {this, "train", "Finetune the model based on the latest run",
     MIN_FUNCTION {
-      if (!score.size(1)) {
+      if (!score.size(0)) {
         cerr << "no score loaded, can't train yet!" << endl;
         return {};
       }
@@ -345,7 +346,7 @@ void rolypoly::loadFinetuned(std::string path) {
 }
 
 void rolypoly::initialiseScore() {
-  score = torch::zeros({1, 0, INPUT_DIM});
+  score = torch::zeros({0, INPUT_DIM});
   score_ms.clear();
 }
 
@@ -479,7 +480,7 @@ bool rolypoly::midiNotesToScore() {
   int counter = 0;// hit index TODO remove, this is used just for debug
   int i = 0;      // note index in midi (a hit can have multiple notes)
   double prevTime = -1.;
-  at::Tensor hit = torch::zeros({1, 1, INPUT_DIM});
+  at::Tensor hit = torch::zeros({1, INPUT_DIM});
   auto pitch_class_map = backend::classes_to_map();
 
   while (i < midifile[1].size()) {
@@ -519,23 +520,23 @@ bool rolypoly::midiNotesToScore() {
       // new hit
       if (prevTime != -1.) {
         // unless this is the very first hit, add prev hit to score
-        score = torch::cat({score, hit}, 1);
+        score = torch::cat({score, hit}, 0);
         score_ms.push_back(prevTime * 1000.); // ms
-        assert(score.size(1) == score_ms.size());
+        assert(score.size(0) == score_ms.size());
       }
       prevTime = midifile[1][i].seconds;
-      hit = torch::zeros({1, 1, INPUT_DIM});
+      hit = torch::zeros({1, INPUT_DIM});
     }
-    hit[pitch_class_map[midifile[1][i][1]]] = midifile[1][i][2]; // hit, vel
-    hit[INX_BPM] = tempo_map[current_tempo_index].second; // tempo
-    hit[INX_TSIG] = timesig_map[current_timesig_index].second; // timesig
-    hit[INX_BAR_POS] = pos_in_bar; // pos_in_bar
+    hit[0][pitch_class_map[midifile[1][i][1]]] = midifile[1][i][2]; // hit, vel
+    hit[0][INX_BPM] = tempo_map[current_tempo_index].second; // tempo
+    hit[0][INX_TSIG] = timesig_map[current_timesig_index].second; // timesig
+    hit[0][INX_BAR_POS] = pos_in_bar; // pos_in_bar
 
     counter++;
     i++;
   }
 
-  if (DEBUG) cout << "sent " << counter << " == " << score.size(1) << " hits to model" << endl;
+  if (DEBUG) cout << "sent " << counter << " == " << score.size(0) << " hits to model" << endl;
   
   if (i >= midifile[1].size()) {
     return true; // done
@@ -549,8 +550,7 @@ void rolypoly::prepareToPlay() {
   }
   playhead_ms = t_toModel = t_fromModel =
     played_ms = t_play = 0;
-  play_notes.clear();
-  play_notes.reserve(score.size(1));
+  play_notes = torch::zeros({0, INPUT_DIM});
   
   modelOut = torch::zeros({1, 1, OUTPUT_DIM});
 }
@@ -562,7 +562,7 @@ void rolypoly::advanceReadHead() {
   if (!m_generate) {
     double timestep_ms = score_ms[t_toModel];
     // get all notes in the next lookahead_ms
-    while (timestep_ms < start_ms + lookahead_ms && t_toModel < score.size(1)) {
+    while (timestep_ms < start_ms + lookahead_ms && t_toModel < score.size(0)) {
       t_toModel++;
       timestep_ms = score_ms[t_toModel];
     }
@@ -586,21 +586,14 @@ void rolypoly::tensorToModel() {
     cout << "WARNING: more than " << BLOCK_SIZE-1 << " notes need processing. Only considering the latest " << BLOCK_SIZE-1 << ".";
     while (newNotes > BLOCK_SIZE - 1) {
       // copy notes from score into play_notes
-      play_notes.emplace_back(std::array<double, INPUT_DIM>());
-      for (int c = 0; c < modelOut.size(2); c++) {
-        play_notes[t_fromModel][c] = score[0][t_fromModel][c].item<double>();
-      }
-      play_notes[t_fromModel][INX_BPM] = score[0][t_fromModel][INX_BPM].item<double>();
-      play_notes[t_fromModel][INX_TSIG] = score[0][t_fromModel][INX_TSIG].item<double>();
-      play_notes[t_fromModel][INX_BAR_POS] = score[0][t_fromModel][INX_BAR_POS].item<double>();
-      play_notes[t_fromModel][INX_TAU_G] = 0.;
+      play_notes = torch::cat({play_notes, score[t_fromModel].unsqueeze(0)}, 0);
       t_fromModel++;                      
       newNotes--;
     }
   }
 
   long start = std::max(0, t_toModel - BLOCK_SIZE);
-  torch::Tensor input_tensor = score.index({Slice(), Slice(start, t_toModel)});
+  torch::Tensor input_tensor = score.index({Slice(start, t_toModel)}).unsqueeze(0);
 
   if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
   // send the notes to the model
@@ -614,22 +607,20 @@ void rolypoly::tensorToModel() {
   // populate play_notes[...t_toModel]
   if (DEBUG) cout << "== TAUfromMOD == notes from model: " << newNotes << endl;
 
-  for (int i = BLOCK_SIZE - newNotes; i > BLOCK_SIZE; i++) {
-    play_notes.emplace_back(std::array<double, INPUT_DIM>());
-    for (int c = 0; c < OUTPUT_DIM - 1; c++) {
-      play_notes[t_fromModel][c] = modelOut[0][i][c].item<double>();
-    }
-    play_notes[t_fromModel][INX_BPM] = input_tensor[0][i-1][INX_BPM].item<double>();
-    play_notes[t_fromModel][INX_TSIG] = input_tensor[0][i-1][INX_TSIG].item<double>();
-    play_notes[t_fromModel][INX_BAR_POS] = input_tensor[0][i-1][INX_BAR_POS].item<double>();
-    play_notes[t_fromModel][INX_TAU_G] = modelOut[0][i][18].item<double>(); // last output channel: tau_g_hat
+  for (int i = BLOCK_SIZE - newNotes; i < BLOCK_SIZE; i++) {
+    // TODO if use score velocities, just take 9-18 from modelOut
+    torch::Tensor new_note = modelOut[0][i].index({Slice(0, OUTPUT_DIM - 1)});
+    new_note = torch::cat({new_note, input_tensor[0][i-1].index({Slice(INX_BPM, INX_TAU_G)})});
+    new_note = torch::cat({new_note, modelOut[0][i][18]}); // last output channel: tau_g_hat
+
+    play_notes = torch::cat({play_notes, new_note}, 0);
     t_fromModel++;
   }
 }
 
 std::pair<double, int> rolypoly::computeNextNoteTimeMs() {
   if (!m_generate && !done_playing) { 
-    if (t_play >= play_notes.size()) {
+    if (t_play >= play_notes.size(0)) {
       cout << "no tau yet" << endl;
       return std::make_pair(score_ms[t_play], -1);
     }
@@ -638,8 +629,8 @@ std::pair<double, int> rolypoly::computeNextNoteTimeMs() {
     double earliest_ms = std::numeric_limits<double>::infinity();
     int earliest_channel = -1;
     for (int c = 9; c < 18; c++) {
-      double this_ms = score_ms[t_play] + play_notes[t_play][c];
-      if (this_ms < earliest_ms && play_notes[t_play][c-9] > 0) {
+      double this_ms = score_ms[t_play] + play_notes[t_play][c].item<double>();
+      if (this_ms < earliest_ms && play_notes[t_play][c-9].item<double>() > 0) {
         earliest_ms = this_ms;
         earliest_channel = c;
       }
@@ -688,9 +679,9 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
 
   // is the onset within 1/3 of the closest note duration?
   double closest_note_duration;
-  if (onset_time_ms > closest_note_time && closest_note < score.size(1)-1) {
+  if (onset_time_ms > closest_note_time && closest_note < score.size(0)-1) {
     int next_note = closest_note+1;
-    while (score_ms[next_note] == closest_note_time && next_note < score.size(1)-1) next_note++;
+    while (score_ms[next_note] == closest_note_time && next_note < score.size(0)-1) next_note++;
     closest_note_duration = score_ms[next_note] - closest_note_time;
   } else if (onset_time_ms < closest_note_time && closest_note > 0) {
     int prev_note = closest_note-1;
@@ -707,7 +698,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   }
 
   // add detected tau_g to score
-  score[0][closest_note][INX_TAU_G] = tau_guitar;
+  score[closest_note][INX_TAU_G] = tau_guitar;
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
@@ -723,14 +714,14 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
 void rolypoly::perform(audio_bundle input, audio_bundle output) {
   auto vec_size = input.frame_count();
   // INPUT
-  if (m_play && play_notes.size() && !done_playing) {
+  if (m_play && play_notes.size(0) && !done_playing) {
     processLiveOnsets(input);
   }
 
   // OUTPUT
   if (m_play) {
     // if the "play" attribute is true,
-    if (!play_notes.size()) {
+    if (!play_notes.size(0)) {
       // no notes yet!
       fill_with_zero(output);
       return;
@@ -751,7 +742,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       micro_index = std::min(micro_index, vec_size-1);
       micro_index = std::max(micro_index, 0L);
       auto out = output.samples(next_note.second);
-      double vel = play_notes[t_play][next_note.second];
+      double vel = play_notes[t_play][next_note.second].item<double>();
       // cout << "vel: " << vel << " at t: " << t_play << endl;
       if (vel > 0) {
         if (signal_out) // OUTPUT NOTE SIGNALS
@@ -767,7 +758,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       next_note.first = std::max(score_ms[t_toModel], next_note.first );
     }
 
-    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_play >= score.size(1)) {
+    if (playhead_ms >= midifile[1].back().seconds * 1000. || t_play >= score.size(0)) {
       cout << "Done playing. To finetune the model based on this run, send the 'train' message." << endl;
       m_play = false;
       done_playing = true;
