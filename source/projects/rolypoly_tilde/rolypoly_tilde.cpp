@@ -676,7 +676,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   // find the closest note in the score
   int closest_note = 0;
   double closest_note_time = score_ms[0];
-  for (int i = 0; i < t_play+1; i++) { // for all notes played so far
+  for (int i = 0; i <= t_play; i++) { // for all notes played so far
     double note_time = score_ms[i];
     if (abs(note_time - onset_time_ms) < abs(closest_note_time - onset_time_ms)) {
       closest_note = i;
@@ -706,25 +706,8 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
     if (DEBUG) cout << "NOT within " << closest_note_duration/3 << " of " << closest_note_time << endl; return;
   }
 
-
-  torch::Tensor input_tensor = torch::zeros({1, 1, INPUT_DIM});
-  input_tensor[0][0][0] = 666; // mark this as a live onset
-  input_tensor[0][0][1] = tau_guitar; // in ms
-  for (int c = 2; c < INPUT_DIM; c++) {
-    input_tensor[0][0][c] = score[closest_note][c]; // bpm, tsig, pos_in_bar
-  }
-  // send the onset to the model
-  // if (DEBUG) {
-      try {
-          auto output = model->forward(input_tensor);
-          // cout << "ONSET x_dec:\n" << output << endl;
-      } catch (std::exception& e)
-      {
-          cerr << e.what() << endl;
-      }
-  // } else {
-  //   m_model.get_model().forward({input_tensor}).toTensor();
-  // }
+  // add detected tau_g to score
+  score[0][closest_note][INX_TAU_G] = tau_guitar;
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
