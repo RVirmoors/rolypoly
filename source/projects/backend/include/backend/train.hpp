@@ -95,7 +95,7 @@ void getBatch(
     }
 }
 
-torch::Tensor computeLoss(torch::Tensor y_hat, torch::Tensor y) {
+torch::Tensor getLoss(torch::Tensor y_hat, torch::Tensor y) {
     // discard zero note offsets from y
     auto mask = (y.index({ Slice(), Slice(), Slice(0, 9) }) == 0.0);
 
@@ -143,7 +143,7 @@ float estimateLoss(TransformerModel model,
         torch::Tensor x, y;
         getBatch(val_data, config.batch_size, config.block_size, x, y);
         torch::Tensor y_hat = model->forward(x);
-        torch::Tensor loss = computeLoss(y_hat, y);
+        torch::Tensor loss = getLoss(y_hat, y);
         losses[i] = loss.item<float>();
     }
     eval_loss = losses.mean().item<float>();
@@ -232,7 +232,7 @@ void train(HitsTransformer hitsModel,
         }
                 
         torch::Tensor out = model->forward(x);
-        loss = computeLoss(out, y);
+        loss = getLoss(out, y);
         loss.backward();
         nn::utils::clip_grad_norm_(model->parameters(), 0.5);
         optimizer.step();
@@ -262,11 +262,38 @@ void train(HitsTransformer hitsModel,
     }
 }
 
+torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor score, torch::Tensor play_notes, double follow) {
+    torch::Tensor vel = score.index({Slice(), Slice(), Slice(0, 9)});
+    torch::Tensor vel_hat = play_notes.index({Slice(), Slice(), Slice(0, 9)});
+
+    torch::Tensor tau_g = score.index({Slice(), Slice(), INX_TAU_G});
+    torch::Tensor tau_g_hat = play_notes.index({Slice(), Slice(), INX_TAU_G});
+
+    torch::Tensor y_offsets = play_notes.index({Slice(), Slice(), Slice(9, 18)});
+    torch::Tensor non_zero_mask = (y_offsets != 0).to(torch::kFloat32);
+    torch::Tensor non_zero_sum = (y_offsets * non_zero_mask).sum(2);
+    torch::Tensor non_zero_count = non_zero_mask.sum(2);
+    torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
+
+    torch::Tensor tau_d = torch::where(
+        tau_g != 0,
+        mean_offsets,
+        0.0
+    );
+
+    torch::Tensor r = torch::zeros({1}); // TODO offset regularization vs GMD stats
+    torch::Tensor v = torch::mse_loss(vel_hat, v);
+    torch::Tensor o = torch::mse_loss(tau_d, tau_g);
+    torch::Tensor g = torch::mse_loss(tau_g_hat, tau_g);
+
+    return 0.25 * r + 0.0025 * v + follow * o + 0.5 * g;
+}
+
 void finetune(TransformerModel model, 
                 TrainConfig config,
                 at::Tensor score,
                 at::Tensor play_notes,
-                bool m_follow,
+                double m_follow,
                 torch::Device device = torch::kCPU)
 {
     torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
@@ -275,14 +302,27 @@ void finetune(TransformerModel model,
     model->train();
 
     std::map<std::string, std::vector<torch::Tensor>> train_data;
-    torch::Tensor x, y;
-    torch::Tensor input_enc = score.index({
-        Slice(1, score.size(0)), 
-        Slice(0, 9)});
-
+    train_data["X"].push_back(score);
+    train_data["Y"].push_back(play_notes);
 
     for (int epoch = 0; epoch < config.epochs; epoch++) {
         optimizer.zero_grad();
+            
+        torch::Tensor x, y;
+        getBatch(train_data, 
+            config.batch_size, 
+            config.block_size,
+            x, y);
+
+        torch::Tensor out = model->forward(x);
+        torch::Tensor loss = finetuneLoss(out, x, y, m_follow);
+        loss.backward();
+        nn::utils::clip_grad_norm_(model->parameters(), 0.5);
+        optimizer.step();
+
+        if (epoch % (int)(config.epochs / 5) == 0) {
+            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
+        }
     }
 }
 

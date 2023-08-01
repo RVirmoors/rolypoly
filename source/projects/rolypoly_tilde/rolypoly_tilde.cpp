@@ -12,12 +12,13 @@
 
 // midi stuff
 #include "MidiFile.h"
-#define MAX_SCORE_LENGTH 100000
 
 // Max & Torch
 #include "c74_min.h"
 #include "torch/torch.h"
 #include "backend.hpp"
+
+// C++ stuff
 #include <string>
 #include <thread>
 #include <vector>
@@ -70,7 +71,7 @@ public:
   bool m_train;
   bool m_use_thread;
 
-  // MIDI RELATED MEMBERS
+  // SCORE RELATED MEMBERS
   MidiFile midifile;
   c74::min::path m_midi_path;
   at::Tensor score;
@@ -607,15 +608,19 @@ void rolypoly::tensorToModel() {
   // populate play_notes[...t_toModel]
   if (DEBUG) cout << "== TAUfromMOD == notes from model: " << newNotes << endl;
 
-  for (int i = BLOCK_SIZE - newNotes; i < BLOCK_SIZE; i++) {
+  for (int i = modelOut.size(1) - newNotes; i < modelOut.size(1); i++) {
     // TODO if use score velocities, just take 9-18 from modelOut
     torch::Tensor new_note = modelOut[0][i].index({Slice(0, OUTPUT_DIM - 1)});
-    new_note = torch::cat({new_note, input_tensor[0][i-1].index({Slice(INX_BPM, INX_TAU_G)})});
+    new_note = torch::cat({new_note, input_tensor[0][i].index({Slice(INX_BPM, INX_TAU_G)})});
     new_note = torch::cat({new_note, modelOut[0][i][18]}); // last output channel: tau_g_hat
 
     play_notes = torch::cat({play_notes, new_note}, 0);
     t_fromModel++;
   }
+  // copy executed offsets to score (to be later fed into the model for inference)
+  if (t_toModel < score.size(0) - 1)
+    score.index_put_({Slice(start+1, t_toModel+1), Slice(9, 18)}, 
+      play_notes.index({Slice(start, t_toModel), Slice(9, 18)}));
 }
 
 std::pair<double, int> rolypoly::computeNextNoteTimeMs() {
