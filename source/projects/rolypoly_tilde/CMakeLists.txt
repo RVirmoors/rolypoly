@@ -25,10 +25,9 @@ link_directories(
 )
 
 link_libraries(
-#	torch.lib	# for GPU
+	torch.lib	# for GPU
 	torch_cpu.lib
 	c10.lib
-	backend.lib
 )
 
 

@@ -25,6 +25,7 @@
 
 using namespace c74::min;
 using namespace smf;
+using namespace at::indexing;
 
 // ======= useful functions ==============
 
@@ -74,7 +75,7 @@ public:
   c74::min::path m_midi_path;
   at::Tensor score;
   vector<double> score_ms;
-  long t_toModel; // next timestep to be sent to the model
+  int t_toModel; // next timestep to be sent to the model
   int reading_midi;
   int skip; // used to skip everything but NoteOn events
   bool done_reading;
@@ -82,9 +83,9 @@ public:
   // PLAY RELATED MEMBERS
   double playhead_ms;  // in ms
   double played_ms; // latest offset-adjusted note that has been played
-  long t_fromModel; // next timestep to be read from the model  
-  long t_play; // next timestep to be played from play_notes
-  long last_onset; // last timestep with an onset detected
+  int t_fromModel; // next timestep to be read from the model  
+  int t_play; // next timestep to be played from play_notes
+  int last_onset; // last timestep with an onset detected
   at::Tensor modelOut; // result from calling model->forward()
   std::vector<std::array<double, INPUT_DIM>> play_notes; // hits to be played
   bool done_playing;
@@ -108,14 +109,15 @@ public:
   void prepareToPlay();
   void advanceReadHead();
   void tensorToModel();
-  double computeNextNoteTimeMs();
+  std::pair<double, int> computeNextNoteTimeMs();
   void processLiveOnsets(audio_bundle input);
 
 	// BACKEND RELATED MEMBERS
   torch::Device device = torch::kCPU;
-  backend::TransformerModel model;//(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12);
-  backend::HitsTransformer hitsModel;//(128, 16, 12);
-	c74::min::path m_path, h_m_path;
+  backend::TransformerModel model = nullptr;//(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12);
+  backend::HitsTransformer hitsModel = nullptr;//(128, 16, 12);
+	c74::min::path m_path, h_m_path;  
+  bool m_loaded;
 
 	// AUDIO PERFORM
 	std::unique_ptr<std::thread> m_compute_thread;
@@ -208,8 +210,7 @@ public:
 
       if (reading_midi && !done_reading) {
         // populate score
-        score = torch::zeros({1, 0, INPUT_DIM});
-        score_ms.clear();
+        initialiseScore();
         done_reading = midiNotesToScore();
       }
 
@@ -262,27 +263,27 @@ public:
         {
             cerr << e.what() << endl;
         }
-        cout << "Done. Losses:\nTOTAL   Dhat-D   Vhat-V  Dhat-G  Ghat-G\n" << losses.slice(2, 0, 5) << endl;
+        //cout << "Done. Losses:\nTOTAL   Dhat-D   Vhat-V  Dhat-G  Ghat-G\n" << losses.slice(2, 0, 5) << endl;
         // save model
-        m_model.get_model().save("model.pt");
+        torch::save(model, "model.pt");
         cout << "Saved model.pt" << endl;
-        loadFinetuned("model.pt");
-        if (DEBUG) {
-          // send zeros to get diag info
-          input_tensor = torch::zeros({1, 1, INPUT_DIM});
-          torch::Tensor diag;
-          try {
-              diag = model->forward(input_tensor);
-          }
-          catch (std::exception& e)
-          {
-              cerr << e.what() << endl;
-          }
-          cout << "D_hat     G_hat     G\n" << diag.slice(2, 0, 3).slice(1, 0, 10) << endl;
-        }
+        // loadFinetuned("model.pt");
+        // if (DEBUG) {
+        //   // send zeros to get diag info
+        //   input_tensor = torch::zeros({1, 1, INPUT_DIM});
+        //   torch::Tensor diag;
+        //   try {
+        //       diag = model->forward(input_tensor);
+        //   }
+        //   catch (std::exception& e)
+        //   {
+        //       cerr << e.what() << endl;
+        //   }
+        //   cout << "D_hat     G_hat     G\n" << diag.slice(2, 0, 3).slice(1, 0, 10) << endl;
+        // }
         // reset the training flag
         m_train = false;
-        torch::AutoGradMode enable_grad(false);
+        //enable_grad(false);
       }
       return {};
     }
@@ -338,34 +339,18 @@ public:
 };
 
 void rolypoly::loadFinetuned(std::string path) {
-  torch::jit::script::Module finetuned = torch::jit::load(path);
-  // copy the parameters from the finetuned model to the base model
-  torch::AutoGradMode enable_grad(false);
-  std::unordered_map<std::string, at::Tensor> name_to_tensor;
-  for (auto& param : finetuned.named_parameters()) {
-      name_to_tensor[param.name] = param.value;
-  }
-  for (auto& base_param : m_model.get_model().named_parameters()) {
-      auto name = base_param.name;
-      auto& base_tensor = base_param.value;
-      auto fine_tuned_param = name_to_tensor[name];
-      base_tensor.copy_(fine_tuned_param);
-      base_tensor.detach_();
-      base_tensor.requires_grad_(true);
-      // cout << "Loaded " << name << endl;
-  }
+  torch::load(model, path);
   cout << "Loaded finetuned model" << endl;
-  m_model.get_model().eval();
+  model->eval();
 }
 
 void rolypoly::initialiseScore() {
-  score.clear();
+  score = torch::zeros({1, 0, INPUT_DIM});
   score_ms.clear();
-  score.reserve(MAX_SCORE_LENGTH);
 }
 
 rolypoly::rolypoly(const atoms &args)
-    : m_compute_thread(nullptr),
+    : m_compute_thread(nullptr), m_loaded(false),
       m_read(false), m_play(false), m_generate(false), m_train(false),
       m_use_thread(true), lookahead_ms(500), m_follow(0.4) {
 
@@ -374,7 +359,7 @@ rolypoly::rolypoly(const atoms &args)
       device = torch::kCUDA;
   }
   model = backend::TransformerModel(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
-  hitsModel = backend::HitsTransformer(128, 16, 12);
+  hitsModel = backend::HitsTransformer(128, 16, 12, device);
 
   // CHECK ARGUMENTS
   if (!args.size()) {
@@ -406,12 +391,16 @@ rolypoly::rolypoly(const atoms &args)
       skip = 0;
   }
 
-  // TRY TO LOAD MODEL
-  if (m_model.load(std::string(m_path))) {
-      cerr << "error during loading" << endl;
-      error();
-      return;
+  // TRY TO LOAD MODELS
+  try {
+    torch::load(model, m_path);
+    torch::load(hitsModel, "roly_hits.pt");
+  } catch (std::exception& e)
+  {
+      if (DEBUG) cerr << e.what() << endl;
+      cout << "Error loading models." << endl;
   }
+  m_loaded = true;
 
   // LOAD FINETUNED MODEL IF EXISTS
   try {
@@ -601,10 +590,10 @@ void rolypoly::tensorToModel() {
       for (int c = 0; c < modelOut.size(2); c++) {
         play_notes[t_fromModel][c] = score[0][t_fromModel][c].item<double>();
       }
-      play_notes[t_fromModel][INX_BPM] = score[0][t_fromModel][INX_BPM];
-      play_notes[t_fromModel][INX_TSIG] = score[0][t_fromModel][INX_TSIG];
-      play_notes[t_fromModel][INX_BAR_POS] = score[0][t_fromModel][INX_BAR_POS];
-      play_notes[t_fromModel][INX_TAU_G] = 0;
+      play_notes[t_fromModel][INX_BPM] = score[0][t_fromModel][INX_BPM].item<double>();
+      play_notes[t_fromModel][INX_TSIG] = score[0][t_fromModel][INX_TSIG].item<double>();
+      play_notes[t_fromModel][INX_BAR_POS] = score[0][t_fromModel][INX_BAR_POS].item<double>();
+      play_notes[t_fromModel][INX_TAU_G] = 0.;
       t_fromModel++;                      
       newNotes--;
     }
@@ -630,9 +619,9 @@ void rolypoly::tensorToModel() {
     for (int c = 0; c < OUTPUT_DIM - 1; c++) {
       play_notes[t_fromModel][c] = modelOut[0][i][c].item<double>();
     }
-    play_notes[t_fromModel][INX_BPM] = input_tensor[0][i-1][INX_BPM];
-    play_notes[t_fromModel][INX_TSIG] = input_tensor[0][i-1][INX_TSIG];
-    play_notes[t_fromModel][INX_BAR_POS] = input_tensor[0][i-1][INX_BAR_POS];
+    play_notes[t_fromModel][INX_BPM] = input_tensor[0][i-1][INX_BPM].item<double>();
+    play_notes[t_fromModel][INX_TSIG] = input_tensor[0][i-1][INX_TSIG].item<double>();
+    play_notes[t_fromModel][INX_BAR_POS] = input_tensor[0][i-1][INX_BAR_POS].item<double>();
     play_notes[t_fromModel][INX_TAU_G] = modelOut[0][i][18].item<double>(); // last output channel: tau_g_hat
     t_fromModel++;
   }
@@ -641,16 +630,16 @@ void rolypoly::tensorToModel() {
 std::pair<double, int> rolypoly::computeNextNoteTimeMs() {
   if (!m_generate && !done_playing) { 
     if (t_play >= play_notes.size()) {
-      //cout << "no tau yet" << endl;
+      cout << "no tau yet" << endl;
       return std::make_pair(score_ms[t_play], -1);
     }
     // find next earliest hit in play_notes[t_play]
-    // if all hits have been played, increment t_play
+    // if all hits have been played, increment t_play and look again
     double earliest_ms = std::numeric_limits<double>::infinity();
     int earliest_channel = -1;
-    for (int c = 9; c < 18; i++) {
+    for (int c = 9; c < 18; c++) {
       double this_ms = score_ms[t_play] + play_notes[t_play][c];
-      if (this_ms < earliest_ms && play_notes[t_play][c] > ) {
+      if (this_ms < earliest_ms && play_notes[t_play][c-9] > 0) {
         earliest_ms = this_ms;
         earliest_channel = c;
       }
@@ -740,7 +729,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
   // CHECK IF MODEL IS LOADED AND ENABLED
-  if (!m_model.is_loaded() || !enable) {
+  if (!m_loaded || !enable) {
     fill_with_zero(output);
     return;
   }
