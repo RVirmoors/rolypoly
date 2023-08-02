@@ -78,6 +78,15 @@ void dataScaleUp(torch::Tensor& data) {
     data.index({Slice(), Slice(), Slice(INX_BPM, INX_BPM + 1)}).mul_(200).add_(40);
 }
 
+void dataScaleUpHits(torch::Tensor& data) {
+    /*
+    Scale back up from [0, 1]
+    input: (batch, block_size, 10)
+    output: (batch, block_size, 10)
+    */
+    data.index({Slice(), Slice(), Slice(1, 10)}).mul_(127);
+}
+
 std::string tensor_to_csv(at::Tensor tensor) {
   // in: tensor of shape (length, channels)
   // out: csv string of shape (length, channels)
