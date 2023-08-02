@@ -64,10 +64,9 @@ public:
 	rolypoly(const atoms &args = {});
 	~rolypoly();
 
-  // ATTRIBUTES
+  // OPERATION MODES
   bool m_read;
   bool m_play;
-  bool m_generate;
   bool m_train;
   bool m_use_thread;
 
@@ -132,13 +131,15 @@ public:
   argument<symbol> hit_path_arg{this, "hit_model path",
                             "Absolute path to the hit generation model."}; // TODO: implement
 
-  // ENABLE / DISABLE ATTRIBUTE
+  // ATTRIBUTES
   attribute<bool> enable{this, "enable", true,
                          description{"Enable / disable tensor computation"}};
 
-  // LATENCY (guitar onsets) ATTRIBUTE
   attribute<int> latency{this, "latency", 512,
                          description{"Onset detection latency (samples)"}};
+
+  attribute<bool> generate{this, "generate", false,
+                         description{"Generate hits on the fly, not reading from the score"}};
 
   attribute<bool> score_filter{this, "score_filter", true,
                          description{"Filter out notes not in the score"}}; // TODO: implement
@@ -265,25 +266,8 @@ public:
         {
             cerr << e.what() << endl;
         }
-        //cout << "Done. Losses:\nTOTAL   Dhat-D   Vhat-V  Dhat-G  Ghat-G\n" << losses.slice(2, 0, 5) << endl;
-        // save model
         torch::save(model, "model.pt");
-        cout << "Saved model.pt" << endl;
-        // loadFinetuned("model.pt");
-        // if (DEBUG) {
-        //   // send zeros to get diag info
-        //   input_tensor = torch::zeros({1, 1, INPUT_DIM});
-        //   torch::Tensor diag;
-        //   try {
-        //       diag = model->forward(input_tensor);
-        //   }
-        //   catch (std::exception& e)
-        //   {
-        //       cerr << e.what() << endl;
-        //   }
-        //   cout << "D_hat     G_hat     G\n" << diag.slice(2, 0, 3).slice(1, 0, 10) << endl;
-        // }
-        // reset the training flag
+        cout << "Done. Saved model.pt" << endl;
         m_train = false;
         //enable_grad(false);
       }
@@ -353,7 +337,7 @@ void rolypoly::initialiseScore() {
 
 rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr), m_loaded(false),
-      m_read(false), m_play(false), m_generate(false), m_train(false),
+      m_read(false), m_play(false), m_train(false),
       m_use_thread(true), lookahead_ms(500), m_follow(0.4) {
 
   if (torch::cuda::is_available()) {
@@ -560,15 +544,13 @@ void rolypoly::advanceReadHead() {
   // advance t_toModel over all the notes in the upcoming lookahead_ms
   double start_ms = playhead_ms;
   if (DEBUG) cout << "== MID2VEC == looking ahead from " << start_ms << " ms" << endl;
-  if (!m_generate) {
-    double timestep_ms = score_ms[t_toModel];
-    // get all notes in the next lookahead_ms
-    while (timestep_ms < start_ms + lookahead_ms && t_toModel < score.size(0)) {
-      t_toModel++;
-      timestep_ms = score_ms[t_toModel];
-    }
-  } // TODO: "generate" == "true" -> play latest note from play_notes
-    // TODO: if pos_in_bar < previous pos_in_bar, then we have a new bar
+
+  double timestep_ms = score_ms[t_toModel];
+  // get all notes in the next lookahead_ms
+  while (timestep_ms < start_ms + lookahead_ms && t_toModel < score.size(0)) {
+    t_toModel++;
+    timestep_ms = score_ms[t_toModel];
+  }
 }
 
 void rolypoly::tensorToModel() {
@@ -624,7 +606,7 @@ void rolypoly::tensorToModel() {
 }
 
 std::pair<double, int> rolypoly::computeNextNoteTimeMs() {
-  if (!m_generate && !done_playing) { 
+  if (!done_playing) { 
     if (t_play >= play_notes.size(0)) {
       cout << "no tau yet" << endl;
       return std::make_pair(score_ms[t_play], -1);
@@ -646,9 +628,7 @@ std::pair<double, int> rolypoly::computeNextNoteTimeMs() {
       t_play++;
       return computeNextNoteTimeMs();
     }
-  } else {
-    // TODO: "generate" == "true" -> use latest notes from play_notes
-  }
+  } 
   return std::make_pair(0, 0);
 }
 
