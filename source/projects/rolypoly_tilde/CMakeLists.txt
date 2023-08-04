@@ -19,17 +19,21 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/../backend/include
 )
 
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch")
+find_package(Torch REQUIRED)
+
 link_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/lib
-	${CMAKE_CURRENT_SOURCE_DIR}/../backend/Release
 )
 
-link_libraries(
-	torch.lib	# for GPU
-	torch_cpu.lib
-	c10.lib
-)
 
+# link_libraries(
+# 	torch.lib	# for GPU
+# 	torch_cpu.lib
+# 	c10.lib
+# 	dnnl.lib
+# 	"${TORCH_CUDA_LIBRARIES}"
+# )
 
 set( SOURCE_FILES
 	${PROJECT_NAME}.cpp
@@ -45,6 +49,9 @@ add_library(
 	MODULE
 	${SOURCE_FILES}
 )
+
+target_link_libraries(${PROJECT_NAME} PRIVATE "${TORCH_LIBRARIES}")
+target_link_libraries(${PROJECT_NAME} PRIVATE "${TORCH_CUDA_LIBRARIES}")
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 

@@ -272,8 +272,8 @@ public:
         {
             cerr << e.what() << endl;
         }
-        torch::save(model, "model.pt");
-        cout << "Done. Saved model.pt" << endl;
+        torch::save(model, "roly.pt");
+        cout << "Done. Saved roly.pt" << endl;
         m_train = false;
         //enable_grad(false);
       }
@@ -396,7 +396,7 @@ rolypoly::rolypoly(const atoms &args)
 
   // LOAD FINETUNED MODEL IF EXISTS
   try {
-    loadFinetuned("model.pt");
+    loadFinetuned("roly.pt");
   }         
   catch (std::exception& e)
   {

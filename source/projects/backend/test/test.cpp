@@ -186,24 +186,6 @@ TORCH_MODULE(ToyHitsTransformer);
 
 // ========== TRAIN ===============
 
-float get_lr(int ep, backend::TrainConfig config) {
-// https://github.com/karpathy/nanoGPT/blob/master/train.py#L228C5-L228C5
-    if (!config.decay_lr) {
-        return config.lr;
-    }
-    if (ep < config.warmup_iters) {
-        return config.lr * ep / config.warmup_iters;
-    }
-    if (ep > config.lr_decay_iters) {
-        return config.min_lr;
-    }
-    float decay_ratio = (float)(ep - config.warmup_iters) / (config.lr_decay_iters - config.warmup_iters);
-    _ASSERT(0 <= decay_ratio);
-    _ASSERT(decay_ratio <= 1);
-    float coeff = 0.5 * (1.0 + cos(M_PI * decay_ratio));
-    return config.min_lr + coeff * (config.lr - config.min_lr);
-}
-
 torch::Tensor toyHitsLoss(torch::Tensor y_hat, torch::Tensor y) {
     torch::Tensor y_hat_hits = y_hat.index({Slice(), Slice(), Slice(1,10)});
     torch::Tensor y_hits = toyThreshToOnes(y).to(torch::kFloat);

@@ -29,14 +29,9 @@
 			<description>Absolute path to the pretrained model. </description>
 		</objarg>
 
-		<objarg name='method' optional='1' type='symbol'>
-			<digest>Name of the method to call during synthesis</digest>
-			<description>Name of the method to call during synthesis. </description>
-		</objarg>
-
-		<objarg name='buffer size' optional='1' type='int'>
-			<digest>Size of the internal buffer (can't be lower than the method's ratio)</digest>
-			<description>Size of the internal buffer (can't be lower than the method's ratio). </description>
+		<objarg name='hit_model path' optional='1' type='symbol'>
+			<digest>Absolute path to the hit generation model</digest>
+			<description>Absolute path to the hit generation model. </description>
 		</objarg>
 
 	</objarglist>
@@ -51,19 +46,14 @@
 			<description>Finetune the model based on the latest run </description>
 		</method>
 
-		<method name='start'>
-			<digest>Start playing </digest>
-			<description>Start playing </description>
-		</method>
-
-		<method name='anything'>
-			<digest>callback for attributes </digest>
-			<description>callback for attributes </description>
-		</method>
-
 		<method name='read'>
 			<digest>Load score </digest>
 			<description>Load score </description>
+		</method>
+
+		<method name='start'>
+			<digest>Start playing </digest>
+			<description>Start playing </description>
 		</method>
 
 	</methodlist>
@@ -86,6 +76,11 @@
 		<attribute name='latency' get='1' set='1' type='long' size='1' >
 			<digest>Onset detection latency (samples) </digest>
 			<description>Onset detection latency (samples) </description>
+		</attribute>
+
+		<attribute name='generate' get='1' set='1' type='long' size='1' >
+			<digest>Generate hits on the fly, not reading from the score </digest>
+			<description>Generate hits on the fly, not reading from the score </description>
 		</attribute>
 
 		<attribute name='score_filter' get='1' set='1' type='long' size='1' >
