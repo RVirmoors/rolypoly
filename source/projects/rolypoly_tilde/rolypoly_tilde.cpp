@@ -168,7 +168,7 @@ public:
     MIN_FUNCTION {
       // warmup the model
       std::chrono::microseconds duration;
-      torch::Tensor input_tensor = torch::randn({1, 1, INPUT_DIM});
+      torch::Tensor input_tensor = torch::randn({1, 1, INPUT_DIM}).to(device);
       for (int i = 0; i < 7; i++) {
           auto start = std::chrono::high_resolution_clock::now();
           try {
@@ -337,7 +337,7 @@ void rolypoly::loadFinetuned(std::string path) {
 }
 
 void rolypoly::initialiseScore() {
-  score = torch::zeros({0, INPUT_DIM});
+  score = torch::zeros({0, INPUT_DIM}).to(device);
   score_ms.clear();
 }
 
@@ -350,7 +350,7 @@ rolypoly::rolypoly(const atoms &args)
       cout << "Using CUDA." << endl;
       device = torch::kCUDA;
   } else {
-    cout << "No CUDA found, using CPU." << endl;
+    cout << "No CUDA found, using CPU..." << endl;
   }
   model = backend::TransformerModel(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
   hitsModel = backend::HitsTransformer(128, 16, 12, device);
@@ -473,7 +473,7 @@ bool rolypoly::midiNotesToScore() {
   int counter = 0;// hit index TODO remove, this is used just for debug
   int i = 0;      // note index in midi (a hit can have multiple notes)
   double prevTime = -1.;
-  at::Tensor hit = torch::zeros({1, INPUT_DIM});
+  at::Tensor hit = torch::zeros({1, INPUT_DIM}).to(device);
   auto pitch_class_map = backend::classes_to_map();
 
   while (i < midifile[1].size()) {
@@ -518,7 +518,7 @@ bool rolypoly::midiNotesToScore() {
         assert(score.size(0) == score_ms.size());
       }
       prevTime = midifile[1][i].seconds;
-      hit = torch::zeros({1, INPUT_DIM});
+      hit = torch::zeros({1, INPUT_DIM}).to(device);
     }
     hit[0][pitch_class_map[midifile[1][i][1]]] = midifile[1][i][2]; // hit, vel
     hit[0][INX_BPM] = tempo_map[current_tempo_index].second; // tempo
@@ -543,7 +543,7 @@ void rolypoly::prepareToPlay() {
   }
   playhead_ms = t_toModel = t_fromModel =
     played_ms = t_play = 0;
-  play_notes = torch::zeros({0, INPUT_DIM});
+  play_notes = torch::zeros({0, INPUT_DIM}).to(device);
 }
 
 void rolypoly::advanceReadHead() {
@@ -566,7 +566,7 @@ void rolypoly::tensorToModel() {
   // if in generate mode, then run the HitsModel to insert a new note into the score
 
   int newNotes = t_toModel - t_fromModel;
-  torch::Tensor modelOut = torch::zeros({1, 1, OUTPUT_DIM});
+  torch::Tensor modelOut = torch::zeros({1, 1, OUTPUT_DIM}).to(device);
 
   if (!newNotes) { // no new notes
     return;
