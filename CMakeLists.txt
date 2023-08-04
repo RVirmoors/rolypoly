@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.19)
 set( CMAKE_CXX_COMPILER "C:/msys64/mingw64/bin/g++.exe" )
 set( CMAKE_C_COMPILER "C:/msys64/mingw64/bin/gcc.exe" )
-project(rolypoly_tilde)
+project(rolypoly)
 
-# //enable_testing()
+# enable_testing()
 
 string(REGEX REPLACE "(.*)/" "" THIS_PACKAGE_NAME "${CMAKE_CURRENT_SOURCE_DIR}")
 
