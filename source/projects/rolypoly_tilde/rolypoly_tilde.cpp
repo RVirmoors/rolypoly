@@ -385,8 +385,8 @@ rolypoly::rolypoly(const atoms &args)
 
   // TRY TO LOAD MODELS
   try {
-    torch::load(model, m_path);
-    torch::load(hitsModel, "roly_hits.pt");
+    torch::load(model, m_path, device);
+    torch::load(hitsModel, "roly_hits.pt", device);
   } catch (std::exception& e)
   {
       if (DEBUG) cerr << e.what() << endl;
