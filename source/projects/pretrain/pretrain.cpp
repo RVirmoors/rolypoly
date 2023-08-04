@@ -161,7 +161,7 @@ int main() {
     std::string load_hits_model = "out/hitsModel.pt";
     if (fs::exists(load_hits_model)) {
         try {
-            torch::load(hitsModel, load_hits_model);
+            torch::load(hitsModel, load_hits_model, device);
             std::cout << "Model checkpoint loaded successfully from: " << load_hits_model << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;
@@ -170,7 +170,7 @@ int main() {
     std::string load_model = "out/model.pt";
     if (fs::exists(load_model)) {
         try {
-            torch::load(model, load_model);
+            torch::load(model, load_model, device);
             std::cout << "Model checkpoint loaded successfully from: " << load_model << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "Error loading model checkpoint: " << e.what() << std::endl;

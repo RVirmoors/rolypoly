@@ -272,8 +272,8 @@ public:
         {
             cerr << e.what() << endl;
         }
-        torch::save(model, "roly.pt");
-        cout << "Done. Saved roly.pt" << endl;
+        torch::save(model, "roly_fine.pt");
+        cout << "Done. Saved roly_fine.pt" << endl;
         m_train = false;
         //enable_grad(false);
       }
@@ -331,7 +331,7 @@ public:
 };
 
 void rolypoly::loadFinetuned(std::string path) {
-  torch::load(model, path);
+  torch::load(model, path, device);
   cout << "Loaded finetuned model" << endl;
   model->eval();
 }
@@ -398,11 +398,11 @@ rolypoly::rolypoly(const atoms &args)
 
   // LOAD FINETUNED MODEL IF EXISTS
   try {
-    loadFinetuned("roly.pt");
+    loadFinetuned("roly_fine.pt");
   }         
   catch (std::exception& e)
   {
-      if (DEBUG) cerr << e.what() << endl;
+      // if (DEBUG) cerr << e.what() << endl;
       cout << "No finetuned model found." << endl;
   }
 

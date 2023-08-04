@@ -1,10 +1,12 @@
 # rolypoly~
 
-(update May '23) the object is functional, alpha release w/ full documentation coming soon
+version 2.0b2, August 2023
 
 ## quickstart
 
-(coming soon) get the package from the Releases tab
+get the package from the Releases tab
+
+[download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
 
 ## training your own model
 
@@ -47,8 +49,6 @@ pretrain
 you need [CMake](https://cmake.org/download/) installed
 
 create a subfolder called `libtorch` and[download+extract LibTorch](https://pytorch.org/get-started/locally/) (Release version) into it
-
-copy the libtorch *.dll files from `libtorch/lib` to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
 
 first you need to build `nn_tilde` (just the backend is enough): inside `nn_tilde/` create a `build` subfolder and enter it:
 - `cd nn_tilde`
