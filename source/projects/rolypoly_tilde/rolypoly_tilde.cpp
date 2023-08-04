@@ -349,6 +349,8 @@ rolypoly::rolypoly(const atoms &args)
   if (torch::cuda::is_available()) {
       cout << "Using CUDA." << endl;
       device = torch::kCUDA;
+  } else {
+    cout << "No CUDA found, using CPU." << endl;
   }
   model = backend::TransformerModel(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
   hitsModel = backend::HitsTransformer(128, 16, 12, device);
