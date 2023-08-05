@@ -1,13 +1,13 @@
 // Rolypoly C++ implementation
 // 2023 rvirmoors
-// v2.0b1 initially based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
+// v2.0.1 initially based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 //
 // Frontend: Max external object
 
 #define DEBUG true
 
 #ifndef VERSION
-#define VERSION "2.0b2"
+#define VERSION "2.0.1"
 #endif
 
 // midi stuff
@@ -471,7 +471,6 @@ void rolypoly::parseTimeEvents(MidiFile &midifile) {
 bool rolypoly::midiNotesToScore() {
   // populates score with midi data: hit, vel, tempo, timesig, pos_in_bar
 
-  int counter = 0;// hit index TODO remove, this is used just for debug
   int i = 0;      // note index in midi (a hit can have multiple notes)
   double prevTime = -1.;
   at::Tensor hit = torch::zeros({1, INPUT_DIM}).to(device);
@@ -526,11 +525,12 @@ bool rolypoly::midiNotesToScore() {
     hit[0][INX_TSIG] = timesig_map[current_timesig_index].second; // timesig
     hit[0][INX_BAR_POS] = pos_in_bar; // pos_in_bar
 
-    counter++;
     i++;
   }
 
-  if (DEBUG) cout << "sent " << counter << " == " << score.size(0) << " hits to model" << endl;
+  if (DEBUG) cout << "sent " << score.size(0) << " hits to model" << endl;
+
+  if (DEBUG) cout << score.index({Slice(0,5)}) << endl;
   
   if (i >= midifile[1].size()) {
     return true; // done
@@ -584,19 +584,21 @@ void rolypoly::tensorToModel() {
   }
 
   long start = std::max(0, t_toModel - BLOCK_SIZE);
+  cout << "sending " << start << " - " << t_toModel << endl;
   torch::Tensor input_tensor = score.index({Slice(start, t_toModel)}).unsqueeze(0);
   backend::dataScaleDown(input_tensor);
 
   if (DEBUG) cout << "== VEC2MOD == input_tensor  :  " << input_tensor << endl;
+
   // send the notes to the model
   try {
     modelOut = model(input_tensor);
     backend::dataScaleUp(input_tensor);
+    backend::dataScaleUp(modelOut);
     if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
   }
-
   // populate play_notes[...t_toModel]
   if (DEBUG) cout << "== TAUfromMOD == notes from model: " << newNotes << endl;
 
@@ -610,12 +612,15 @@ void rolypoly::tensorToModel() {
         });
     else
       new_note = modelOut[0][i].index({Slice(0, OUTPUT_DIM - 1)});
+
     new_note = torch::cat({new_note, input_tensor[0][i].index({Slice(INX_BPM, INX_TAU_G)})});
-    new_note = torch::cat({new_note, modelOut[0][i][18]}); // last output channel: tau_g_hat
+    new_note = torch::cat({new_note, modelOut[0][i][18].unsqueeze(0)}); // last output channel: tau_g_hat
+    new_note.unsqueeze_(0);
 
     play_notes = torch::cat({play_notes, new_note}, 0);
   }
 
+  /*
   if (generate) {
     // compute a new note to be played next = inserted into the score at t_toModel
     input_tensor = score.index({Slice(start, t_toModel)}).unsqueeze(0);
@@ -647,7 +652,7 @@ void rolypoly::tensorToModel() {
   if (t_toModel < score.size(0) - 1)
     score.index_put_({Slice(t_fromModel+1, t_toModel+1), Slice(9, 18)}, 
       play_notes.index({Slice(t_fromModel, t_toModel), Slice(9, 18)}));
-
+*/
   t_fromModel = t_toModel;
 }
 
