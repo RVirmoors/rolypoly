@@ -57,7 +57,7 @@
 						}
 ,
 						"classnamespace" : "box",
-						"rect" : [ 263.0, 111.0, 1086.0, 887.0 ],
+						"rect" : [ 0.0, 26.0, 1086.0, 887.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -1597,7 +1597,7 @@
 									"numinlets" : 1,
 									"numoutlets" : 10,
 									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "" ],
-									"patching_rect" : [ 107.5, 188.666667640209198, 166.0, 22.0 ],
+									"patching_rect" : [ 107.5, 188.666667640209198, 122.0, 22.0 ],
 									"text" : "rolypoly~ roly tim.mid"
 								}
 
@@ -2134,7 +2134,7 @@
 						}
 ,
 						"classnamespace" : "box",
-						"rect" : [ 0.0, 26.0, 1086.0, 887.0 ],
+						"rect" : [ 263.0, 111.0, 1086.0, 887.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,

@@ -122,7 +122,7 @@ public:
   torch::Device device = torch::kCPU;
   backend::TransformerModel model = nullptr;//(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12);
   backend::HitsTransformer hitsModel = nullptr;//(128, 16, 12);
-	c74::min::path m_path, h_m_path;  
+  c74::min::path m_path, h_m_path;  
   bool m_loaded;
 
 	// AUDIO PERFORM
@@ -350,7 +350,7 @@ rolypoly::rolypoly(const atoms &args)
       cout << "Using CUDA." << endl;
       device = torch::kCUDA;
   } else {
-    cout << "No CUDA found, using CPU..." << endl;
+    cout << "No CUDA found, using CPU." << endl;
   }
   model = backend::TransformerModel(INPUT_DIM, OUTPUT_DIM, 128, 16, 12, 12, device);
   hitsModel = backend::HitsTransformer(128, 16, 12, device);
@@ -362,6 +362,7 @@ rolypoly::rolypoly(const atoms &args)
   if (args.size() > 0) { // ONE ARGUMENT IS GIVEN
     auto model_path = std::string(args[0]);
     m_path = get_latest_model(model_path);
+    h_m_path = get_latest_model("roly_hits.pt");
   }
   if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
     auto midi_path = std::string(args[1]);
@@ -388,7 +389,7 @@ rolypoly::rolypoly(const atoms &args)
   // TRY TO LOAD MODELS
   try {
     torch::load(model, m_path, device);
-    torch::load(hitsModel, "roly_hits.pt", device);
+    torch::load(hitsModel, h_m_path, device);
   } catch (std::exception& e)
   {
       if (DEBUG) cerr << e.what() << endl;
