@@ -57,7 +57,7 @@
 						}
 ,
 						"classnamespace" : "box",
-						"rect" : [ 0.0, 26.0, 836.0, 887.0 ],
+						"rect" : [ 263.0, 111.0, 836.0, 887.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -1573,8 +1573,8 @@
 									"numinlets" : 1,
 									"numoutlets" : 10,
 									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "" ],
-									"patching_rect" : [ 107.5, 188.666667640209198, 122.0, 22.0 ],
-									"text" : "rolypoly~ roly tim.mid"
+									"patching_rect" : [ 107.5, 188.666667640209198, 132.0, 22.0 ],
+									"text" : "rolypoly~ roly s120.mid"
 								}
 
 							}
@@ -1603,6 +1603,19 @@
 									"patching_rect" : [ 234.75, 8.666667999999987, 150.0, 22.0 ],
 									"presentation" : 1,
 									"presentation_rect" : [ 35.0, 32.666667999999987, 150.0, 22.0 ]
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"attr" : "generate",
+									"id" : "obj-5",
+									"maxclass" : "attrui",
+									"numinlets" : 1,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"parameter_enable" : 0,
+									"patching_rect" : [ 234.75, 37.666667999999987, 150.0, 22.0 ]
 								}
 
 							}
@@ -1990,6 +2003,13 @@
 , 							{
 								"patchline" : 								{
 									"destination" : [ "obj-1", 0 ],
+									"source" : [ "obj-5", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-1", 0 ],
 									"source" : [ "obj-52", 0 ]
 								}
 
@@ -2096,7 +2116,7 @@
 						}
 ,
 						"classnamespace" : "box",
-						"rect" : [ 263.0, 111.0, 836.0, 887.0 ],
+						"rect" : [ 0.0, 26.0, 836.0, 887.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
