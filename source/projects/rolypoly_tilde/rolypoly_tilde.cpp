@@ -172,6 +172,7 @@ public:
       for (int i = 0; i < 7; i++) {
           auto start = std::chrono::high_resolution_clock::now();
           try {
+              torch::NoGradGuard no_grad_guard;
               model->forward(input_tensor);
           }
           catch (std::exception& e)
@@ -589,7 +590,9 @@ void rolypoly::tensorToModel() {
 
   // send the notes to the model
   try {
-    modelOut = model(input_tensor);
+    torch::NoGradGuard no_grad_guard;
+    modelOut = model(input_tensor).detach_();
+    // modelOut = input_tensor.index({Slice(), Slice(0, input_tensor.size(1)), Slice(0, input_tensor.size(2))});
     backend::dataScaleUp(input_tensor);
     backend::dataScaleUp(modelOut);
     // if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
@@ -627,6 +630,7 @@ void rolypoly::tensorToModel() {
     // compute a new note to be played next = inserted into the score at t_toModel
     input_tensor = score.index({Slice(start, t_toModel)}).unsqueeze(0);
     backend::dataScaleDown(input_tensor);
+    torch::NoGradGuard no_grad_guard;
     modelOut = hitsModel(input_tensor);
     backend::dataScaleUpHits(modelOut);
     int last = modelOut.size(1) - 1;
