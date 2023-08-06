@@ -591,6 +591,8 @@ void rolypoly::tensorToModel() {
   // send the notes to the model
   try {
     torch::NoGradGuard no_grad_guard;
+    at::set_num_threads(1)           // Disables the intraop thread pool.
+    at::set_num_interop_threads(1). // Disables the interop thread pool.
     modelOut = model(input_tensor).detach_();
     // modelOut = input_tensor.index({Slice(), Slice(0, input_tensor.size(1)), Slice(0, input_tensor.size(2))});
     backend::dataScaleUp(input_tensor);
