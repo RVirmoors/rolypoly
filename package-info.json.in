@@ -1,6 +1,6 @@
 {
 	"author" : "rvirmoors",
-	"description" : Interactive Learning of Microtiming in an Expressive Drum Machine",
+	"description" : "Interactive Learning of Microtiming in an Expressive Drum Machine",
 	"homepatcher" : "rolypoly.maxhelp",
 	"max_version_min" : "8.0", "max_version_max" : "none",
 	"name" : "@C74_PACKAGE_NAME@",

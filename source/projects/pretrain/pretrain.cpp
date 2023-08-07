@@ -106,6 +106,20 @@ void takeToTrainData(torch::Tensor& take, torch::Tensor& input, torch::Tensor& o
 
 int main() {
 
+    backend::TrainConfig config;
+    // TODO: make these command-line configurable
+    config.batch_size = 512; // 512;
+    config.block_size = 16; // 16;
+    config.epochs = 12000;
+    config.final = false;
+    config.eval_interval = 25;
+    config.eval_iters = 50; // 200
+    config.decay_lr = true;
+    config.lr = 4e-5;
+    config.train_ensemble = true;
+
+    const bool dont_train = true;
+
     std::string outDir = "out";
     if (!fs::exists(outDir))
         fs::create_directory(outDir);
@@ -119,17 +133,6 @@ int main() {
     std::vector<MetaData> meta;
     getMeta(meta);
 
-    backend::TrainConfig config;
-    // TODO: make these command-line configurable
-    config.batch_size = 512; // 512;
-    config.block_size = 16; // 16;
-    config.epochs = 12000;
-    config.final = false;
-    config.eval_interval = 25;
-    config.eval_iters = 50; // 200
-    config.decay_lr = true;
-    config.lr = 4e-5;
-    config.train_ensemble = true;
     std::map<std::string, std::vector<torch::Tensor>> train_data, val_data;
 
     for (const auto& data : meta) {
@@ -177,15 +180,18 @@ int main() {
         }
     }
 
-    try {
-    if (config.train_ensemble)
-        backend::train(hitsModel, model, config, train_data, val_data, load_hits_model, load_model, device);
-    else
-        backend::train(nullptr, model, config, train_data, val_data, load_hits_model, load_model, device);
-        } catch (const std::exception& e) {
-            std::cout << e.what();
-            std::cin.get();
+    if (!dont_train) {
+        try {
+        if (config.train_ensemble)
+            backend::train(hitsModel, model, config, train_data, val_data, load_hits_model, load_model, device);
+        else
+            backend::train(nullptr, model, config, train_data, val_data, load_hits_model, load_model, device);
+            } catch (const std::exception& e) {
+                std::cout << e.what();
+                std::cin.get();
+        }
     }
+
 
     try {
     std::cout << "EXAMPLE EVAL:\n=============\n  hits   offsets    y" << std::endl;
