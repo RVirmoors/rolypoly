@@ -105,7 +105,6 @@ void takeToTrainData(torch::Tensor& take, torch::Tensor& input, torch::Tensor& o
 }
 
 int main() {
-
     backend::TrainConfig config;
     // TODO: make these command-line configurable
     config.batch_size = 512; // 512;
@@ -116,9 +115,9 @@ int main() {
     config.eval_iters = 50; // 200
     config.decay_lr = true;
     config.lr = 4e-5;
-    config.train_ensemble = true;
-
-    const bool dont_train = true;
+    config.train_ensemble = false;
+    config.train_main = false;
+    const bool dont_train = false;
 
     std::string outDir = "out";
     if (!fs::exists(outDir))
@@ -184,17 +183,21 @@ int main() {
         try {
         if (config.train_ensemble)
             backend::train(hitsModel, model, config, train_data, val_data, load_hits_model, load_model, device);
-        else
+        else if (config.train_main)
             backend::train(nullptr, model, config, train_data, val_data, load_hits_model, load_model, device);
-            } catch (const std::exception& e) {
-                std::cout << e.what();
-                std::cin.get();
+        else
+            backend::train(hitsModel, nullptr, config, train_data, val_data, load_hits_model, load_model, device);
+        } 
+        catch (const std::exception& e) {
+            std::cout << e.what();
+            std::cin.get();
         }
     }
 
 
     try {
     std::cout << "EXAMPLE EVAL:\n=============\n  hits   offsets    y" << std::endl;
+    torch::NoGradGuard no_grad_guard;
     hitsModel->eval();
     model->eval();
     torch::Tensor x = val_data["X"][0].slice(0, 0, config.block_size).unsqueeze(0);
@@ -202,13 +205,21 @@ int main() {
     torch::Tensor y = val_data["Y"][0].slice(0, 0, config.block_size).unsqueeze(0);
     backend::dataScaleDown(y);
     torch::Tensor hits = hitsModel(x);
-    hits = torch::cat({hits, torch::zeros({hits.size(0), hits.size(1), 8})}, 2);
+    torch::Tensor hit_pos = hits.index({Slice(), Slice(), 0});
+    hits = torch::cat({hits.index({Slice(), Slice(), Slice(1, 10)}), 
+        torch::zeros({hits.size(0), hits.size(1), 9}).to(device)}, 2);
+
     torch::Tensor pred = model(x);
 
+    torch::Tensor y_pos = y.index({Slice(), Slice(), INX_BAR_POS});
     y = y.index({Slice(), Slice(), Slice(0, 18)});
     pred = pred.index({Slice(), Slice(), Slice(0, 18)});
 
-    std::cout << torch::stack({hits[0][config.block_size-1], pred[0][config.block_size-1], y[0][config.block_size-1]}, 1 )  << std::endl;
+    std::cout << torch::stack({hits[0][config.block_size-1], pred[0][config.block_size-1], y[0][config.block_size-1]}, 1 ) << std::endl;
+
+    std::cout << "BAR POS EVAL:\n============\n  hits       y\n";
+    std::cout << torch::stack({hit_pos[0], y_pos[0]}, 1 ) << std::endl;
+
     std::cin.get();
     } catch (const std::exception& e) {
             std::cout << e.what();

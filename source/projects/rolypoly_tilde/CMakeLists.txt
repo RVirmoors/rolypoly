@@ -24,19 +24,6 @@ list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch")
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
-# link_directories(
-# 	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/lib
-# )
-
-
-# link_libraries(
-# 	torch.lib	# for GPU
-# 	torch_cpu.lib
-# 	c10.lib
-# 	dnnl.lib
-# 	"${TORCH_CUDA_LIBRARIES}"
-# )
-
 set( SOURCE_FILES
 	${PROJECT_NAME}.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../midifile/src/MidiFile.cpp

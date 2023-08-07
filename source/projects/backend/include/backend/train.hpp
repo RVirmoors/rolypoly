@@ -26,6 +26,7 @@ struct TrainConfig {
     int lr_decay_iters = 10000; // should be ~= total epochs
     float min_lr = 1e-7; // should be max_rate / 10
     bool train_ensemble = true; // train both hits and offset transformers
+    bool train_main = true; // if not enxemble, train the main (offset) transformer
 };
 
 float get_lr(int ep, TrainConfig config) {
@@ -180,14 +181,20 @@ void train(HitsTransformer hitsModel,
             std::string save_model = "out/model.pt",
             torch::Device device = torch::kCPU) 
 {    
-    bool trainHits = false;
-    if (hitsModel) {
+    bool trainHits, trainMain = false;
+    if (model && hitsModel) {
         trainHits = true;
+        trainMain = true;
         std::cout << "Training Ensemble..." << std::endl;
     }
-    else {
+    else if (!hitsModel) {
+        trainMain = true;
         hitsModel = HitsTransformer(1,1,1,device); // dummy
         std::cout << "Training Main Transformer..." << std::endl;
+    } else if (!model) {
+        trainHits = true;
+        model = TransformerModel(10, 1, 1, 1, 1, 1, device); // dummy
+        std::cout << "Training Note Generator..." << std::endl;
     }
 
     torch::optim::Adam hitsOptimizer(hitsModel->parameters(), torch::optim::AdamOptions(config.lr));
@@ -230,12 +237,14 @@ void train(HitsTransformer hitsModel,
                 );
             x.detach_();
         }
-                
-        torch::Tensor out = model->forward(x);
-        loss = getLoss(out, y);
-        loss.backward();
-        nn::utils::clip_grad_norm_(model->parameters(), 0.5);
-        optimizer.step();
+
+        if (trainMain) {
+            torch::Tensor out = model->forward(x);
+            loss = getLoss(out, y);
+            loss.backward();
+            nn::utils::clip_grad_norm_(model->parameters(), 0.5);
+            optimizer.step();
+        }
 
         if (epoch % config.eval_interval == 0) {
             if (trainHits) {
@@ -247,12 +256,14 @@ void train(HitsTransformer hitsModel,
                     torch::save(hitsModel, save_hits_model);
                 }                
             }
-            float eval_loss = estimateLoss(model, config, val_data, device);  
-            if (eval_loss < min_loss) {
-                min_loss = eval_loss;
-                std::cout << "New min val loss: " << min_loss << std::endl;
-                // Save the model checkpoint.
-                torch::save(model, save_model);
+            if (trainMain) {
+                float eval_loss = estimateLoss(model, config, val_data, device);  
+                if (eval_loss < min_loss) {
+                    min_loss = eval_loss;
+                    std::cout << "New min val loss: " << min_loss << std::endl;
+                    // Save the model checkpoint.
+                    torch::save(model, save_model);
+                }
             }
         }
 
