@@ -83,9 +83,9 @@
 			<description>Generate hits on the fly, not reading from the score </description>
 		</attribute>
 
-		<attribute name='score_filter' get='1' set='1' type='long' size='1' >
-			<digest>Filter out notes not in the score </digest>
-			<description>Filter out notes not in the score </description>
+		<attribute name='score_hits' get='1' set='1' type='long' size='1' >
+			<digest>Filter out notes not in the score &amp; use scored velocities </digest>
+			<description>Filter out notes not in the score &amp; use scored velocities </description>
 		</attribute>
 
 		<attribute name='message_out' get='1' set='1' type='long' size='1' >

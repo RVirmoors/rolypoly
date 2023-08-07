@@ -700,7 +700,7 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "signal" ],
-									"patching_rect" : [ 457.0, 31.0, 45.0, 22.0 ],
+									"patching_rect" : [ 473.0, 30.0, 45.0, 22.0 ],
 									"text" : "adc~ 3"
 								}
 
@@ -1492,7 +1492,7 @@
 									"numinlets" : 2,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 149.666664570569992, 73.999995589256287, 33.0, 22.0 ],
+									"patching_rect" : [ 140.5, 73.999995589256287, 33.0, 22.0 ],
 									"presentation" : 1,
 									"presentation_rect" : [ 278.0, 165.0, 33.0, 22.0 ],
 									"text" : "read"
@@ -1593,7 +1593,7 @@
 							}
 , 							{
 								"box" : 								{
-									"attr" : "score_filter",
+									"attr" : "score_hits",
 									"id" : "obj-4",
 									"maxclass" : "attrui",
 									"numinlets" : 1,
