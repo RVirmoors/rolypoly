@@ -22,6 +22,17 @@ torch::Tensor threshToOnes(torch::Tensor src, float startIndex = 9, float thresh
             ); // replace all hits with 1
 }
 
+torch::Tensor threshToZero(torch::Tensor out, float thresh = 3/127.) {
+    return torch::cat({
+        out.index({Slice(), Slice(), {0}}).unsqueeze(2), // bar pos unchanged
+        torch::where(
+            out.index({Slice(), Slice(), Slice(1, 10)}) < thresh,
+            0.0,
+            out.index({Slice(), Slice(), Slice(1, 10)})
+        ) // replace very weak hits with 0
+    }, 2);
+}
+
 struct TransformerModelImpl : nn::Module {
     TransformerModelImpl(int input_dim, int output_dim, int d_model, int nhead, int enc_layers, int dec_layers, torch::Device device) :
     device(device),
@@ -128,7 +139,7 @@ struct HitsTransformerImpl : nn::Module {
 
         output = hitsFc(output);
         output = torch::sigmoid(output);
-        return output;
+        return threshToZero(output);
     }
 
     nn::Linear hitsEmbedding;

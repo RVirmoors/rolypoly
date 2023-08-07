@@ -187,7 +187,8 @@ int main() {
             std::cin.get();
     }
 
-    std::cout << "EXAMPLE EVAL:\n=============\n  hits  offsets     y" << std::endl;
+    try {
+    std::cout << "EXAMPLE EVAL:\n=============\n  hits   offsets    y" << std::endl;
     hitsModel->eval();
     model->eval();
     torch::Tensor x = val_data["X"][0].slice(0, 0, config.block_size).unsqueeze(0);
@@ -199,8 +200,13 @@ int main() {
     torch::Tensor pred = model(x);
 
     y = y.index({Slice(), Slice(), Slice(0, 18)});
+    pred = pred.index({Slice(), Slice(), Slice(0, 18)});
 
     std::cout << torch::stack({hits[0][config.block_size-1], pred[0][config.block_size-1], y[0][config.block_size-1]}, 1 )  << std::endl;
     std::cin.get();
+    } catch (const std::exception& e) {
+            std::cout << e.what();
+            std::cin.get();
+    }
     return 0;
 }

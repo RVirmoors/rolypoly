@@ -46,7 +46,7 @@ void fill_with_zero(audio_bundle output) {
 }
 
 double bartime_to_ms(double from_pos, double to_pos, double bpm, double tsig) {
-  while (to_pos < from_pos)
+  while (to_pos <= from_pos)
     to_pos += 1.0;
   double bartime = to_pos - from_pos;
   return bartime * 1000. / 60. * bpm * tsig;
@@ -556,6 +556,7 @@ void rolypoly::advanceReadHead() {
   if (DEBUG) cout << "t_play: " << t_play << " | t_toModel: " << t_toModel << endl;
   // get all notes in the next lookahead_ms
   while (score_ms[t_toModel] < playhead_ms + lookahead_ms && t_toModel < score.size(0) - 1) {
+    cout << "found " << t_toModel << " ::: " << score[t_toModel] << endl;
     t_toModel++;
   }
 }
@@ -629,39 +630,51 @@ void rolypoly::tensorToModel() {
 
   
   if (generate) {
-      /*
-      cout << "GENERATE" << endl;
-    // compute a new note to be played next = inserted into the score at t_toModel
-    input_tensor = score.index({Slice(start, t_toModel)}).unsqueeze(0);
-    backend::dataScaleDown(input_tensor);
-    torch::NoGradGuard no_grad_guard;
-    modelOut = hitsModel(input_tensor);
-    backend::dataScaleUpHits(modelOut);
-    int last = modelOut.size(1) - 1;
-    cout << modelOut << endl;
-    
-    torch::Tensor generated_note = torch::cat({
-      modelOut[0][last].index({Slice(1, 10)}), // hits generated
-      torch::zeros({9}).to(device), // offsets estimated above, to be filled in below
-      score[t_toModel].index({Slice(INX_BPM, INX_BAR_POS)}), // tempo & t_sig from prev note
-      modelOut[0][last][0].unsqueeze(0), // bar pos generated
-      torch::zeros({1}).to(device), // tau_guitar, to be filled in on onset detect
-    });
 
-    cout << generated_note << endl;
-    score = torch::cat({
-      score.index({Slice(0, t_toModel)}),
-      generated_note.unsqueeze(0),
-      score.index({Slice(t_toModel, None)})
-    }, 0);
-    double generated_note_ms = score_ms[t_toModel] + 
-      bartime_to_ms(score[t_toModel][INX_BAR_POS].item<double>(), 
-                        generated_note[INX_BAR_POS].item<double>(), 
-                        generated_note[INX_BPM].item<double>(),
-                        generated_note[INX_TSIG].item<double>());
-    score_ms.insert(score_ms.begin() + t_toModel, generated_note_ms);
-    assert(score.size(0) == score_ms.size());
-    */
+    // compute new notes to be played next = inserted into the score at t_toModel
+    // how many? as many as fit in the next lookahead_ms
+    double upTo_ms = score_ms[t_toModel-1] + lookahead_ms;
+    double generated_note_ms = 0.0;
+    cout << "GENERATE up to " << upTo_ms << " starting at " << playhead_ms << endl;
+    int i = 0;
+
+    //while (generated_note_ms < upTo_ms) {
+      input_tensor = score.index({Slice(start+i, t_toModel+i)}).unsqueeze(0);
+      backend::dataScaleDown(input_tensor);
+
+      torch::NoGradGuard no_grad_guard;
+      modelOut = hitsModel(input_tensor);
+      backend::dataScaleUpHits(modelOut);
+      int last = modelOut.size(1) - 1;    
+      
+      torch::Tensor generated_note = torch::cat({
+        modelOut[0][last].index({Slice(1, 10)}), // hits generated
+        torch::zeros({9}).to(device), // offsets estimated above, to be filled in below
+        score[t_toModel].index({Slice(INX_BPM, INX_BAR_POS)}), // tempo & t_sig from prev note
+        modelOut[0][last][0].unsqueeze(0), // bar pos generated
+        torch::zeros({1}).to(device), // tau_guitar, to be filled in on onset detect
+      });
+
+      generated_note_ms = score_ms[t_toModel+i] + 
+        bartime_to_ms(score[t_toModel+i][INX_BAR_POS].item<double>(), 
+                          generated_note[INX_BAR_POS].item<double>(), 
+                          generated_note[INX_BPM].item<double>(),
+                          generated_note[INX_TSIG].item<double>());
+      score_ms.insert(score_ms.begin() + t_toModel+i, generated_note_ms);
+
+      score = torch::cat({
+        score.index({Slice(0, t_toModel + i)}),
+        generated_note.unsqueeze(0),
+        score.index({Slice(t_toModel + i, None)})
+          }, 0);
+
+      cout << "Gen note: " << generated_note << endl;
+      cout << "Score increased to: " << score.size(0) << endl;
+
+      assert(score.size(0) == score_ms.size());
+    //  i++;
+    //}
+    cout << "GENERATED " << i << " notes. Finished at " << playhead_ms << endl;
   }
 
   // copy executed offsets to score (to be later fed into the model for inference)
@@ -794,13 +807,12 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
     if (playhead_ms < next_note.first)
       playhead_ms += bufsize_ms;
 
-    if (next_note.second == -1) {
-      // no tau yet
-      return;
-    }
-
     // if (DEBUG) cout << "playhead: " << playhead_ms << " | next note @ " << next_note.first << endl;
     while (playhead_ms >= next_note.first - bufsize_ms && !done_playing) {
+      if (next_note.second == -1) {
+        // no tau yet
+        return;
+      }
       // when the time comes, play the microtime-adjusted note
       long micro_index = (next_note.first - playhead_ms) / bufsize_ms * vec_size;
       micro_index = std::min(micro_index, vec_size-1);
