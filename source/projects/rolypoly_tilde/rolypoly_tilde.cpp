@@ -593,7 +593,7 @@ void rolypoly::tensorToModel() {
   // send the notes to the model
   try {
     torch::NoGradGuard no_grad_guard;
-    modelOut = model(input_tensor).detach_();
+    modelOut = model(input_tensor);
     // modelOut = input_tensor.index({Slice(), Slice(0, input_tensor.size(1)), Slice(0, input_tensor.size(2))});
     backend::dataScaleUp(input_tensor);
     backend::dataScaleUp(modelOut);
@@ -615,6 +615,8 @@ void rolypoly::tensorToModel() {
     }        
     else
       new_note = modelOut[0][i].index({Slice(0, OUTPUT_DIM - 1)});
+
+    // cout << "NEW NOTE: " << new_note << endl;
 
     new_note = torch::cat({new_note, input_tensor[0][i].index({Slice(INX_BPM, INX_TAU_G)})});
     new_note = torch::cat({new_note, modelOut[0][i][18].unsqueeze(0)}); // last output channel: tau_g_hat
