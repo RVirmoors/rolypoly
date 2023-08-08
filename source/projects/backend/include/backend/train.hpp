@@ -276,9 +276,11 @@ void train(HitsTransformer hitsModel,
 torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor score, torch::Tensor play_notes, double follow) {
     torch::Tensor vel = score.index({Slice(), Slice(), Slice(0, 9)});
     torch::Tensor vel_hat = play_notes.index({Slice(), Slice(), Slice(0, 9)});
+    vel_hat.set_requires_grad(true);
 
     torch::Tensor tau_g = score.index({Slice(), Slice(), INX_TAU_G});
     torch::Tensor tau_g_hat = play_notes.index({Slice(), Slice(), INX_TAU_G});
+    tau_g_hat.set_requires_grad(true);
 
     torch::Tensor y_offsets = play_notes.index({Slice(), Slice(), Slice(9, 18)});
     torch::Tensor non_zero_mask = (y_offsets != 0).to(torch::kFloat32);
@@ -291,16 +293,17 @@ torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor score, torch::Tensor
         mean_offsets,
         0.0
     );
+    tau_d.set_requires_grad(true);
 
     torch::Tensor r = torch::zeros({1}); // TODO offset regularization vs GMD stats
-    torch::Tensor v = torch::mse_loss(vel_hat, v);
+    torch::Tensor v = torch::mse_loss(vel_hat, vel);
     torch::Tensor o = torch::mse_loss(tau_d, tau_g);
     torch::Tensor g = torch::mse_loss(tau_g_hat, tau_g);
 
     return 0.25 * r + 0.0025 * v + follow * o + 0.5 * g;
 }
 
-void finetune(TransformerModel model, 
+double finetune(TransformerModel model, 
                 TrainConfig config,
                 at::Tensor score,
                 at::Tensor play_notes,
@@ -309,14 +312,16 @@ void finetune(TransformerModel model,
 {
     torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
     double min_loss = std::numeric_limits<double>::infinity();
+    torch::Tensor loss;
     
     model->train();
 
     std::map<std::string, std::vector<torch::Tensor>> train_data;
-    train_data["X"].push_back(score);
-    train_data["Y"].push_back(play_notes);
+    train_data["X"].push_back(score.clone().detach());
+    train_data["Y"].push_back(play_notes.clone().detach());
 
     for (int epoch = 0; epoch < config.epochs; epoch++) {
+        torch::AutoGradMode enable_grad(true);
         optimizer.zero_grad();
             
         torch::Tensor x, y;
@@ -326,15 +331,16 @@ void finetune(TransformerModel model,
             x, y);
 
         torch::Tensor out = model->forward(x);
-        torch::Tensor loss = finetuneLoss(out, x, y, m_follow);
+        loss = finetuneLoss(out, x, y, m_follow);
         loss.backward();
         nn::utils::clip_grad_norm_(model->parameters(), 0.5);
         optimizer.step();
 
-        if (epoch % (int)(config.epochs / 5) == 0) {
-            std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
-        }
+        std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
     }
+
+    model->eval();
+    return loss.item<double>();
 }
 
 } // end namespace backend

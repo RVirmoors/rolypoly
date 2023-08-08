@@ -1561,8 +1561,8 @@
 									"numinlets" : 1,
 									"numoutlets" : 10,
 									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "" ],
-									"patching_rect" : [ 107.5, 188.666667640209198, 114.0, 22.0 ],
-									"text" : "rolypoly~ baron.mid"
+									"patching_rect" : [ 107.5, 188.666667640209198, 113.5, 22.0 ],
+									"text" : "rolypoly~ s120.mid"
 								}
 
 							}

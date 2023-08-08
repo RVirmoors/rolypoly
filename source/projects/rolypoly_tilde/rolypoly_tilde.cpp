@@ -30,6 +30,17 @@ using namespace at::indexing;
 
 // ======= useful functions ==============
 
+unsigned power_ceil(unsigned x) {
+  // from nn_tilde
+  if (x <= 1)
+    return 1;
+  int power = 2;
+  x--;
+  while (x >>= 1)
+    power <<= 1;
+  return power;
+}
+
 c74::min::path get_latest_model(std::string model_path) {
   if (model_path.substr(model_path.length() - 3) != ".pt")
     model_path = model_path + ".pt";
@@ -66,13 +77,12 @@ public:
 	std::vector<std::unique_ptr<outlet<>>> m_outlets;
   atoms m_note;
   // kick, snar, hcls, hopn, ltom, mtom, htom, cras, ride
-  const int playableNotes[9] = {36, 38, 42, 46, 43, 45, 48, 57, 51};
+  const int out_pitches[9] = {36, 38, 42, 46, 43, 45, 48, 57, 51};
 
 	rolypoly(const atoms &args = {});
 	~rolypoly();
 
-  // OPERATION MODES
-  bool m_read;
+  // OPERATION
   bool m_play;
   bool m_train;
   bool m_use_thread;
@@ -263,22 +273,22 @@ public:
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
         //m_model.get_model().save("model_pre.pt");
-        cout << "Finetuning the model... this could take a while." << endl;
         torch::AutoGradMode enable_grad(true);
         try {
           backend::TrainConfig config;
-          config.block_size = BLOCK_SIZE;
+          config.batch_size = 8;
+          config.block_size = power_ceil(score_ms.size()/2);
+          // cout << "block size is " << config.block_size << endl;
           config.epochs = 20;
-          backend::finetune(model, config, score, play_notes, m_follow, device);
+          double loss = backend::finetune(model, config, score, play_notes, m_follow, device);
+          // torch::save(model, "roly_fine.pt");
+          cout << "Done. Loss: " << loss << ". Saved roly_fine.pt" << endl;
         }
         catch (std::exception& e)
         {
             cerr << e.what() << endl;
         }
-        torch::save(model, "roly_fine.pt");
-        cout << "Done. Saved roly_fine.pt" << endl;
         m_train = false;
-        //enable_grad(false);
       }
       return {};
     }
@@ -288,7 +298,6 @@ public:
     MIN_FUNCTION {
       done_reading = false;
       initialiseScore();
-      m_read = true;
       timer_mode = TIMER::READ;
       m_timer.delay(0);
       return {};
@@ -317,9 +326,15 @@ public:
         cerr << "no score loaded, can't train yet!" << endl;
         return {};
       }
+      if (m_play || !done_reading) {
+        cerr << "wait until the end of the song, then train!" << endl;
+        return {};
+      }
+      
+      cout << "Finetuning the model... this could take a while." << endl;
       if (args.size() == 1) {
         m_follow = args[0];
-        cout << "Finetuning with Follow = " << m_follow << endl;
+        cout << "Using Follow = " << m_follow << endl;
       } else {
         cout << "Using default Follow: " << m_follow << endl;
       }
@@ -346,7 +361,7 @@ void rolypoly::initialiseScore() {
 
 rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr), m_loaded(false),
-      m_read(false), m_play(false), m_train(false),
+      done_reading(false), m_play(false), m_train(false),
       m_use_thread(true), lookahead_ms(500), m_follow(0.4) {
 
   if (torch::cuda::is_available()) {
@@ -865,7 +880,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
           out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
         if (message_out) { // OUTPUT MESSAGES
           int msg_index = output.channel_count();
-          m_note[0] = playableNotes[next_note.second];
+          m_note[0] = out_pitches[next_note.second];
           m_note[1] = vel;
           m_outlets[msg_index].get()->send(m_note[0], m_note[1]);
         }
