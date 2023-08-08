@@ -24,7 +24,7 @@ struct MetaData {
 };
 
 void getMeta(std::vector<MetaData>& meta) {
-    std::ifstream file("groove/info.csv");
+    std::ifstream file("groove/miniinfo.csv");
     if (!file.is_open()) {
         std::cerr << "Error opening file." << std::endl;
         return;
@@ -117,7 +117,7 @@ int main() {
     config.lr = 4e-5;
     config.train_ensemble = false;
     config.train_main = false;
-    const bool dont_train = false;
+    const bool dont_train = true;
 
     std::string outDir = "out";
     if (!fs::exists(outDir))
@@ -211,14 +211,15 @@ int main() {
 
     torch::Tensor pred = model(x);
 
+    torch::Tensor x_pos = x.index({Slice(), Slice(), INX_BAR_POS});
     torch::Tensor y_pos = y.index({Slice(), Slice(), INX_BAR_POS});
     y = y.index({Slice(), Slice(), Slice(0, 18)});
     pred = pred.index({Slice(), Slice(), Slice(0, 18)});
 
     std::cout << torch::stack({hits[0][config.block_size-1], pred[0][config.block_size-1], y[0][config.block_size-1]}, 1 ) << std::endl;
 
-    std::cout << "BAR POS EVAL:\n============\n  hits       y\n";
-    std::cout << torch::stack({hit_pos[0], y_pos[0]}, 1 ) << std::endl;
+    std::cout << "BAR POS EVAL:\n============\n   x      hits      y\n";
+    std::cout << torch::stack({x_pos[0], hit_pos[0], y_pos[0]}, 1 ) << std::endl;
 
     std::cin.get();
     } catch (const std::exception& e) {
