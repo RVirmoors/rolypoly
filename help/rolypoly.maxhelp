@@ -666,18 +666,6 @@
 							}
 , 							{
 								"box" : 								{
-									"id" : "obj-16",
-									"linecount" : 2,
-									"maxclass" : "comment",
-									"numinlets" : 1,
-									"numoutlets" : 0,
-									"patching_rect" : [ 419.75, 603.0, 111.0, 34.0 ],
-									"text" : "TODO: nicer sounding drums"
-								}
-
-							}
-, 							{
-								"box" : 								{
 									"id" : "obj-2",
 									"maxclass" : "newobj",
 									"numinlets" : 1,
@@ -1573,8 +1561,8 @@
 									"numinlets" : 1,
 									"numoutlets" : 10,
 									"outlettype" : [ "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "signal", "" ],
-									"patching_rect" : [ 107.5, 188.666667640209198, 132.0, 22.0 ],
-									"text" : "rolypoly~ roly s120.mid"
+									"patching_rect" : [ 107.5, 188.666667640209198, 114.0, 22.0 ],
+									"text" : "rolypoly~ baron.mid"
 								}
 
 							}

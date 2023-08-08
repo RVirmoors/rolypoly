@@ -363,12 +363,10 @@ rolypoly::rolypoly(const atoms &args)
     return;
   }
   if (args.size() > 0) { // ONE ARGUMENT IS GIVEN
-    auto model_path = std::string(args[0]);
-    m_path = get_latest_model(model_path);
+    m_path = get_latest_model("roly.pt");
     h_m_path = get_latest_model("roly_hits.pt");
-  }
-  if (args.size() > 1) { // TWO ARGUMENTS ARE GIVEN
-    auto midi_path = std::string(args[1]);
+
+    auto midi_path = std::string(args[0]);
     if (midi_path.substr(midi_path.length() - 4) != ".mid")
       midi_path = midi_path + ".mid";
     m_midi_path = path(midi_path);
@@ -393,6 +391,8 @@ rolypoly::rolypoly(const atoms &args)
   try {
     torch::load(model, m_path, device);
     torch::load(hitsModel, h_m_path, device);
+    model->eval();
+    hitsModel->eval();
   } catch (std::exception& e)
   {
       if (DEBUG) cerr << e.what() << endl;
@@ -542,7 +542,7 @@ bool rolypoly::midiNotesToScore() {
 }
 
 void rolypoly::prepareToPlay() {
-  if (m_compute_thread && m_compute_thread->joinable()) {\
+  if (m_compute_thread && m_compute_thread->joinable()) {
     m_compute_thread->join();
   }
   playhead_ms = t_toModel = t_fromModel =
@@ -639,29 +639,62 @@ void rolypoly::tensorToModel() {
       backend::dataScaleDown(input_tensor);
 
       torch::NoGradGuard no_grad_guard;
-      modelOut = hitsModel(input_tensor);
+      torch::Tensor hitsOut = hitsModel(input_tensor);
       backend::dataScaleUp(input_tensor);
-      backend::dataScaleUpHits(modelOut);
-      int last = modelOut.size(1) - 1;
+      backend::dataScaleUpHits(hitsOut);
+      int last = hitsOut.size(1) - 1;
 
-      cout << "pos out from hModel: " << modelOut.index({0, Slice(), 0}) << endl;
+      cout << "pos out from hModel: " << hitsOut.index({0, Slice(), 0}) << endl;
 
-      cout << "last pos out: " << modelOut[0][last][0].item<double>() << endl;
+      cout << "last pos out: " << hitsOut[0][last][0].item<double>() << endl;
       
       torch::Tensor generated_note = torch::cat({
-        modelOut[0][last].index({Slice(1, 10)}), // hits generated
+        hitsOut[0][last].index({Slice(1, 10)}), // hits generated
         torch::zeros({9}).to(device), // offsets estimated above, to be filled in below
         score[t_toModel].index({Slice(INX_BPM, INX_BAR_POS)}), // tempo & t_sig from prev note
-        modelOut[0][last][0].unsqueeze(0), // bar pos generated
+        hitsOut[0][last][0].unsqueeze(0), // bar pos generated
         torch::zeros({1}).to(device), // tau_guitar, to be filled in on onset detect
       });
 
+      score = torch::cat({
+        score.index({Slice(0, t_toModel+i)}),
+        generated_note.unsqueeze(0),
+        score.index({Slice(t_toModel+i, None)})
+          }, 0);
+
+      cout << "testing " << generated_note[INX_BAR_POS].item<double>() << endl;
+      try {
+      // if the generated bar_pos is before the preceding note's bar_pos
+      // note: JANKY!!!! TODO find something better...
+      if (generated_note[INX_BAR_POS].item<double>() < 
+        score[t_toModel+i - 1][INX_BAR_POS].item<double>()) {
+        // heuristic to check end of bar
+        // (and avoid stuff like 0.8 0.2 0.05 where the 0.2 should be 0.9)
+        input_tensor = score.index({Slice(start+1+i, t_toModel+i)}).unsqueeze(0);
+        backend::dataScaleDown(input_tensor);
+        torch::Tensor future_note = hitsModel(input_tensor);
+        backend::dataScaleUp(input_tensor);
+        last = future_note.size(1) - 1;
+        double future_bar_pos = future_note[0][last][0].item<double>();
+        cout << "future would be @ " << future_bar_pos << endl;
+        if (future_bar_pos < generated_note[INX_BAR_POS].item<double>()) {
+          // move the generated note bar_pos back to the end of the bar
+          generated_note[INX_BAR_POS] = (score.index({Slice(0, t_toModel+i-1, INX_BAR_POS)}) + 1.) / 2.;
+          cout << "adjusted pos out: " << generated_note[INX_BAR_POS].item<double>() << endl;
+        }
+      }
+      } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+      }
+
+      // now compute the ms equivalent of the bar_pos
       generated_note_ms = score_ms[t_toModel+i-1];
       cout << "push_ms = b_to_ms(" << score[t_toModel+i - 1][INX_BAR_POS].item<double>() << ", " << generated_note[INX_BAR_POS].item<double>() << ", " << generated_note[INX_BPM].item<double>() << ", " << generated_note[INX_TSIG].item<double>() << endl;
       double push_ms = bartime_to_ms(score[t_toModel+i - 1][INX_BAR_POS].item<double>(), 
                           generated_note[INX_BAR_POS].item<double>(), 
                           generated_note[INX_BPM].item<double>(),
                           generated_note[INX_TSIG].item<double>());
+
       cout << "insert note at " << generated_note_ms << " + " << push_ms << endl;
       score_ms.insert(score_ms.begin() + t_toModel+i, generated_note_ms);
 
@@ -671,24 +704,17 @@ void rolypoly::tensorToModel() {
       generated_note_ms += push_ms; // for the while() check above
 
       cout << score_ms << endl;
-
-      score = torch::cat({
-        score.index({Slice(0, t_toModel + i)}),
-        generated_note.unsqueeze(0),
-        score.index({Slice(t_toModel + i, None)})
-          }, 0);
-
-      cout << "Gen note: " << generated_note << endl;
+      // cout << "Gen note: " << generated_note << endl;
       cout << "Score increased to: " << score.size(0) << endl;
 
       assert(score.size(0) == score_ms.size());
       i++;
     }
     cout << "GENERATED " << i << " notes. Finished executing at " << playhead_ms << endl;
-    m_play = false;
-    done_playing = true;
-    timer_mode = TIMER::INACTIVE;
-    m_timer.stop();
+    // m_play = false;
+    // done_playing = true;
+    // timer_mode = TIMER::INACTIVE;
+    // m_timer.stop();
   }
 
   // copy executed offsets to score (to be later fed into the model for inference)

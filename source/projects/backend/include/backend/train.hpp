@@ -148,7 +148,6 @@ float estimateLoss(TransformerModel model,
         losses[i] = loss.item<float>();
     }
     eval_loss = losses.mean().item<float>();
-    model->train();
     return eval_loss;
 }
 
@@ -168,7 +167,6 @@ float estimateLoss(HitsTransformer model,
         losses[i] = loss.item<float>();
     }
     eval_loss = losses.mean().item<float>();
-    model->train();
     return eval_loss;
 }
 
@@ -254,6 +252,7 @@ void train(HitsTransformer hitsModel,
                     std::cout << "New min val hit_loss: " << min_hit_loss << std::endl;
                     // Save the model checkpoint.
                     torch::save(hitsModel, save_hits_model);
+                    hitsModel->train();
                 }                
             }
             if (trainMain) {
@@ -263,6 +262,7 @@ void train(HitsTransformer hitsModel,
                     std::cout << "New min val loss: " << min_loss << std::endl;
                     // Save the model checkpoint.
                     torch::save(model, save_model);
+                    model->train();
                 }
             }
         }
