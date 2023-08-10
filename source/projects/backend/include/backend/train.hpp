@@ -273,37 +273,34 @@ void train(HitsTransformer hitsModel,
     }
 }
 
-torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor score, torch::Tensor play_notes, double follow) {
-    torch::Tensor vel = score.index({Slice(), Slice(), Slice(0, 9)});
-    torch::Tensor vel_hat = play_notes.index({Slice(), Slice(), Slice(0, 9)});
-    vel_hat.set_requires_grad(true);
+torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor x, torch::Tensor y, double follow) {
+    torch::Tensor vel = x.index({Slice(), Slice(), Slice(0, 9)});
+    torch::Tensor vel_hat = out.index({Slice(), Slice(), Slice(0, 9)});
 
-    torch::Tensor tau_g = score.index({Slice(), Slice(), INX_TAU_G});
-    torch::Tensor tau_g_hat = play_notes.index({Slice(), Slice(), INX_TAU_G});
-    tau_g_hat.set_requires_grad(true);
+    torch::Tensor tau_g = x.index({Slice(), Slice(), INX_TAU_G});
+    torch::Tensor tau_g_hat = out.index({Slice(), Slice(), 18}); // model has 19 outputs, last one is tau_g
 
-    torch::Tensor y_offsets = play_notes.index({Slice(), Slice(), Slice(9, 18)});
-    torch::Tensor non_zero_mask = (y_offsets != 0).to(torch::kFloat32);
-    torch::Tensor non_zero_sum = (y_offsets * non_zero_mask).sum(2);
-    torch::Tensor non_zero_count = non_zero_mask.sum(2);
-    torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
+    // torch::Tensor y_offsets = y.index({Slice(), Slice(), Slice(9, 18)});
+    // torch::Tensor non_zero_mask = (y_offsets != 0).to(torch::kFloat32);
+    // torch::Tensor non_zero_sum = (y_offsets * non_zero_mask).sum(2);
+    // torch::Tensor non_zero_count = non_zero_mask.sum(2);
+    // torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
 
-    torch::Tensor tau_d = torch::where(
-        tau_g != 0,
-        mean_offsets,
-        0.0
-    );
-    tau_d.set_requires_grad(true);
+    // torch::Tensor tau_d = torch::where(
+    //     tau_g != 0,
+    //     mean_offsets,
+    //     0.0
+    // );
 
     torch::Tensor r = torch::zeros({1}); // TODO offset regularization vs GMD stats
     torch::Tensor v = torch::mse_loss(vel_hat, vel);
-    torch::Tensor o = torch::mse_loss(tau_d, tau_g);
+    //torch::Tensor o = torch::mse_loss(tau_d, tau_g);
     torch::Tensor g = torch::mse_loss(tau_g_hat, tau_g);
 
-    return 0.25 * r + 0.0025 * v + follow * o + 0.5 * g;
+    return 0.25 * r + 0.0025 * v + 0.5 * g; // + follow * o + ;
 }
 
-double finetune(TransformerModel model, 
+torch::Tensor finetune(TransformerModel model, 
                 TrainConfig config,
                 at::Tensor score,
                 at::Tensor play_notes,
@@ -314,14 +311,17 @@ double finetune(TransformerModel model,
     double min_loss = std::numeric_limits<double>::infinity();
     torch::Tensor loss;
     
+    torch::AutoGradMode enable_grad(true);
     model->train();
 
     std::map<std::string, std::vector<torch::Tensor>> train_data;
     train_data["X"].push_back(score.clone().detach());
     train_data["Y"].push_back(play_notes.clone().detach());
 
+    torch::Tensor losses = torch::zeros({0});
+
     for (int epoch = 0; epoch < config.epochs; epoch++) {
-        torch::AutoGradMode enable_grad(true);
+        torch::autograd::DetectAnomalyGuard detect_anomaly;
         optimizer.zero_grad();
             
         torch::Tensor x, y;
@@ -329,18 +329,19 @@ double finetune(TransformerModel model,
             config.batch_size, 
             config.block_size,
             x, y);
+        y.set_requires_grad(true);
 
         torch::Tensor out = model->forward(x);
         loss = finetuneLoss(out, x, y, m_follow);
         loss.backward();
-        nn::utils::clip_grad_norm_(model->parameters(), 0.5);
+        //nn::utils::clip_grad_norm_(model->parameters(), 0.5);
+        optimizer.step();
         optimizer.step();
 
-        std::cout << "Epoch " << epoch << " - train loss: " << loss.item<float>() << std::endl;
+        losses = torch::cat({losses, loss});
     }
 
-    model->eval();
-    return loss.item<double>();
+    return losses;
 }
 
 } // end namespace backend

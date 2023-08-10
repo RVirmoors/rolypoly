@@ -157,7 +157,7 @@ public:
   attribute<bool> generate{this, "generate", false,
                          description{"Generate hits on the fly, not reading from the score"}};
 
-  attribute<bool> score_hits{this, "score_hits", true,
+  attribute<bool> score_hits{this, "score_hits", false,
                          description{"Filter out notes not in the score & use scored velocities"}};
 
   attribute<bool> signal_out{this, "signal_out", true,
@@ -275,14 +275,29 @@ public:
         //m_model.get_model().save("model_pre.pt");
         torch::AutoGradMode enable_grad(true);
         try {
+          for (const auto& pair : model->named_parameters()) {
+              const std::string& name = pair.key();
+              const torch::Tensor& parameter = pair.value()[0];
+              cout << "Parameter name: " << name << endl;
+              cout << "Parameter value: " << parameter << endl;
+              break;
+          }
           backend::TrainConfig config;
           config.batch_size = 8;
           config.block_size = power_ceil(score_ms.size()/2);
-          // cout << "block size is " << config.block_size << endl;
-          config.epochs = 20;
-          double loss = backend::finetune(model, config, score, play_notes, m_follow, device);
+          cout << "block size is " << config.block_size << endl;
+          config.epochs = 8;
+          torch::Tensor losses = backend::finetune(model, config, score, play_notes, m_follow, device);
+          model->eval();
           torch::save(model, "roly_fine.pt");
-          cout << "Done. Loss: " << loss << ". Saved roly_fine.pt" << endl;
+          cout << ". Saved roly_fine.pt " << losses << endl;
+          for (const auto& pair : model->named_parameters()) {
+              const std::string& name = pair.key();
+              const torch::Tensor& parameter = pair.value()[0];
+              cout << "Parameter name: " << name << endl;
+              cout << "Parameter value: " << parameter << endl;
+              break;
+          }
         }
         catch (std::exception& e)
         {
@@ -417,7 +432,7 @@ rolypoly::rolypoly(const atoms &args)
 
   // LOAD FINETUNED MODEL IF EXISTS
   try {
-    loadFinetuned("roly_fine.pt");
+    loadFinetuned(get_latest_model("roly_fine.pt"));
   }         
   catch (std::exception& e)
   {
