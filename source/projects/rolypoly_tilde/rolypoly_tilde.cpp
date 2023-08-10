@@ -275,29 +275,16 @@ public:
         //m_model.get_model().save("model_pre.pt");
         torch::AutoGradMode enable_grad(true);
         try {
-          for (const auto& pair : model->named_parameters()) {
-              const std::string& name = pair.key();
-              const torch::Tensor& parameter = pair.value()[0];
-              cout << "Parameter name: " << name << endl;
-              cout << "Parameter value: " << parameter << endl;
-              break;
-          }
           backend::TrainConfig config;
+          config.lr = 1e-4;
           config.batch_size = 8;
           config.block_size = power_ceil(score_ms.size()/2);
           cout << "block size is " << config.block_size << endl;
           config.epochs = 8;
           torch::Tensor losses = backend::finetune(model, config, score, play_notes, m_follow, device);
           model->eval();
-          torch::save(model, "roly_fine.pt");
-          cout << ". Saved roly_fine.pt " << losses << endl;
-          for (const auto& pair : model->named_parameters()) {
-              const std::string& name = pair.key();
-              const torch::Tensor& parameter = pair.value()[0];
-              cout << "Parameter name: " << name << endl;
-              cout << "Parameter value: " << parameter << endl;
-              break;
-          }
+          cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
+          cout << "To play with this version, send 'start'. To save this version, send the 'save' message." << endl;
         }
         catch (std::exception& e)
         {
@@ -315,6 +302,14 @@ public:
       initialiseScore();
       timer_mode = TIMER::READ;
       m_timer.delay(0);
+      return {};
+    }
+  };
+
+  message<> save {this, "save", "Save finetuned model",
+    MIN_FUNCTION {
+      torch::save(model, "roly_fine.pt");
+      cout << "Saved roly_fine.pt" << endl;
       return {};
     }
   };

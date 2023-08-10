@@ -51,6 +51,11 @@
 			<description>Load score </description>
 		</method>
 
+		<method name='save'>
+			<digest>Save finetuned model </digest>
+			<description>Save finetuned model </description>
+		</method>
+
 		<method name='start'>
 			<digest>Start playing </digest>
 			<description>Start playing </description>

@@ -130,7 +130,7 @@
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
 									"patching_rect" : [ 14.5, 128.0, 48.0, 22.0 ],
-									"text" : "pipe 10"
+									"text" : "pipe 80"
 								}
 
 							}
