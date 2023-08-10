@@ -281,7 +281,7 @@ public:
           // cout << "block size is " << config.block_size << endl;
           config.epochs = 20;
           double loss = backend::finetune(model, config, score, play_notes, m_follow, device);
-          // torch::save(model, "roly_fine.pt");
+          torch::save(model, "roly_fine.pt");
           cout << "Done. Loss: " << loss << ". Saved roly_fine.pt" << endl;
         }
         catch (std::exception& e)
@@ -334,9 +334,9 @@ public:
       cout << "Finetuning the model... this could take a while." << endl;
       if (args.size() == 1) {
         m_follow = args[0];
-        cout << "Using Follow = " << m_follow << endl;
+        cout << "using Follow = " << m_follow << endl;
       } else {
-        cout << "Using default Follow: " << m_follow << endl;
+        cout << "using default Follow: " << m_follow << endl;
       }
 
       m_train = true;
