@@ -24,14 +24,9 @@
 
 	<objarglist>
 
-		<objarg name='model path' optional='1' type='symbol'>
-			<digest>Absolute path to the pretrained model</digest>
-			<description>Absolute path to the pretrained model. </description>
-		</objarg>
-
-		<objarg name='hit_model path' optional='1' type='symbol'>
-			<digest>Absolute path to the hit generation model</digest>
-			<description>Absolute path to the hit generation model. </description>
+		<objarg name='midi path' optional='1' type='symbol'>
+			<digest>Path to the midi drum score file (</digest>
+			<description>Path to the midi drum score file (.mid) </description>
 		</objarg>
 
 	</objarglist>
@@ -51,7 +46,7 @@
 			<description>Load score </description>
 		</method>
 
-		<method name='save'>
+		<method name='write'>
 			<digest>Save finetuned model </digest>
 			<description>Save finetuned model </description>
 		</method>

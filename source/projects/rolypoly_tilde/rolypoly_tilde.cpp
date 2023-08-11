@@ -115,7 +115,7 @@ public:
   int current_timesig_index;
   double barStart = 0, barEnd = 0;
 
-  double m_follow; // [0 ... 1] how much to direct the model to follow the guitar
+  torch::Tensor train_ops; // 3 [0..1] values: vel, follow, predict
 
   void loadFinetuned(std::string path);
   void initialiseScore();
@@ -142,10 +142,8 @@ public:
 
 
   // ONLY FOR DOCUMENTATION
-  argument<symbol> path_arg{this, "model path",
-                            "Absolute path to the pretrained model."};
-  argument<symbol> hit_path_arg{this, "hit_model path",
-                            "Absolute path to the hit generation model."}; // TODO: implement
+  argument<symbol> path_arg{this, "midi path",
+                            "Path to the midi drum score file (.mid)"};
 
   // ATTRIBUTES
   attribute<bool> enable{this, "enable", true,
@@ -281,7 +279,7 @@ public:
           config.block_size = power_ceil(score_ms.size()/2);
           cout << "block size is " << config.block_size << endl;
           config.epochs = 8;
-          torch::Tensor losses = backend::finetune(model, config, score, play_notes, m_follow, device);
+          torch::Tensor losses = backend::finetune(model, config, score, play_notes, train_ops, device);
           model->eval();
           cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
           cout << "To play with this version, send 'start'. To save this version, send the 'save' message." << endl;
@@ -306,10 +304,14 @@ public:
     }
   };
 
-  message<> save {this, "save", "Save finetuned model",
+  message<> write {this, "write", "Save finetuned model",
     MIN_FUNCTION {
-      torch::save(model, "roly_fine.pt");
-      cout << "Saved roly_fine.pt" << endl;
+      if (m_loaded) {
+        torch::save(model, "roly_fine.pt");
+        cout << "Saved roly_fine.pt" << endl;
+      } else {
+        cerr << "No model to save!" << endl;
+      }
       return {};
     }
   };
@@ -342,11 +344,13 @@ public:
       }
       
       cout << "Finetuning the model... this could take a while." << endl;
-      if (args.size() == 1) {
-        m_follow = args[0];
-        cout << "using Follow = " << m_follow << endl;
+      if (args.size() == 3) {
+        train_ops[0] = (double)args[0];
+        train_ops[1] = (double)args[1];
+        train_ops[2] = (double)args[2];
+        cout << "using train options = " << train_ops << endl;
       } else {
-        cout << "using default Follow: " << m_follow << endl;
+        cout << "using default train options: " << train_ops << endl;
       }
 
       m_train = true;
@@ -372,7 +376,7 @@ void rolypoly::initialiseScore() {
 rolypoly::rolypoly(const atoms &args)
     : m_compute_thread(nullptr), m_loaded(false),
       done_reading(false), m_play(false), m_train(false),
-      m_use_thread(true), lookahead_ms(500), m_follow(0.4) {
+      m_use_thread(true), lookahead_ms(500) {
 
   if (torch::cuda::is_available()) {
       cout << "Using CUDA." << endl;
@@ -573,6 +577,7 @@ void rolypoly::prepareToPlay() {
   playhead_ms = t_toModel = t_fromModel =
     played_ms = t_play = 0;
   play_notes = torch::zeros({0, INPUT_DIM}).to(device);
+  train_ops = torch::tensor({1., 0.4, 0.8}).to(device);
 }
 
 void rolypoly::advanceReadHead() {

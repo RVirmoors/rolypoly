@@ -273,7 +273,7 @@ void train(HitsTransformer hitsModel,
     }
 }
 
-torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor x, double follow) {
+torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor x, torch::Tensor follow) {
     torch::Tensor vel = x.index({Slice(), Slice(), Slice(0, 9)});
     torch::Tensor vel_hat = out.index({Slice(), Slice(), Slice(0, 9)});
 
@@ -296,14 +296,14 @@ torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor x, double follow) {
     torch::Tensor o = torch::mse_loss(tau_d, tau_g);
     torch::Tensor g = torch::mse_loss(tau_g_hat, tau_g);
 
-    return 0.25 * r + 0.0025 * v + 0.002 * (follow * o + g);
+    return 0.25 * r + 0.005 * follow[0] * v + 0.002 * (follow[1] * o + follow[2] * g);
 }
 
 torch::Tensor finetune(TransformerModel model, 
                 TrainConfig config,
-                at::Tensor score,
-                at::Tensor play_notes,
-                double m_follow,
+                torch::Tensor score,
+                torch::Tensor play_notes,
+                torch::Tensor m_follow,
                 torch::Device device = torch::kCPU)
 {
     torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
@@ -317,7 +317,7 @@ torch::Tensor finetune(TransformerModel model,
     train_data["X"].push_back(score.clone().detach());
     train_data["Y"].push_back(play_notes.clone().detach());
 
-    torch::Tensor losses = torch::zeros({0});
+    torch::Tensor losses = torch::zeros({0}).to(device);
 
     for (int epoch = 0; epoch < config.epochs; epoch++) {
         // torch::autograd::DetectAnomalyGuard detect_anomaly;
