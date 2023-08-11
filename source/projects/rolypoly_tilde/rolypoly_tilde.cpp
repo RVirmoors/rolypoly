@@ -117,6 +117,8 @@ public:
 
   torch::Tensor train_ops; // 3 [0..1] values: vel, follow, predict
 
+  torch::Tensor finetuneLoss(torch::Tensor out, torch::Tensor x);
+  torch::Tensor finetune(backend::TrainConfig config);
   void loadFinetuned(std::string path);
   void initialiseScore();
   void parseTimeEvents(MidiFile &midifile);
@@ -279,10 +281,10 @@ public:
           config.block_size = power_ceil(score_ms.size()/2);
           cout << "block size is " << config.block_size << endl;
           config.epochs = 8;
-          torch::Tensor losses = backend::finetune(model, config, score, play_notes, train_ops, device);
+          torch::Tensor losses = finetune(config);
           model->eval();
           cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
-          cout << "To play with this version, send 'start'. To save this version, send the 'save' message." << endl;
+          cout << "To play with this version, send 'start'. To save this version, send the 'write' message." << endl;
         }
         catch (std::exception& e)
         {
@@ -361,6 +363,69 @@ public:
     }
   };
 };
+
+torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
+  torch::Tensor vel = x.index({Slice(), Slice(), Slice(0, 9)});
+  torch::Tensor vel_hat = out.index({Slice(), Slice(), Slice(0, 9)});
+
+  torch::Tensor tau_g = x.index({Slice(), Slice(), INX_TAU_G});
+  torch::Tensor tau_g_hat = out.index({Slice(), Slice(), 18}); // model has 19 outputs, last one is tau_g
+
+  torch::Tensor y_offsets = out.index({Slice(), Slice(), Slice(9, 18)});
+  torch::Tensor non_zero_mask = (y_offsets != 0).to(torch::kFloat32);
+  torch::Tensor non_zero_sum = (y_offsets * non_zero_mask).sum(2);
+  torch::Tensor non_zero_count = non_zero_mask.sum(2);
+  torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
+  torch::Tensor tau_d = torch::where(
+      tau_g != 0,
+      mean_offsets,
+      0.0
+  );
+
+  torch::Tensor r = torch::zeros({1}); // TODO offset regularization vs GMD stats
+  torch::Tensor v = torch::mse_loss(vel_hat, vel);
+  torch::Tensor o = torch::mse_loss(tau_d, tau_g);
+  torch::Tensor g = torch::mse_loss(tau_g_hat, tau_g);
+
+  return 0.25 * r + 0.005 * train_ops[0] * v + 0.002 * (train_ops[1] * o + train_ops[2] * g);
+}
+
+torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
+  torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
+  double min_loss = std::numeric_limits<double>::infinity();
+  torch::Tensor loss;
+  
+  torch::AutoGradMode enable_grad(true);
+  model->train();
+
+  std::map<std::string, std::vector<torch::Tensor>> train_data;
+  train_data["X"].push_back(score.clone().detach());
+  train_data["Y"].push_back(play_notes.clone().detach());
+
+  torch::Tensor losses = torch::zeros({0}).to(device);
+
+  for (int epoch = 0; epoch < config.epochs; epoch++) {
+    // torch::autograd::DetectAnomalyGuard detect_anomaly;
+    optimizer.zero_grad();
+        
+    torch::Tensor x, y;
+    backend::getBatch(train_data, 
+        config.batch_size, 
+        config.block_size,
+        x, y);
+    y.set_requires_grad(true);
+
+    torch::Tensor out = model->forward(x);
+    loss = finetuneLoss(out, x);
+    loss.backward();
+    torch::nn::utils::clip_grad_norm_(model->parameters(), 0.5);
+    optimizer.step();
+
+    losses = torch::cat({losses, loss});
+  }
+
+  return losses;
+}
 
 void rolypoly::loadFinetuned(std::string path) {
   torch::load(model, path, device);
