@@ -56,6 +56,7 @@ void dataScaleDown(torch::Tensor& data) {
     9 offsets from [-0.04, 0.04]
     bpm from [40, 240]
     bar_pos keep fractional part
+    tau_g offset from [-0.04, 0.04]
 
     input: (batch, block_size, input_dim)
     output: (batch, block_size, input_dim)
@@ -65,6 +66,9 @@ void dataScaleDown(torch::Tensor& data) {
     data.index({Slice(), Slice(), Slice(9, 18)}).div_(0.08);
     data.index({Slice(), Slice(), Slice(INX_BPM, INX_BPM + 1)}).sub_(40).div_(200);
     data.index({Slice(), Slice(), Slice(INX_BAR_POS, INX_BAR_POS + 1)}).frac_();
+    // if (data.size(2) == INPUT_DIM) {
+    //     data.index({Slice(), Slice(), Slice(INX_TAU_G, INX_TAU_G + 1)}).div_(0.08);
+    // }
 }
 
 void dataScaleUp(torch::Tensor& data) {
@@ -76,6 +80,9 @@ void dataScaleUp(torch::Tensor& data) {
     data.index({Slice(), Slice(), Slice(0, 9)}).mul_(127);
     data.index({Slice(), Slice(), Slice(9, 18)}).mul_(0.08);
     data.index({Slice(), Slice(), Slice(INX_BPM, INX_BPM + 1)}).mul_(200).add_(40);
+    // if (data.size(2) == INPUT_DIM) {
+    //     data.index({Slice(), Slice(), Slice(INX_TAU_G, INX_TAU_G + 1)}).mul_(0.08);
+    // }
 }
 
 void dataScaleUpHits(torch::Tensor& data) {

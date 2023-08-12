@@ -63,7 +63,11 @@ double bartime_to_ms(double from_pos, double to_pos, double bpm, double tsig) {
   return bartime * 1000. / 60. * bpm * tsig;
 }
 
-// ========= MAIN ROLYPOLY~ CLASS =========
+torch::Tensor ms_to_bartime(double ms, torch::Tensor bpm, torch::Tensor tsig) {
+  return ms / 1000. * 60. / bpm / tsig;
+}
+
+// ============= MAIN ROLYPOLY~ CLASS =============
 
 class rolypoly : public object<rolypoly>, public vector_operator<> {
 public:
@@ -276,15 +280,17 @@ public:
         torch::AutoGradMode enable_grad(true);
         try {
           backend::TrainConfig config;
-          config.lr = 1e-4;
+          config.lr = 1e-5;
           config.batch_size = 8;
           config.block_size = power_ceil(score_ms.size()/2);
-          cout << "block size is " << config.block_size << endl;
+          // cout << "block size is " << config.block_size << endl;
           config.epochs = 8;
+          cout << "BEFORE   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
           torch::Tensor losses = finetune(config);
           model->eval();
           cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
           cout << "To play with this version, send 'start'. To save this version, send the 'write' message." << endl;
+          cout << "AFTER   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
         }
         catch (std::exception& e)
         {
@@ -364,6 +370,8 @@ public:
   };
 };
 
+// ========= ROLYPOLY~ METHOD DEFINITIONS =========
+
 torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
   torch::Tensor vel = x.index({Slice(), Slice(), Slice(0, 9)});
   torch::Tensor vel_hat = out.index({Slice(), Slice(), Slice(0, 9)});
@@ -371,9 +379,9 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
   torch::Tensor tau_g = x.index({Slice(), Slice(), INX_TAU_G});
   torch::Tensor tau_g_hat = out.index({Slice(), Slice(), 18}); // model has 19 outputs, last one is tau_g
 
-  torch::Tensor y_offsets = out.index({Slice(), Slice(), Slice(9, 18)});
-  torch::Tensor non_zero_mask = (y_offsets != 0).to(torch::kFloat32);
-  torch::Tensor non_zero_sum = (y_offsets * non_zero_mask).sum(2);
+  torch::Tensor y_hat_offsets = out.index({Slice(), Slice(), Slice(9, 18)});
+  torch::Tensor non_zero_mask = (y_hat_offsets != 0).to(torch::kFloat32);
+  torch::Tensor non_zero_sum = (y_hat_offsets * non_zero_mask).sum(2);
   torch::Tensor non_zero_count = non_zero_mask.sum(2);
   torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
   torch::Tensor tau_d = torch::where(
@@ -382,12 +390,20 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
       0.0
   );
 
-  torch::Tensor r = torch::zeros({1}); // TODO offset regularization vs GMD stats
-  torch::Tensor v = torch::mse_loss(vel_hat, vel);
-  torch::Tensor o = torch::mse_loss(tau_d, tau_g);
-  torch::Tensor g = torch::mse_loss(tau_g_hat, tau_g);
+  cout << out[0].index({Slice(), Slice(9, 18)}) << endl;
+  cout << "tau out (D): " << tau_d[0] << endl << "real tau (G): " << tau_g[0] << endl;
+  // cout << torch::cat({tau_d, tau_g}, 0)[0] << endl;
 
-  return 0.25 * r + 0.005 * train_ops[0] * v + 0.002 * (train_ops[1] * o + train_ops[2] * g);
+  torch::Tensor r = 0.25  * torch::zeros({1}); // TODO offset regularization vs GMD stats
+  torch::Tensor v = 0.5   * train_ops[0] * torch::mse_loss(vel_hat, vel);
+  torch::Tensor o = 0.002 * train_ops[1] * torch::mse_loss(tau_d, tau_g);
+  torch::Tensor g = 0.002 * train_ops[2] * torch::mse_loss(tau_g_hat, tau_g);
+
+  if (DEBUG) cout << "losses: v=" << v.item<float>() <<
+    " | o=" << o.item<float>() <<
+    " | g=" << g.item<float>() << endl;
+
+  return r + v + o + g;
 }
 
 torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
@@ -397,6 +413,11 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
   
   torch::AutoGradMode enable_grad(true);
   model->train();
+
+  for (int i = 0; i < score.size(0); i++) {
+    if (i % 2) score[i][INX_TAU_G] = -0.1;
+    else score[i][INX_TAU_G] = 0.2;
+  }
 
   std::map<std::string, std::vector<torch::Tensor>> train_data;
   train_data["X"].push_back(score.clone().detach());
@@ -903,8 +924,10 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
     if (DEBUG) cout << "NOT within " << closest_note_duration/3 << " of " << closest_note_time << endl; return;
   }
 
+  cout << "onset tau is " << tau_guitar << endl;
+
   // add detected tau_g to score
-  score[closest_note][INX_TAU_G] = tau_guitar;
+  score[closest_note][INX_TAU_G] = ms_to_bartime(tau_guitar, score[closest_note][INX_BPM], score[closest_note][INX_TSIG]);
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
@@ -913,7 +936,6 @@ void rolypoly::operator()(audio_bundle input, audio_bundle output) {
     fill_with_zero(output);
     return;
   }
-
   perform(input, output);
 }
 
