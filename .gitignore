@@ -391,3 +391,5 @@ help/model.pt
 help/roly_hits.pt
 help/roly.pt
 help/roly_fine.pt
+help/workflow/*
+*.skba
