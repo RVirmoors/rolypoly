@@ -280,8 +280,7 @@ public:
     MIN_FUNCTION {
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
-        //m_model.get_model().save("model_pre.pt");
-        cout << "BEFORE   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
+        // cout << "BEFORE   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
         torch::AutoGradMode enable_grad(true);
         try {
           backend::TrainConfig config;
@@ -293,8 +292,8 @@ public:
           torch::Tensor losses = finetune(config);
           //model->eval();
           cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
-          cout << "To play with this version, send 'start'. To save this version, send the 'write' message." << endl;
-          cout << "AFTER   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
+          cout << "To play with this version, send the 'start' message. To save this version, send 'write'. To train again, send 'train'." << endl;
+          // cout << "AFTER   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
         }
         catch (std::exception& e)
         {
@@ -394,8 +393,8 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
       0.0
   );
 
-  cout << out[0].index({Slice(), Slice(9, 18)}) << endl;
-  cout << "tau out (D): " << tau_d[0] << endl << "real tau (G): " << tau_g[0] << endl;
+  // cout << out[0].index({Slice(), Slice(9, 18)}) << endl;
+  // cout << "tau out (D): " << tau_d[0] << endl << "real tau (G): " << tau_g[0] << endl;
   // cout << torch::cat({tau_d, tau_g}, 0)[0] << endl;
 
   torch::Tensor r = 0.25  * torch::zeros({1}); // TODO offset regularization vs GMD stats
@@ -744,7 +743,7 @@ void rolypoly::tensorToModel() {
       )
     );
 
-    cout << "NEW NOTE: " << new_note << endl;
+    // cout << "NEW NOTE: " << new_note << endl;
     new_note = torch::cat({new_note, input_tensor[0][i].index({Slice(INX_BPM, INX_TAU_G)})});
     new_note = torch::cat({new_note, modelOut[0][i][18].unsqueeze(0)}); // last output channel: tau_g_hat
     new_note.unsqueeze_(0);
@@ -898,7 +897,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   }
   if (location == -1) return; // no onset in this buffer
 
-  // get the onset time in ms
+  try{  // get the onset time in ms
   double onset_time_ms = playhead_ms + 
     lib::math::samples_to_milliseconds(location - latency, samplerate());
   
@@ -940,7 +939,10 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   cout << "onset tau is " << tau_guitar << endl;
 
   // add detected tau_g to score
-  score[closest_note][INX_TAU_G] = ms_to_bartime(tau_guitar, score[closest_note][INX_BPM], score[closest_note][INX_TSIG]);
+  score[closest_note][INX_TAU_G] = ms_to_bartime(tau_guitar, score[closest_note][INX_BPM], score[closest_note][INX_TSIG]);}
+  catch (const std::exception& e) {
+    std::cerr << e.what() << std::endl;
+  }
 }
 
 void rolypoly::operator()(audio_bundle input, audio_bundle output) {
