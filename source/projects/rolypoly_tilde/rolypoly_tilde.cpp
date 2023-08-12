@@ -941,7 +941,7 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
   // add detected tau_g to score
   score[closest_note][INX_TAU_G] = ms_to_bartime(tau_guitar, score[closest_note][INX_BPM], score[closest_note][INX_TSIG]);}
   catch (const std::exception& e) {
-    std::cerr << e.what() << std::endl;
+    std::cerr << "ONSET ERROR:" << e.what() << std::endl;
   }
 }
 
