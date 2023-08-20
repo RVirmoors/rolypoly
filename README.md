@@ -5,9 +5,7 @@ a Max object that
 - interprets a MIDI drum track in anticipation and reaction to your expressive nuances
 - is able to generate drum hits on the fly, autoregressively
 
-version 2.0.1, August 2023, experimental build.
-
-[version history](VERSIONS.md)
+version 2.0.1, August 2023, experimental build // [version history](VERSIONS.md)
 
 ## quickstart
 

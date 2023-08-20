@@ -7,6 +7,3 @@
 [submodule "midifile"]
 	path = midifile
 	url = https://github.com/craigsapp/midifile
-[submodule "nn_tilde"]
-	path = nn_tilde
-	url = https://github.com/acids-ircam/nn_tilde
