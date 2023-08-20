@@ -288,12 +288,12 @@ public:
           config.batch_size = 8;
           config.block_size = power_ceil(score_ms.size()/2);
           // cout << "block size is " << config.block_size << endl;
-          config.epochs = 8;
+          config.epochs = 10;
           torch::Tensor losses = finetune(config);
           //model->eval();
           cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
-          cout << "To play with this version, send the 'start' message. To save this version, send 'write'. To train again, send 'train'." << endl;
-          // cout << "AFTER   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
+          cout << "Using epoch w/ smallest loss. To play with this version, send the 'start' message. To save this version, send 'write'. To train again, send 'train'." << endl;
+          cout << "AFTER   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 12)}) << endl;
         }
         catch (std::exception& e)
         {
@@ -359,9 +359,9 @@ public:
         train_ops[0] = (double)args[0];
         train_ops[1] = (double)args[1];
         train_ops[2] = (double)args[2];
-        cout << "using train options = " << train_ops << endl;
+        cout << "using train options [vel/off/gtr]: " << train_ops << endl;
       } else {
-        cout << "using default train options: " << train_ops << endl;
+        cout << "using default train options [vel/off/gtr]: " << train_ops << endl;
       }
 
       m_train = true;
@@ -402,9 +402,9 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
   torch::Tensor o = 0.002 * train_ops[1] * torch::mse_loss(tau_d, tau_g);
   torch::Tensor g = 0.002 * train_ops[2] * torch::mse_loss(tau_g_hat, tau_g);
 
-  if (DEBUG) cout << "losses: v=" << v.item<float>() <<
-    " | o=" << o.item<float>() <<
-    " | g=" << g.item<float>() << endl;
+  if (DEBUG) cout << "losses: vel=" << v.item<float>() <<
+    " | off=" << o.item<float>() <<
+    " | gtr=" << g.item<float>() << endl;
 
   return r + v + o + g;
 }
@@ -441,6 +441,11 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
 
     torch::Tensor out = model->forward(x);
     loss = finetuneLoss(out, x);
+    if (loss.item<double>() < min_loss) {
+      min_loss = loss.item<double>();
+      torch::save(model, "roly_best.pt");
+      cout << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 12)}) << endl;
+    }
     loss.backward();
     torch::nn::utils::clip_grad_norm_(model->parameters(), 0.5);
     optimizer.step();
@@ -448,6 +453,8 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
     losses = torch::cat({losses, loss});
   }
 
+  torch::load(model, "roly_best.pt", device);
+  cout << "AFTER LOADING " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 12)}) << endl;
   return losses;
 }
 
@@ -650,8 +657,7 @@ bool rolypoly::midiNotesToScore() {
   }
 
   if (DEBUG) cout << "sent " << score.size(0) << " hits to model" << endl;
-
-  if (DEBUG) cout << score.index({Slice(0,5)}) << endl;
+  //if (DEBUG) cout << score.index({Slice(0,5)}) << endl;
   
   if (i >= midifile[1].size()) {
     return true; // done
