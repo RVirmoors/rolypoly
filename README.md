@@ -7,6 +7,8 @@ a Max object that
 
 version 2.0.1, August 2023, experimental build.
 
+[version history](VERSIONS.md)
+
 ## quickstart
 
 get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` folder
