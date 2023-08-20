@@ -1,8 +1,10 @@
 # rolypoly~
 
-a Max object that listens to your audio instrument and interprets a MIDI drum track in anticipation and reaction to your expressive nuances
+a Max object that 
+- listens to your audio instrument
+- interprets a MIDI drum track in anticipation and reaction to your expressive nuances
 
-- version 2.0.1, August 2023
+version 2.0.1, August 2023, experimental build.
 
 ## quickstart
 
@@ -16,32 +18,20 @@ run `help/rolypoly.maxhelp` for the basics
 
 see my paper "Finetuning Rolypoly~ 2.0: an expressive drum machine that adapts with every performance" presented at AIMC2023
 
-i'm also writing a blog covering some specifics
+i'm also writing a blog covering hands-on specifics
 
-and coming soon a series of how-to videos, hopefully
+and a series of [how-to videos](https://youtube.com/playlist?list=PLkr4iJAO7fYSMZM1oYECK5GKXrWN6zdq1)
 
 ## training your own model
 
 clone into `Max 8/Packages`, fetching submodules: 
 - `git clone https://github.com/RVirmoors/rolypoly --recursive`
 
-(optional but recommended) create a new virtual environment:
-- `python -m venv venv`
+to parse the GMD dataset (or your own, similarly formatted):
 
-you need the following Python modules:
-- pytorch (I use `ltt` to get it, but you can go [the classic way](https://pytorch.org/get-started/locally/)):
-```
-python -m pip install light-the-torch
-ltt install torch
-```
-- others:
-`pip install numpy`
+- download GMD and extract to `pretrain/build/Release/groove`
 
-make sure you're in the `py` folder:
-- `cd py`
-
-
-...
+- use this Python script to parse .mid tracks into .csv data files
 
 
 ```
@@ -49,7 +39,7 @@ cd source/projects/pretrain/build
 cmake --build . --config Release
 cd Release
 ```
-- download GMD and extract to `pretrain/build/Release/groove`
+
 run:
 ```
 pretrain
