@@ -3,6 +3,7 @@
 a Max object that 
 - listens to your audio instrument
 - interprets a MIDI drum track in anticipation and reaction to your expressive nuances
+- is able to generate drum hits on the fly, autoregressively
 
 version 2.0.1, August 2023, experimental build.
 
@@ -13,6 +14,8 @@ get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releas
 [download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
 
 run `help/rolypoly.maxhelp` for the basics
+
+demo video coming very soon
 
 ## how does it work?
 
