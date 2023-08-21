@@ -71,6 +71,10 @@ torch::Tensor ms_to_bartime(double ms, torch::Tensor bpm, torch::Tensor tsig) {
   return ms / 1000. * 60. / bpm / tsig;
 }
 
+torch::Tensor ms_to_bartime(torch::Tensor ms, torch::Tensor bpm, torch::Tensor tsig) {
+  return ms / 1000. * 60. / bpm / tsig;
+}
+
 // ============= MAIN ROLYPOLY~ CLASS =============
 
 class rolypoly : public object<rolypoly>, public vector_operator<> {
@@ -359,9 +363,15 @@ public:
         train_ops[0] = (double)args[0];
         train_ops[1] = (double)args[1];
         train_ops[2] = (double)args[2];
-        cout << "using train options [vel/off/gtr]: " << train_ops << endl;
+        cout << "using train options [vel/off/gtr]: " << 
+          train_ops[0].item<float>() << " / " <<
+          train_ops[1].item<float>() << " / " <<
+          train_ops[2].item<float>() << endl;
       } else {
-        cout << "using default train options [vel/off/gtr]: " << train_ops << endl;
+        cout << "using default train options [vel/off/gtr]: " << 
+          train_ops[0].item<float>() << " / " <<
+          train_ops[1].item<float>() << " / " <<
+          train_ops[2].item<float>() << endl;
       }
 
       m_train = true;
@@ -383,7 +393,7 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
   torch::Tensor tau_g_hat = out.index({Slice(), Slice(), 18}); // model has 19 outputs, last one is tau_g
 
   torch::Tensor y_hat_offsets = out.index({Slice(), Slice(), Slice(9, 18)});
-  torch::Tensor non_zero_mask = (y_hat_offsets != 0).to(torch::kFloat32);
+  torch::Tensor non_zero_mask = (vel_hat != 0).to(torch::kFloat32);
   torch::Tensor non_zero_sum = (y_hat_offsets * non_zero_mask).sum(2);
   torch::Tensor non_zero_count = non_zero_mask.sum(2);
   torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
@@ -394,13 +404,12 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
   );
 
   // cout << out[0].index({Slice(), Slice(9, 18)}) << endl;
-  // cout << "tau out (D): " << tau_d[0] << endl << "real tau (G): " << tau_g[0] << endl;
-  // cout << torch::cat({tau_d, tau_g}, 0)[0] << endl;
+  cout << "tau out (D):\n" << tau_d[0] << endl << "real tau (G):\n" << tau_g[0] << endl;
 
-  torch::Tensor r = 0.25  * torch::zeros({1}); // TODO offset regularization vs GMD stats
-  torch::Tensor v = 0.5   * train_ops[0] * torch::mse_loss(vel_hat, vel);
-  torch::Tensor o = 0.002 * train_ops[1] * torch::mse_loss(tau_d, tau_g);
-  torch::Tensor g = 0.002 * train_ops[2] * torch::mse_loss(tau_g_hat, tau_g);
+  torch::Tensor r = 0.25 * torch::zeros({1}); // TODO offset regularization vs GMD stats
+  torch::Tensor v = 0.5  * train_ops[0] * torch::mse_loss(vel_hat, vel);
+  torch::Tensor o = 0.02 * train_ops[1] * torch::mse_loss(tau_d, tau_g);
+  torch::Tensor g = 0.02 * train_ops[2] * torch::mse_loss(tau_g_hat, tau_g);
 
   if (DEBUG) cout << "losses: vel=" << v.item<float>() <<
     " | off=" << o.item<float>() <<
@@ -417,10 +426,10 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
   torch::AutoGradMode enable_grad(true);
   model->train();
 
-  // for (int i = 0; i < score.size(0); i++) {
-  //   if (i % 2) score[i][INX_TAU_G] = -0.1;
-  //   else score[i][INX_TAU_G] = 0.2;
-  // }
+  for (int i = 0; i < score.size(0); i++) {
+    if (i % 2) score[i][INX_TAU_G] = -0.02;
+    else score[i][INX_TAU_G] = 0.04;
+  }
 
   std::map<std::string, std::vector<torch::Tensor>> train_data;
   train_data["X"].push_back(score.clone().detach());
@@ -439,23 +448,20 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
         config.batch_size, 
         config.block_size,
         x, y);
-    // y.set_requires_grad(true);
-
 
     torch::Tensor out = model->forward(x);
 
-    // cout << " === X === \n" << x.sizes() << endl << x.index({0, Slice(0, 4), Slice(0, 3)}) << endl;
-    cout << " == out == \n" << out.index({0, Slice(0, 4), Slice(0, 3)}) << endl;
+    cout << " === X === \n" << x.sizes() << endl << x.index({0, Slice(0, 4), Slice(9, 22)}) << endl;
+    cout << " == out == \n" << out.index({0, Slice(0, 4), Slice(9, 19)}) << endl;
     // cout << "epoch " << epoch << " - params " << model->parameters()[5][0] << endl;
-
 
     loss = finetuneLoss(out, x);
     if (loss.item<double>() < min_loss) {
       min_loss = loss.item<double>();
       torch::save(model, "roly_best.pt");
       cout << "SAVED BEST" << endl;
-      cout << model(inTest).index({0, Slice(0, 4), Slice(0, 3)}) << endl;
-      // cout << "params " << model->parameters()[5][0] << endl;
+      cout << model(inTest).index({0, Slice(0, 4), Slice(9, 19)}) << endl;
+      cout << "params " << model->parameters()[5][0] << endl;
     }
     loss.backward();
     torch::nn::utils::clip_grad_norm_(model->parameters(), 0.5);
@@ -465,7 +471,8 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
   }
 
   torch::load(model, "roly_best.pt", device);
-  cout << "AFTER LOADING\n" << model(inTest).index({0, Slice(0, 4), Slice(0, 3)}) << endl;
+  cout << "AFTER LOADING\n" << model(inTest).index({0, Slice(0, 4), Slice(9, 19)}) << endl;
+  cout << "params " << model->parameters()[5][0] << endl;
   return losses;
 }
 
@@ -721,35 +728,43 @@ void rolypoly::tensorToModel() {
   }
 
   long start = std::max(0, t_toModel - BLOCK_SIZE);
-  cout << "sending " << start << " - " << t_toModel << endl;
+  cout << "sending " << start << " - " << t_toModel-1 << endl;
   torch::Tensor input_tensor = score.index({Slice(start, t_toModel)}).unsqueeze(0);
   backend::dataScaleDown(input_tensor);
 
   // send the notes to the model, to get the offsets for play_notes
   try {
+    cout << "INPUT TENSOR\n" << input_tensor[0] << endl;
     torch::NoGradGuard no_grad_guard;
     modelOut = model(input_tensor);
     // modelOut = input_tensor.index({Slice(), Slice(0, input_tensor.size(1)), Slice(0, input_tensor.size(2))});
     backend::dataScaleUp(input_tensor);
     backend::dataScaleUp(modelOut);
-    // if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
+    if (DEBUG) cout << "== VEC2MOD == output  :  " << modelOut << endl;
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
   }
   // populate play_notes[...t_toModel]
-  if (DEBUG) cout << "== TENStoMOD == notes from model == " << t_fromModel << " : " << t_toModel << endl;
+  if (DEBUG) cout << "== TENStoMOD == notes from model == " << t_fromModel << " : " << t_toModel-1 << endl;
 
   for (int i = modelOut.size(1) - newNotes; i < modelOut.size(1); i++) {
     torch::Tensor new_note;
     // if using score velocities, just take [9:18] (the offsets) from modelOut
     if (score_hits) {
+      auto zero_offsets = torch::where( // if vel is zero, zero the offset too
+        input_tensor[0][i].index({Slice(0, 9)}) == 0,
+        0.0,
+        modelOut[0][i].index({Slice(9, 18)})
+      );
       new_note = torch::cat({
         input_tensor[0][i].index({Slice(0, 9)}),
-        modelOut[0][i].index({Slice(9, 18)})
+        zero_offsets
           });
     }        
     else // else, also take the velocities generated by the model
       new_note = modelOut[0][i].index({Slice(0, OUTPUT_DIM - 1)});
+
+    cout << "NEW NOTE modelOut: " << new_note << endl;
 
     // convert bartime offset values to ms
     new_note.index_put_({Slice(9, 18)},
@@ -760,7 +775,7 @@ void rolypoly::tensorToModel() {
       )
     );
 
-    // cout << "NEW NOTE: " << new_note << endl;
+    cout << "NEW NOTE: " << new_note << endl;
     new_note = torch::cat({new_note, input_tensor[0][i].index({Slice(INX_BPM, INX_TAU_G)})});
     new_note = torch::cat({new_note, modelOut[0][i][18].unsqueeze(0)}); // last output channel: tau_g_hat
     new_note.unsqueeze_(0);
@@ -864,8 +879,13 @@ void rolypoly::tensorToModel() {
 
   // copy executed offsets to score (to be later fed into the model for inference)
   if (t_toModel < score.size(0) - 1)
-    score.index_put_({Slice(t_fromModel+1, t_toModel+1), Slice(9, 18)}, 
-      play_notes.index({Slice(t_fromModel, t_toModel), Slice(9, 18)}));
+    score.index_put_({Slice(t_fromModel+1, t_toModel+1), Slice(9, 18)},
+      ms_to_bartime(
+        play_notes.index({Slice(t_fromModel, t_toModel), Slice(9, 18)}),
+        score.index({Slice(t_fromModel, t_toModel), Slice(INX_BPM, INX_BPM+1)}),
+        score.index({Slice(t_fromModel, t_toModel), Slice(INX_TSIG, INX_TSIG+1)})
+      )
+    );
 
   t_fromModel = t_toModel;
 }

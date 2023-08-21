@@ -418,7 +418,7 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 680.0, 73.999995589256287, 79.0, 22.0 ],
+									"patching_rect" : [ 677.5, 73.999995589256287, 79.0, 22.0 ],
 									"text" : "prepend train"
 								}
 
@@ -434,7 +434,7 @@
 									"presentation" : 1,
 									"presentation_linecount" : 3,
 									"presentation_rect" : [ 328.0, 235.0, 55.0, 50.0 ],
-									"text" : "train 1.74269 0. 0."
+									"text" : "train 0. 1.391813 0."
 								}
 
 							}
