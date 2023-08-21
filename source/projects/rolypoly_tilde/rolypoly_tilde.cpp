@@ -280,7 +280,7 @@ public:
     MIN_FUNCTION {
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
-        // cout << "BEFORE   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 18)}) << endl;
+        cout << "BEFORE\n" << model(score.unsqueeze(0)).index({0, Slice(0, 4), Slice(0, 3)}) << endl;
         torch::AutoGradMode enable_grad(true);
         try {
           backend::TrainConfig config;
@@ -293,7 +293,7 @@ public:
           //model->eval();
           cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
           cout << "Using epoch w/ smallest loss. To play with this version, send the 'start' message. To save this version, send 'write'. To train again, send 'train'." << endl;
-          cout << "AFTER   " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 12)}) << endl;
+          // cout << "params " << model->parameters()[5][0] << endl;
         }
         catch (std::exception& e)
         {
@@ -425,6 +425,8 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
   std::map<std::string, std::vector<torch::Tensor>> train_data;
   train_data["X"].push_back(score.clone().detach());
   train_data["Y"].push_back(play_notes.clone().detach());
+  torch::Tensor inTest = score.clone().detach().unsqueeze(0);
+  backend::dataScaleDown(inTest);
 
   torch::Tensor losses = torch::zeros({0}).to(device);
 
@@ -432,19 +434,28 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
     // torch::autograd::DetectAnomalyGuard detect_anomaly;
     optimizer.zero_grad();
         
-    torch::Tensor x, y;
+    torch::Tensor x, y; // y is dummy, unused
     backend::getBatch(train_data, 
         config.batch_size, 
         config.block_size,
         x, y);
-    y.set_requires_grad(true);
+    // y.set_requires_grad(true);
+
 
     torch::Tensor out = model->forward(x);
+
+    // cout << " === X === \n" << x.sizes() << endl << x.index({0, Slice(0, 4), Slice(0, 3)}) << endl;
+    cout << " == out == \n" << out.index({0, Slice(0, 4), Slice(0, 3)}) << endl;
+    // cout << "epoch " << epoch << " - params " << model->parameters()[5][0] << endl;
+
+
     loss = finetuneLoss(out, x);
     if (loss.item<double>() < min_loss) {
       min_loss = loss.item<double>();
       torch::save(model, "roly_best.pt");
-      cout << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 12)}) << endl;
+      cout << "SAVED BEST" << endl;
+      cout << model(inTest).index({0, Slice(0, 4), Slice(0, 3)}) << endl;
+      // cout << "params " << model->parameters()[5][0] << endl;
     }
     loss.backward();
     torch::nn::utils::clip_grad_norm_(model->parameters(), 0.5);
@@ -454,7 +465,7 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
   }
 
   torch::load(model, "roly_best.pt", device);
-  cout << "AFTER LOADING " << model(score.unsqueeze(0)).index({0, Slice(), Slice(9, 12)}) << endl;
+  cout << "AFTER LOADING\n" << model(inTest).index({0, Slice(0, 4), Slice(0, 3)}) << endl;
   return losses;
 }
 
@@ -998,7 +1009,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       auto out = output.samples(next_note.second);
       double vel = play_notes[t_play][next_note.second].item<double>();
       // cout << "vel: " << vel << " at t: " << t_play << endl;
-      if (vel > 0) {
+      if (vel > 0.1) {
         if (signal_out) // OUTPUT NOTE SIGNALS
           out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
         if (message_out) { // OUTPUT MESSAGES
