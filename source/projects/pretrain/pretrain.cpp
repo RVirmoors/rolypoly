@@ -198,8 +198,8 @@ int main() {
     try {
     std::cout << "EXAMPLE EVAL:\n=============\n  hits   offsets    y" << std::endl;
     torch::NoGradGuard no_grad_guard;
-    hitsModel->eval();
-    model->eval();
+    hitsModel->train();
+    model->train();
     torch::Tensor x = val_data["X"][0].slice(0, 0, config.block_size).unsqueeze(0);
     backend::dataScaleDown(x);
     torch::Tensor y = val_data["Y"][0].slice(0, 0, config.block_size).unsqueeze(0);
@@ -220,6 +220,9 @@ int main() {
 
     std::cout << "BAR POS EVAL:\n============\n   x      hits      y\n";
     std::cout << torch::stack({x_pos[0], hit_pos[0], y_pos[0]}, 1 ) << std::endl;
+
+    std::cout << x[0][2] << std::endl;
+    // std::cout << hitsModel->parameters()[5][0] << std::endl;
 
     std::cin.get();
     } catch (const std::exception& e) {
