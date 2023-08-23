@@ -856,10 +856,17 @@ void rolypoly::tensorToModel() {
       generated_note_ms += push_ms; // for the while() check above
 
       if (DEBUG) cout << "BEF PUSHBAR " << score.index({Slice(), INX_BAR_POS}).unsqueeze(0) << endl;
+      try{
       double push_bar = generated_note[INX_BAR_POS].item<double>() - score[t_toModel+i - 1][INX_BAR_POS].item<double>() + 1.0;
       score.index_put_({Slice(t_toModel+i+1, None), INX_BAR_POS},
         (score.index({Slice(t_toModel+i+1, None), INX_BAR_POS}) + push_bar).frac_()
         );
+      }
+        catch (std::exception& e)
+        {
+        cout << generated_note << endl;
+            cerr << e.what() << endl;
+        }
       if (DEBUG) cout << "AFT PUSHBAR " << score.index({Slice(), INX_BAR_POS}).unsqueeze(0) << endl;
 
       if (DEBUG) cout << score_ms << endl;
