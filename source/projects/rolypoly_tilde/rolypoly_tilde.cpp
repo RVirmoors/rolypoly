@@ -794,7 +794,7 @@ void rolypoly::tensorToModel() {
       torch::Tensor generated_note = torch::cat({
         hitsOut[0][last].index({Slice(1, 10)}), // hits generated
         torch::zeros({9}).to(device), // offsets estimated above, to be filled in below
-        score[t_toModel].index({Slice(INX_BPM, INX_BAR_POS)}), // tempo & t_sig from prev note
+        score[t_toModel-1].index({Slice(INX_BPM, INX_BAR_POS)}), // tempo & t_sig from prev note
         hitsOut[0][last][0].unsqueeze(0), // bar pos generated
         torch::zeros({1}).to(device), // tau_guitar, to be filled in on onset detect
       });
@@ -806,7 +806,7 @@ void rolypoly::tensorToModel() {
           }, 0);
 
       if (DEBUG) cout << "testing " << generated_note[INX_BAR_POS].item<double>() << endl;
-      try {
+
       // if the generated bar_pos is before the preceding note's bar_pos
       // note: JANKY!!!! TODO find something better...
       if (generated_note[INX_BAR_POS].item<double>() < 
@@ -830,13 +830,16 @@ void rolypoly::tensorToModel() {
         else if (future_bar_pos > score.index({t_toModel+i-1, INX_BAR_POS}).item<double>()) {
           // case: 0.8 0.75 0.9 where 0.75 should be 0.9
           // discard the generated note (0.75) and use the future note (0.9) instead
-          generated_note = future_note[0][last];
+          generated_note = torch::cat({
+            future_note[0][last].index({Slice(1, 10)}), // hits generated
+            torch::zeros({9}).to(device), // offsets
+            score[t_toModel-1].index({Slice(INX_BPM, INX_BAR_POS)}), // tempo & t_sig from prev note
+            future_note[0][last][0].unsqueeze(0), // bar pos generated
+            torch::zeros({1}).to(device), // tau_guitar, to be filled in on onset detect
+          });
           score[t_toModel+i] = generated_note;
           if (DEBUG) cout << "replaced pos out: " << generated_note[INX_BAR_POS].item<double>() << endl;
         }
-      }
-      } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
       }
 
       // now compute the ms equivalent of the bar_pos
@@ -856,17 +859,10 @@ void rolypoly::tensorToModel() {
       generated_note_ms += push_ms; // for the while() check above
 
       if (DEBUG) cout << "BEF PUSHBAR " << score.index({Slice(), INX_BAR_POS}).unsqueeze(0) << endl;
-      try{
       double push_bar = generated_note[INX_BAR_POS].item<double>() - score[t_toModel+i - 1][INX_BAR_POS].item<double>() + 1.0;
       score.index_put_({Slice(t_toModel+i+1, None), INX_BAR_POS},
         (score.index({Slice(t_toModel+i+1, None), INX_BAR_POS}) + push_bar).frac_()
         );
-      }
-        catch (std::exception& e)
-        {
-        cout << generated_note << endl;
-            cerr << e.what() << endl;
-        }
       if (DEBUG) cout << "AFT PUSHBAR " << score.index({Slice(), INX_BAR_POS}).unsqueeze(0) << endl;
 
       if (DEBUG) cout << score_ms << endl;
