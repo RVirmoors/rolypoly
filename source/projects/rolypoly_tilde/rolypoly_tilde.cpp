@@ -862,10 +862,18 @@ void rolypoly::tensorToModel() {
         double future_bar_pos = future_note[0][last][0].item<double>();
         cout << "future would be @ " << future_bar_pos << "<>" << generated_note[INX_BAR_POS].item<double>() << endl;
         if (future_bar_pos < generated_note[INX_BAR_POS].item<double>()) {
-          cout << "MOVIN" << endl;
+          // case: 0.8 0.5 0.2 where 0.5 should be 0.9
           // move the generated note bar_pos back to the end of the bar
-          generated_note[INX_BAR_POS] = (score.index({Slice(0, t_toModel+i-1, INX_BAR_POS)}) + 1.) / 2.;
+          generated_note[INX_BAR_POS] = (score.index({t_toModel+i-1, INX_BAR_POS}) + 1.) / 2.;
+          score[t_toModel+i][INX_BAR_POS] = generated_note[INX_BAR_POS];
           cout << "adjusted pos out: " << generated_note[INX_BAR_POS].item<double>() << endl;
+        }
+        else if (future_bar_pos > score.index({t_toModel+i-1, INX_BAR_POS}).item<double>()) {
+          // case: 0.8 0.75 0.9 where 0.75 should be 0.9
+          // discard the generated note (0.75) and use the future note (0.9) instead
+          generated_note = future_note[0][last];
+          score[t_toModel+i] = generated_note;
+          cout << "replaced pos out: " << generated_note[INX_BAR_POS].item<double>() << endl;
         }
       }
       } catch (const std::exception& e) {
@@ -874,11 +882,11 @@ void rolypoly::tensorToModel() {
 
       // now compute the ms equivalent of the bar_pos
       generated_note_ms = score_ms[t_toModel+i-1];
-      cout << "push_ms = b_to_ms(" << score[t_toModel+i - 1][INX_BAR_POS].item<double>() << ", " << generated_note[INX_BAR_POS].item<double>() << ", " << generated_note[INX_BPM].item<double>() << ", " << generated_note[INX_TSIG].item<double>() << endl;
+      cout << "push_ms = b_to_ms(" << score[t_toModel+i - 1][INX_BAR_POS].item<double>() << ", " << score[t_toModel+i][INX_BAR_POS].item<double>() << ", " << score[t_toModel+i][INX_BPM].item<double>() << ", " << score[t_toModel+i][INX_TSIG].item<double>() << endl;
       double push_ms = bartime_to_ms(score[t_toModel+i - 1][INX_BAR_POS].item<double>(), 
-                          generated_note[INX_BAR_POS].item<double>(), 
-                          generated_note[INX_BPM].item<double>(),
-                          generated_note[INX_TSIG].item<double>());
+                          score[t_toModel+i][INX_BAR_POS].item<double>(), 
+                          score[t_toModel+i][INX_BPM].item<double>(),
+                          score[t_toModel+i][INX_TSIG].item<double>());
 
       cout << "insert note at " << generated_note_ms << " + " << push_ms << endl;
       score_ms.insert(score_ms.begin() + t_toModel+i, generated_note_ms);
