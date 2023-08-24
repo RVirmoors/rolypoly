@@ -174,6 +174,10 @@ public:
   attribute<bool> generate{this, "generate", false,
                          description{"Generate hits on the fly, not reading from the score"}};
 
+  attribute<vector<double>> generate_vels{this, "generate_vels", {0.1, 1.},
+                         description("Min and max velocities accepted from the generator"),
+                         range { 0.0, 1.0 }};
+
   attribute<symbol> filter_hits{this, "filter_hits", "score_notes",
                          description{"Filter out notes not in the score / use scored velocities"},
                          range{"none", "score_notes", "score_notes_and_vels"}};
@@ -802,8 +806,17 @@ void rolypoly::tensorToModel() {
       hitsModel->train();
       torch::Tensor hitsOut = hitsModel(input_tensor);
       backend::dataScaleUp(input_tensor);
-      backend::dataScaleUpHits(hitsOut);
       int last = hitsOut.size(1) - 1;
+
+      // filter out notes not within generate_vels range
+      hitsOut[0][last].index_put_({Slice(1, 10)},
+        torch::where(
+          (hitsOut[0][last].index({Slice(1,10)}) < generate_vels[0]) + (hitsOut[0][last].index({Slice(1,10)}) > generate_vels[1]),
+          0.0,
+          hitsOut[0][last].index({Slice(1,10)})
+        )
+      );
+      backend::dataScaleUpHits(hitsOut);
 
       if (DEBUG) cout << "pos out from hModel:\n" << hitsOut.index({0, Slice(), 0}).unsqueeze(0) << endl;
       
@@ -1041,9 +1054,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       for (int i = 0; i < 9; i++) {
         auto out = output.samples(i);
         double vel = score[0][i].item<double>();
-        if (vel > 0.1) {
+        if (vel > 0.) {
           if (signal_out) // OUTPUT NOTE SIGNALS
-            out[0] = std::max(std::min(vel / 127., 1.), 0.1);
+            out[0] = std::max(std::min(vel / 127., 1.), 0.01);
           if (message_out) { // OUTPUT MESSAGES
             int msg_index = output.channel_count();
             m_note[0] = out_pitches[i];
@@ -1077,9 +1090,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       micro_index = std::max(micro_index, 0L);
       auto out = output.samples(next_note.second);
       double vel = play_notes[t_play][next_note.second].item<double>();
-      if (vel > 0.1) {
+      if (vel > 0.) {
         if (signal_out) // OUTPUT NOTE SIGNALS
-          out[micro_index] = std::max(std::min(vel / 127., 1.), 0.1);
+          out[micro_index] = std::max(std::min(vel / 127., 1.), 0.01);
         if (message_out) { // OUTPUT MESSAGES
           int msg_index = output.channel_count();
           m_note[0] = out_pitches[next_note.second];

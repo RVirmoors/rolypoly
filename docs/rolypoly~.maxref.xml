@@ -93,6 +93,11 @@
 			<description>Output messages </description>
 		</attribute>
 
+		<attribute name='generate_vels' get='1' set='1' type='float64' size='1' >
+			<digest>Min and max velocities accepted from the generator </digest>
+			<description>Min and max velocities accepted from the generator </description>
+		</attribute>
+
 	</attributelist>
 
 
