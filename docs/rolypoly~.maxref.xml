@@ -78,14 +78,14 @@
 			<description>Onset detection latency (samples) </description>
 		</attribute>
 
+		<attribute name='filter_hits' get='1' set='1' type='symbol' size='1' >
+			<digest>Filter out notes not in the score / use scored velocities </digest>
+			<description>Filter out notes not in the score / use scored velocities </description>
+		</attribute>
+
 		<attribute name='generate' get='1' set='1' type='long' size='1' >
 			<digest>Generate hits on the fly, not reading from the score </digest>
 			<description>Generate hits on the fly, not reading from the score </description>
-		</attribute>
-
-		<attribute name='score_hits' get='1' set='1' type='long' size='1' >
-			<digest>Filter out notes not in the score &amp; use scored velocities </digest>
-			<description>Filter out notes not in the score &amp; use scored velocities </description>
 		</attribute>
 
 		<attribute name='message_out' get='1' set='1' type='long' size='1' >

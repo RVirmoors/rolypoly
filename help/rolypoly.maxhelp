@@ -1955,14 +1955,14 @@
 							}
 , 							{
 								"box" : 								{
-									"attr" : "score_hits",
+									"attr" : "filter_hits",
 									"id" : "obj-4",
 									"maxclass" : "attrui",
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
 									"parameter_enable" : 0,
-									"patching_rect" : [ 234.75, 8.666667999999987, 150.0, 22.0 ],
+									"patching_rect" : [ 234.75, 8.666667999999987, 233.0, 22.0 ],
 									"presentation" : 1,
 									"presentation_rect" : [ 35.0, 32.666667999999987, 150.0, 22.0 ]
 								}
