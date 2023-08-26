@@ -1,14 +1,10 @@
 {
 	"author" : "rvirmoors",
 	"description" : "Interactive Learning of Microtiming in an Expressive Drum Machine",
-	"homepatcher" : "rolypoly.maxhelp",
+	"homepatcher" : "rolypoly~ overview.maxpat",
 	"max_version_min" : "8.0", "max_version_max" : "none",
-	"name" : "@C74_PACKAGE_NAME@",
+	"name" : "rolypoly~",
 	"os" : {
-		"macintosh" : {
-			"platform" : [ "x64", "aarch64" ],
-			"min_version" : "none"
-		},
 		"windows" : {
 			"platform" : [ "x64" ],
 			"min_version" : "none"
@@ -19,6 +15,6 @@
 		"copyright" : "2023 rvirmoors"
 	},
 	"tags" : [ ],
-	"version" : "@GIT_VERSION_MAJ@.@GIT_VERSION_MIN@.@GIT_VERSION_SUB@",
+	"version" : "2.0.1",
 	"website" : "https://github.com/RVirmoors/rolypoly"
 }
