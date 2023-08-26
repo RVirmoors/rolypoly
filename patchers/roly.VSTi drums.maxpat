@@ -484,7 +484,7 @@
 			}
 , 			{
 				"box" : 				{
-					"attr" : "message_out",
+					"attr" : "out_message",
 					"id" : "obj-5",
 					"maxclass" : "attrui",
 					"numinlets" : 1,

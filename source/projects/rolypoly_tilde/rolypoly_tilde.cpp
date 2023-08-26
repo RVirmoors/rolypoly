@@ -729,20 +729,17 @@ void rolypoly::tensorToModel() {
   try {
     torch::NoGradGuard no_grad_guard;
     modelOut = model(input_tensor);
-    // modelOut = input_tensor.index({Slice(), Slice(0, input_tensor.size(1)), Slice(0, input_tensor.size(2))});
     backend::dataScaleUp(input_tensor);
-    cout << "BEF\n" << modelOut << endl;
     // filter out notes not within generate_vels range AND not in the score
     modelOut[0].index_put_({Slice(), Slice(0, 9)},
       torch::where(
-        (modelOut[0].index({Slice(), Slice(0, 9)}) < generate_vels[0] + // IF
-        modelOut[0].index({Slice(), Slice(0, 9)}) > generate_vels[1]) * // OR
-        input_tensor[0].index({Slice(), Slice(0, 9)}) == 0.0,           // AND
+        ((modelOut[0].index({Slice(), Slice(0, 9)}) < generate_vels[0]) + // IF
+        (modelOut[0].index({Slice(), Slice(0, 9)}) > generate_vels[1])) * // OR
+        (input_tensor[0].index({Slice(), Slice(0, 9)}) == 0.0),           // AND
         0.0,                                                            // THEN
         modelOut[0].index({Slice(), Slice(0, 9)})                       // ELSE
       )    
     );
-    cout << "AFT\n" << modelOut << endl;
     backend::dataScaleUp(modelOut);
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;

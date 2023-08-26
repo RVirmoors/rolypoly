@@ -48,7 +48,7 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 340.0, 212.999995589256258, 80.0, 77.0 ],
+					"patching_rect" : [ 340.0, 216.999995589256258, 80.0, 77.0 ],
 					"setminmax" : [ 0.0, 2.0 ],
 					"setstyle" : 1,
 					"size" : 3
@@ -504,7 +504,7 @@
 			}
 , 			{
 				"box" : 				{
-					"attr" : "message_out",
+					"attr" : "out_message",
 					"id" : "obj-5",
 					"maxclass" : "attrui",
 					"numinlets" : 1,

@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 207.0, 102.0, 748.0, 868.0 ],
+		"rect" : [ 142.0, 85.0, 1744.0, 969.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -40,12 +40,28 @@
 		"assistshowspatchername" : 0,
 		"boxes" : [ 			{
 				"box" : 				{
+					"fontname" : "Arial",
+					"fontsize" : 13.0,
+					"id" : "obj-8",
+					"linecount" : 4,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 292.0, 210.0, 288.0, 66.0 ],
+					"presentation_linecount" : 3,
+					"text" : "NOTE: the generate_vels values also apply to the regular model in the filter_hits == none mode. This way, generated notes can be filtered by source (score or not) and/or by probability.",
+					"textcolor" : [ 0.426676, 0.426663, 0.42667, 1.0 ]
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-25",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 162.75, 254.0, 90.0, 22.0 ],
+					"patching_rect" : [ 162.75, 255.0, 90.0, 22.0 ],
 					"text" : "loadmess 0.1 1"
 				}
 
@@ -164,8 +180,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 4.0, 71.0, 508.0, 96.0 ],
-					"presentation_linecount" : 6,
+					"patching_rect" : [ 4.0, 71.0, 511.0, 96.0 ],
 					"text" : "Activating the generate attribute enables rolypoly~ to start improvising note hits \"on the fly\", based on its immediate performance history.\n\nUse the generate_vels range to filter out unwanted notes: note probabilities [0...1] are equated to velocities here, so to use only the top 10% most likely notes you might send \"generate_vels 0.9 1\".",
 					"textcolor" : [ 0.426676, 0.426663, 0.42667, 1.0 ]
 				}
@@ -566,7 +581,7 @@
 			}
 , 			{
 				"box" : 				{
-					"attr" : "message_out",
+					"attr" : "out_message",
 					"id" : "obj-5",
 					"maxclass" : "attrui",
 					"numinlets" : 1,
