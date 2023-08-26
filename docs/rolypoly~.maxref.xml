@@ -63,11 +63,6 @@
 
 	<attributelist>
 
-		<attribute name='signal_out' get='1' set='1' type='long' size='1' >
-			<digest>Output signals </digest>
-			<description>Output signals </description>
-		</attribute>
-
 		<attribute name='enable' get='1' set='1' type='long' size='1' >
 			<digest>Enable / disable tensor computation </digest>
 			<description>Enable / disable tensor computation </description>
@@ -88,14 +83,19 @@
 			<description>Generate hits on the fly, not reading from the score </description>
 		</attribute>
 
-		<attribute name='message_out' get='1' set='1' type='long' size='1' >
-			<digest>Output messages </digest>
-			<description>Output messages </description>
+		<attribute name='generate_vels' get='1' set='1' type='float64' size='1' >
+			<digest>Min and max probabilities/velocities accepted from the generator </digest>
+			<description>Min and max probabilities/velocities accepted from the generator </description>
 		</attribute>
 
-		<attribute name='generate_vels' get='1' set='1' type='float64' size='1' >
-			<digest>Min and max velocities accepted from the generator </digest>
-			<description>Min and max velocities accepted from the generator </description>
+		<attribute name='out_signal' get='1' set='1' type='long' size='1' >
+			<digest>Output note signals </digest>
+			<description>Output note signals </description>
+		</attribute>
+
+		<attribute name='out_message' get='1' set='1' type='long' size='1' >
+			<digest>Output note messages </digest>
+			<description>Output note messages </description>
 		</attribute>
 
 	</attributelist>

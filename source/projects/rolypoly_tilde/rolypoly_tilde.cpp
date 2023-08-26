@@ -175,18 +175,18 @@ public:
                          description{"Generate hits on the fly, not reading from the score"}};
 
   attribute<vector<double>> generate_vels{this, "generate_vels", {0.1, 1.},
-                         description("Min and max velocities accepted from the generator"),
+                         description("Min and max probabilities/velocities accepted from the generator"),
                          range { 0.0, 1.0 }};
 
   attribute<symbol> filter_hits{this, "filter_hits", "score_notes",
                          description{"Filter out notes not in the score / use scored velocities"},
                          range{"none", "score_notes", "score_notes_and_vels"}};
 
-  attribute<bool> signal_out{this, "signal_out", true,
-                         description{"Output signals"}};
+  attribute<bool> out_signal{this, "out_signal", true,
+                         description{"Output note signals"}};
 
-  attribute<bool> message_out{this, "message_out", true,
-                         description{"Output messages"}};
+  attribute<bool> out_message{this, "out_message", true,
+                         description{"Output note messages"}};
 
   // BOOT STAMP
   message<> maxclass_setup{
@@ -731,6 +731,18 @@ void rolypoly::tensorToModel() {
     modelOut = model(input_tensor);
     // modelOut = input_tensor.index({Slice(), Slice(0, input_tensor.size(1)), Slice(0, input_tensor.size(2))});
     backend::dataScaleUp(input_tensor);
+    cout << "BEF\n" << modelOut << endl;
+    // filter out notes not within generate_vels range AND not in the score
+    modelOut[0].index_put_({Slice(), Slice(0, 9)},
+      torch::where(
+        (modelOut[0].index({Slice(), Slice(0, 9)}) < generate_vels[0] + // IF
+        modelOut[0].index({Slice(), Slice(0, 9)}) > generate_vels[1]) * // OR
+        input_tensor[0].index({Slice(), Slice(0, 9)}) == 0.0,           // AND
+        0.0,                                                            // THEN
+        modelOut[0].index({Slice(), Slice(0, 9)})                       // ELSE
+      )    
+    );
+    cout << "AFT\n" << modelOut << endl;
     backend::dataScaleUp(modelOut);
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
@@ -1055,9 +1067,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         auto out = output.samples(i);
         double vel = score[0][i].item<double>();
         if (vel > 0.) {
-          if (signal_out) // OUTPUT NOTE SIGNALS
+          if (out_signal) // OUTPUT NOTE SIGNALS
             out[0] = std::max(std::min(vel / 127., 1.), 0.01);
-          if (message_out) { // OUTPUT MESSAGES
+          if (out_message) { // OUTPUT MESSAGES
             int msg_index = output.channel_count();
             m_note[0] = out_pitches[i];
             m_note[1] = vel;
@@ -1091,9 +1103,9 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
       auto out = output.samples(next_note.second);
       double vel = play_notes[t_play][next_note.second].item<double>();
       if (vel > 0.) {
-        if (signal_out) // OUTPUT NOTE SIGNALS
+        if (out_signal) // OUTPUT NOTE SIGNALS
           out[micro_index] = std::max(std::min(vel / 127., 1.), 0.01);
-        if (message_out) { // OUTPUT MESSAGES
+        if (out_message) { // OUTPUT MESSAGES
           int msg_index = output.channel_count();
           m_note[0] = out_pitches[next_note.second];
           m_note[1] = vel;
