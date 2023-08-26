@@ -390,3 +390,4 @@ py/out/*
 help/workflow/*
 *.skba
 *.pt
+_releases/*

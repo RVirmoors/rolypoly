@@ -25,7 +25,7 @@ i'm also writing a blog covering hands-on specifics
 
 and a series of [how-to videos](https://youtube.com/playlist?list=PLkr4iJAO7fYSMZM1oYECK5GKXrWN6zdq1)
 
-![Animated workflow diagram](help/workflow.gif)
+![Animated workflow diagram](_assets/workflow.gif)
 
 ## pretraining your own model
 
