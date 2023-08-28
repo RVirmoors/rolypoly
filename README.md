@@ -13,7 +13,7 @@ first install the [FluCoMa](https://www.flucoma.org/) package - you can find it 
 
 get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` directory
 
-if you have an nvidia GPU, [download Libtorch (CUDA + Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the /`rolypoly/support` directory
+[download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the /`rolypoly/support` directory
 
 open the rolypoly~ overview patch from the `Extras` menu in Max
 
