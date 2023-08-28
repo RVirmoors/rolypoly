@@ -6,7 +6,8 @@ def zip_files_and_folders(input_list, output_zip):
         for item in input_list:
             if os.path.isfile(item):
                 # If the item is a file, add it to the zip with the 'rolypoly' directory structure.
-                arcname = os.path.join('rolypoly/py', os.path.basename(item))
+                arcname = os.path.join('rolypoly', os.path.basename(item))
+                print(arcname)
                 zipf.write(item, arcname=arcname)
             elif os.path.isdir(item):
                 # If the item is a directory, add its contents to the zip with the 'rolypoly' directory structure.
