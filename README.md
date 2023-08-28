@@ -11,7 +11,9 @@ version 2.0.1, August 2023, experimental build // [version history](VERSIONS.md)
 
 first install the [FluCoMa](https://www.flucoma.org/) package - you can find it in Max's package manager
 
-get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` folder
+get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` directory
+
+if you have an nvidia GPU, [download Libtorch (CUDA + Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the /`rolypoly/support` directory
 
 open the rolypoly~ overview patch from the `Extras` menu in Max
 
