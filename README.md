@@ -9,17 +9,17 @@ version 2.0.1, August 2023, experimental build // [version history](VERSIONS.md)
 
 ## quickstart
 
+first install the [FluCoMa](https://www.flucoma.org/) package - you can find it in Max's package manager
+
 get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` folder
 
-[download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to `c:\Program Files\Cycling '74\Max 8\resources\support\` *(or the /support directory in your package)*
-
-run `help/rolypoly.maxhelp` for the basics
+open the rolypoly~ overview patch from the `Extras` menu in Max
 
 demo video coming very soon
 
 ## how does it work?
 
-see my paper "Finetuning Rolypoly~ 2.0: an expressive drum machine that adapts with every performance" presented at AIMC2023
+see my demo paper "Finetuning Rolypoly~ 2.0: an expressive drum machine that adapts with every performance" presented at AIMC2023
 
 i'm also writing a blog covering hands-on specifics
 
