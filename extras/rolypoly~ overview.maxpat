@@ -535,7 +535,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 632.0, 273.0, 145.0, 22.0 ],
-					"text" : "train 1.321637 0. 0."
+					"text" : "train 0. 1.74269 0."
 				}
 
 			}
@@ -1947,6 +1947,15 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-98", 1 ],
+					"order" : 0,
+					"source" : [ "obj-100", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-98", 0 ],
+					"order" : 1,
 					"source" : [ "obj-100", 0 ]
 				}
 
@@ -2393,13 +2402,6 @@
 				"patchline" : 				{
 					"destination" : [ "obj-4", 0 ],
 					"source" : [ "obj-52", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-4", 0 ],
-					"source" : [ "obj-54", 0 ]
 				}
 
 			}

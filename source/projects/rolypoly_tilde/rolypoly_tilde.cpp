@@ -49,6 +49,10 @@ c74::min::path get_latest_model(std::string model_path) {
   return path(model_path);
 }
 
+std::string local_file_path(std::string filename) {
+  return string(path()) + "/" + filename;
+}
+
 void fill_with_zero(audio_bundle output) {
   for (int c(0); c < output.channel_count(); c++) {
     auto out = output.samples(c);
@@ -289,7 +293,7 @@ public:
       if (DEBUG) cout << "train_deferred" << endl;
       if (m_train) {
         torch::AutoGradMode enable_grad(true);
-//        try {
+        try {
           backend::TrainConfig config;
           config.lr = 1e-5;
           config.batch_size = 8;
@@ -299,11 +303,11 @@ public:
           //model->eval();
           cout << "Losses over " << config.epochs << " epochs:\n" << losses << endl;
           cout << "Using epoch w/ smallest loss. To play with this version, send the 'start' message. To save this version, send 'write'. To train again, send 'train'." << endl;
-        // }
-        // catch (std::exception& e)
-        // {
-        //     cerr << e.what() << endl;
-        // }
+        }
+        catch (std::exception& e)
+        {
+            cerr << e.what() << endl;
+        }
         m_train = false;
       }
       return {};
@@ -323,7 +327,7 @@ public:
   message<> write {this, "write", "Save finetuned model",
     MIN_FUNCTION {
       if (m_loaded) {
-        torch::save(model, "roly_fine.pt");
+        torch::save(model, local_file_path("roly_fine.pt"));
         cout << "Saved roly_fine.pt" << endl;
       } else {
         cerr << "No model to save!" << endl;
@@ -458,8 +462,9 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
 
     loss = finetuneLoss(out, x);
     if (loss.item<double>() < min_loss) {
+        //cout << "trying " << C74 get_latest_model("roly_best.pt") << endl;
       min_loss = loss.item<double>();
-      torch::save(model, "roly_best.pt");
+      torch::save(model, local_file_path("roly_best.pt"));
       if (DEBUG) cout << "SAVED BEST" << endl;
     }
     loss.backward();
@@ -469,7 +474,7 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
     losses = torch::cat({losses, loss});
   }
 
-  torch::load(model, "roly_best.pt", device);
+  torch::load(model, local_file_path("roly_best.pt"), device);
   return losses;
 }
 
