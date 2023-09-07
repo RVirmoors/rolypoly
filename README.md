@@ -21,7 +21,7 @@ demo video coming very soon
 
 ## how does it work?
 
-see my demo paper "Finetuning Rolypoly~ 2.0: an expressive drum machine that adapts with every performance" presented at AIMC2023
+see my [demo paper](https://aimc2023.pubpub.org/pub/ud9m40jc) "Finetuning Rolypoly~ 2.0: an expressive drum machine that adapts with every performance" presented at AIMC2023
 
 i'm also writing a blog covering hands-on specifics
 
