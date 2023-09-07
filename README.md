@@ -17,15 +17,15 @@ get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releas
 
 open the rolypoly~ overview patch from the `Extras` menu in Max
 
-demo video coming very soon
+demo video coming very soon!
 
 ## how does it work?
 
 see my [demo paper](https://aimc2023.pubpub.org/pub/ud9m40jc) "Finetuning Rolypoly~ 2.0: an expressive drum machine that adapts with every performance" presented at AIMC2023
 
-i'm also writing a blog covering hands-on specifics
+i'm also preparing a blog covering hands-on specifics
 
-and a series of [how-to videos](https://youtube.com/playlist?list=PLkr4iJAO7fYSMZM1oYECK5GKXrWN6zdq1)
+and a series of [how-to videos](https://youtube.com/playlist?list=PLkr4iJAO7fYSMZM1oYECK5GKXrWN6zdq1) on related topics
 
 ![Animated workflow diagram](_assets/workflow.gif)
 
