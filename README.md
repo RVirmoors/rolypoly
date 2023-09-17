@@ -57,12 +57,14 @@ if CMake doesn't do it, then manually copy the .dll files from `libtorch/lib` ne
 pretrain
 ```
 
-## build the Max object from source (Win or MacOS)
+## build the Max object from source (Win or Mac)
 
 you need [CMake](https://cmake.org/download/) installed
 
 create a folder called `libtorch` and [download+extract LibTorch](https://pytorch.org/get-started/locally/) (Release version) into it
-- the MacOS download is Intel-only; for M1 (ARM) chips you can find working build [here](https://github.com/mlverse/libtorch-mac-m1/releases/tag/LibTorch).
+- the MacOS download is Intel-only; for ARM (M1) chips you can find a working build [here](https://github.com/mlverse/libtorch-mac-m1/releases/tag/LibTorch).
+- since we don't yet have a [Universal (FAT)](https://developer.apple.com/documentation/apple-silicon/porting-your-macos-apps-to-apple-silicon#Obtain-Universal-Versions-of-Linked-Libraries) LibTorch library, we must compile Intel and ARM binaries separately
+- if you're on an Intel Mac, please name your folder `libtorch_x86`
 
 you tree should look like this:
 ```
@@ -88,13 +90,13 @@ cmake . -S ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release 
 - on MacOS (w/ M1 ARM arch)
 
 ```
-cmake ../source/projects/rolypoly_tilde  -DCMAKE_BUILD_TYPE=Release -DTorch_DIR='/Users/rv/Documents/GitHub/libtorch/share/cmake/Torch' -DCMAKE_OSX_ARCHITECTURES=arm64;
+cmake ../source/projects/rolypoly_tilde  -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64;
 ```
 
-- on MacOS (w/ Intel arch)
+- on MacOS (w/ x86 Intel arch)
 
 ```
-cmake ../source/projects/rolypoly_tilde  -DCMAKE_BUILD_TYPE=Release -DTorch_DIR='/Users/rv/Documents/GitHub/libtorch/share/cmake/Torch'
+cmake ../source/projects/rolypoly_tilde  -DCMAKE_BUILD_TYPE=Release 
 ```
 
 and finally:

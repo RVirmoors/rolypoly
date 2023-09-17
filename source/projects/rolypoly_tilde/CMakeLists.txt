@@ -20,7 +20,13 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/../backend/include
 )
 
+
+if (CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../libtorch_x86")
+else()
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../libtorch")
+endif()
+
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
@@ -60,7 +66,6 @@ add_custom_command(
 		COMMAND cp "${TORCH_INSTALL_PREFIX}/lib/*.dylib" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${${PROJECT_NAME}_EXTERN_OUTPUT_NAME}.mxo/Contents/MacOS/" 
 		COMMENT "Copy Torch Libraries" 
 	)
-
 if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
 	add_custom_command( 
 		TARGET ${PROJECT_NAME} 
@@ -68,6 +73,14 @@ if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
 		COMMAND "codesign" "--force" "--deep" "-s" "-" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${${PROJECT_NAME}_EXTERN_OUTPUT_NAME}.mxo"
 		COMMENT "Codesign external" 
 	)
+endif()
+if (CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
+	add_custom_command(
+		TARGET ${PROJECT_NAME}  POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E rename
+		"${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${${PROJECT_NAME}_EXTERN_OUTPUT_NAME}.mxo"
+		"${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${${PROJECT_NAME}_EXTERN_OUTPUT_NAME}_x86.mxo"
+	COMMENT "Renamed to _x86.mxo")
 endif()
 endif()
 
