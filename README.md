@@ -23,9 +23,7 @@ demo video coming very soon!
 
 see my [demo paper](https://aimc2023.pubpub.org/pub/ud9m40jc) "Finetuning Rolypoly~ 2.0: an expressive drum machine that adapts with every performance" presented at AIMC2023
 
-i'm also preparing a blog covering hands-on specifics
-
-and a series of [how-to videos](https://youtube.com/playlist?list=PLkr4iJAO7fYSMZM1oYECK5GKXrWN6zdq1) on related topics
+i'm also doing [blogs](https://rvirmoors.github.io/2023/09/16/rolypoly-aimc/) and [how-to videos](https://youtube.com/playlist?list=PLkr4iJAO7fYSMZM1oYECK5GKXrWN6zdq1) on related topics
 
 ![Animated workflow diagram](_assets/workflow.gif)
 
@@ -62,11 +60,11 @@ pretrain
 you need [CMake](https://cmake.org/download/) installed
 
 create a folder called `libtorch` and [download+extract LibTorch](https://pytorch.org/get-started/locally/) (Release version) into it
-- the MacOS download is Intel-only; for ARM (M1) chips you can find a working build [here](https://github.com/mlverse/libtorch-mac-m1/releases/tag/LibTorch).
+- the provided MacOS download is Intel-only; for ARM (M1) chips you can find a working build [here](https://github.com/mlverse/libtorch-mac-m1/releases/tag/LibTorch).
 - since we don't yet have a [Universal (FAT)](https://developer.apple.com/documentation/apple-silicon/porting-your-macos-apps-to-apple-silicon#Obtain-Universal-Versions-of-Linked-Libraries) LibTorch library, we must compile Intel and ARM binaries separately
 - if you're on an Intel Mac, please name your folder `libtorch_x86`
 
-you tree should look like this:
+your tree should look like this:
 ```
 - libtorch
     - bin, ...
@@ -107,4 +105,4 @@ cmake --build . --config Release
 
 ## say hi
 
-if you're interested in this tech and would like to use it / comment / contribute, I want to hear from you! Open an issue here or contact me: `grigore dot burloiu at unatc dot ro`
+if you're interested in this tech and would like to use it / comment / contribute, I want to hear from you! Open an issue/pull request, or contact me: `grigore dot burloiu at unatc dot ro`

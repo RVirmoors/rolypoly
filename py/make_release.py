@@ -29,7 +29,7 @@ if __name__ == "__main__":
                   '../README.md',
                   '../icon.png'
                   ]
-    output_zip = 'rolypoly-v2.0.1.zip' 
+    output_zip = 'rolypoly-v0.2.11.zip' 
 
     zip_files_and_folders(input_list, output_zip)
     print(f'Successfully created {output_zip}')

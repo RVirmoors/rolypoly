@@ -7,7 +7,7 @@
 #define DEBUG false
 
 #ifndef VERSION
-#define VERSION "2.0.1"
+#define VERSION "0.2.11"
 #endif
 
 #define INX_DUMPOUT 10
