@@ -13,7 +13,7 @@ first install the [FluCoMa](https://www.flucoma.org/) package - you can find it 
 
 get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` directory
 
-[download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the /`rolypoly/support` directory
+- if using Windows, [download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the /`rolypoly/support` directory
 
 open the rolypoly~ overview patch from the `Extras` menu in Max
 
@@ -57,18 +57,49 @@ if CMake doesn't do it, then manually copy the .dll files from `libtorch/lib` ne
 pretrain
 ```
 
-## build the Max object from source (windows, for now)
+## build the Max object from source (Win or MacOS)
 
 you need [CMake](https://cmake.org/download/) installed
 
-create a subfolder called `libtorch` and[download+extract LibTorch](https://pytorch.org/get-started/locally/) (Release version) into it
+create a folder called `libtorch` and [download+extract LibTorch](https://pytorch.org/get-started/locally/) (Release version) into it
+- the MacOS download is Intel-only; for M1 (ARM) chips you can find working build [here](https://github.com/mlverse/libtorch-mac-m1/releases/tag/LibTorch).
 
-now go back to the project root, create a `build` subfolder and enter it:
+you tree should look like this:
+```
+- libtorch
+    - bin, ...
+- rolypoly
+    - _assets, ...
+```
+
+now go back into `rolypoly`, create a `build` subfolder and enter it:
 
 ```
 mkdir build
 cd build
-cmake . -S ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release -A x64  -DTorch_DIR="..\libtorch\share\cmake\Torch"
+```
+then run:
+- on Windows (64 bit): 
+
+```
+cmake . -S ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release -A x64  -DTorch_DIR="..\..\libtorch\share\cmake\Torch"
+```
+
+- on MacOS (w/ M1 ARM arch)
+
+```
+cmake ../source/projects/rolypoly_tilde  -DCMAKE_BUILD_TYPE=Release -DTorch_DIR='/Users/rv/Documents/GitHub/libtorch/share/cmake/Torch' -DCMAKE_OSX_ARCHITECTURES=arm64;
+```
+
+- on MacOS (w/ Intel arch)
+
+```
+cmake ../source/projects/rolypoly_tilde  -DCMAKE_BUILD_TYPE=Release -DTorch_DIR='/Users/rv/Documents/GitHub/libtorch/share/cmake/Torch'
+```
+
+and finally:
+
+```
 cmake --build . --config Release
 ```
 
