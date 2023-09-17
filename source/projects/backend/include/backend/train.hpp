@@ -41,8 +41,8 @@ float get_lr(int ep, TrainConfig config) {
         return config.min_lr;
     }
     float decay_ratio = (float)(ep - config.warmup_iters) / (config.lr_decay_iters - config.warmup_iters);
-    _ASSERT(0 <= decay_ratio);
-    _ASSERT(decay_ratio <= 1);
+    assert(0 <= decay_ratio);
+    assert(decay_ratio <= 1);
     float coeff = 0.5 * (1.0 + cos(M_PI * decay_ratio));
     return config.min_lr + coeff * (config.lr - config.min_lr);
 }
