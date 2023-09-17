@@ -5,7 +5,7 @@ a Max object that
 - interprets a MIDI drum track in anticipation and reaction to your expressive nuances
 - is able to generate drum hits on the fly, autoregressively
 
-version 2.0.1, August 2023, experimental build // [version history](VERSIONS.md)
+version 0.2.11, Sep 2023 | [version history](VERSIONS.md)
 
 ## quickstart
 
@@ -13,7 +13,7 @@ first install the [FluCoMa](https://www.flucoma.org/) package - you can find it 
 
 get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` directory
 
-- if using Windows, [download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the /`rolypoly/support` directory
+- if using Windows, [download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the `rolypoly/support` directory
 
 open the rolypoly~ overview patch from the `Extras` menu in Max
 
@@ -29,6 +29,8 @@ i'm also doing [blogs](https://rvirmoors.github.io/2023/09/16/rolypoly-aimc/) an
 
 ## pretraining your own model
 
+this should work on Mac but I'd only recommend trying it on a PC w/ CUDA:
+
 clone into `Max 8/Packages`, fetching submodules: 
 - `git clone https://github.com/RVirmoors/rolypoly --recursive`
 
@@ -43,7 +45,7 @@ python midi_to_csv.py
 ```
 this generates .csv files for all relevant .mid files in info.csv
 
-then build the pretrain executable (windows, for now):
+then build the pretrain executable:
 ```
 cd ../source/projects/pretrain
 cmake --build . --config Release
