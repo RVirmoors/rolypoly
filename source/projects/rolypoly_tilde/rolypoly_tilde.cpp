@@ -1,6 +1,6 @@
 // Rolypoly C++ implementation
 // 2023 rvirmoors
-// v2.0.1 initially based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
+// v2 initially based on nn~ by Antoine Caillon & Axel Chemla-Romeu-Santos
 //
 // Frontend: Max external object
 
@@ -232,7 +232,7 @@ public:
   };
 
   timer<timer_options::defer_delivery> m_timer { this, MIN_FUNCTION {
-    if (DEBUG) cout << "== M_TIMER == playhead_ms  | size  :  " << playhead_ms << " | " << score.size(0) << endl;
+    // if (DEBUG) cout << "== M_TIMER == playhead_ms  | size  :  " << playhead_ms << " | " << score.size(0) << endl;
     if (timer_mode == TIMER::READ) {
       read_deferred.set();
     } else if (timer_mode == TIMER::PLAY) {
@@ -435,12 +435,6 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
   
   torch::AutoGradMode enable_grad(true);
   model->train();
-
-  // for debugging:
-  // for (int i = 0; i < score.size(0); i++) {
-  //   if (i % 2) score[i][INX_TAU_G] = -0.02;
-  //   else score[i][INX_TAU_G] = 0.04;
-  // }
 
   std::map<std::string, std::vector<torch::Tensor>> train_data;
   train_data["X"].push_back(score.clone().detach());
@@ -645,7 +639,7 @@ bool rolypoly::midiNotesToScore() {
     }
     double pos_in_bar = std::max(0., midifile[1][i].seconds - barStart) / (barEnd - barStart);
 
-    if (DEBUG) cout << midifile[1][i].seconds
+    if (DEBUG) cout << "note: " << midifile[1][i].seconds
         << ' ' << int(midifile[1][i][1])
         << ' ' << tempo_map[current_tempo_index].second
         << ' ' << timesig_map[current_timesig_index].second
@@ -672,7 +666,7 @@ bool rolypoly::midiNotesToScore() {
   }
 
   if (DEBUG) cout << "sent " << score.size(0) << " hits to model" << endl;
-  //if (DEBUG) cout << score.index({Slice(0,5)}) << endl;
+  // if (DEBUG) cout << score.index({Slice(0,7)}) << endl;
   
   if (i >= midifile[1].size()) {
     return true; // done
@@ -726,9 +720,11 @@ void rolypoly::tensorToModel() {
   }
 
   long start = std::max(0, t_toModel - BLOCK_SIZE);
-  if (DEBUG) cout << "== TENStoMOD == sending " << start << " - " << t_toModel-1 << endl;
-  torch::Tensor input_tensor = score.index({Slice(start, t_toModel)}).unsqueeze(0);
+  if (DEBUG) cout << "== TENStoMOD == sending " << start << " - " << t_toModel << endl;
+  torch::Tensor input_tensor = score.index({Slice(start, t_toModel+1)}).unsqueeze(0);
   backend::dataScaleDown(input_tensor);
+
+  if (DEBUG) cout << "into model: " << input_tensor << endl;
 
   // send the notes to the model, to get the offsets for play_notes
   try {
@@ -745,6 +741,7 @@ void rolypoly::tensorToModel() {
         modelOut[0].index({Slice(), Slice(0, 9)})                       // ELSE
       )    
     );
+    if (DEBUG) cout << "from model: " << modelOut << endl;
     backend::dataScaleUp(modelOut);
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
@@ -798,6 +795,7 @@ void rolypoly::tensorToModel() {
     new_note.unsqueeze_(0);
 
     play_notes = torch::cat({play_notes, new_note}, 0);
+    if (DEBUG) cout << play_notes << endl;
   }
   
   if (generate && playhead_ms > upTo_ms) {
@@ -1099,6 +1097,7 @@ void rolypoly::perform(audio_bundle input, audio_bundle output) {
         return;
       }
       // when the time comes, play the microtime-adjusted note
+      if (DEBUG) cout << "playing " << next_note << endl;
       long micro_index = (next_note.first - playhead_ms) / bufsize_ms * vec_size;
       micro_index = std::min(micro_index, vec_size-1);
       micro_index = std::max(micro_index, 0L);
