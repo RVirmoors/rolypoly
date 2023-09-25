@@ -15,8 +15,8 @@ include(${C74_MIN_API_DIR}/script/min-pretarget.cmake)
 include_directories( 
 	"${C74_INCLUDES}"
 	${CMAKE_CURRENT_SOURCE_DIR}/../../../midifile/include
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include
-	${CMAKE_CURRENT_SOURCE_DIR}/../../../libtorch/include/torch/csrc/api/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../../libtorch/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../../../../libtorch/include/torch/csrc/api/include
 	${CMAKE_CURRENT_SOURCE_DIR}/../backend/include
 )
 

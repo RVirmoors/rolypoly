@@ -36,9 +36,9 @@
 
 	<methodlist>
 
-		<method name='start'>
-			<digest>Start playing </digest>
-			<description>Start playing </description>
+		<method name='train'>
+			<digest>Finetune the model based on the latest run </digest>
+			<description>Finetune the model based on the latest run </description>
 		</method>
 
 		<method name='read'>
@@ -46,14 +46,14 @@
 			<description>Load score </description>
 		</method>
 
-		<method name='train'>
-			<digest>Finetune the model based on the latest run </digest>
-			<description>Finetune the model based on the latest run </description>
-		</method>
-
 		<method name='write'>
 			<digest>Save finetuned model </digest>
 			<description>Save finetuned model </description>
+		</method>
+
+		<method name='start'>
+			<digest>Start playing </digest>
+			<description>Start playing </description>
 		</method>
 
 	</methodlist>
@@ -63,24 +63,9 @@
 
 	<attributelist>
 
-		<attribute name='out_signal' get='1' set='1' type='long' size='1' >
-			<digest>Output note signals </digest>
-			<description>Output note signals </description>
-		</attribute>
-
-		<attribute name='filter_hits' get='1' set='1' type='symbol' size='1' >
-			<digest>Filter out notes not in the score / use scored velocities </digest>
-			<description>Filter out notes not in the score / use scored velocities </description>
-		</attribute>
-
-		<attribute name='generate_vels' get='1' set='1' type='float64' size='1' >
-			<digest>Min and max probabilities/velocities accepted from the generator </digest>
-			<description>Min and max probabilities/velocities accepted from the generator </description>
-		</attribute>
-
-		<attribute name='generate' get='1' set='1' type='long' size='1' >
-			<digest>Generate hits on the fly, not reading from the score </digest>
-			<description>Generate hits on the fly, not reading from the score </description>
+		<attribute name='enable' get='1' set='1' type='long' size='1' >
+			<digest>Enable / disable tensor computation </digest>
+			<description>Enable / disable tensor computation </description>
 		</attribute>
 
 		<attribute name='latency' get='1' set='1' type='long' size='1' >
@@ -88,14 +73,29 @@
 			<description>Onset detection latency (samples) </description>
 		</attribute>
 
+		<attribute name='filter_hits' get='1' set='1' type='symbol' size='1' >
+			<digest>Filter out notes not in the score / use scored velocities </digest>
+			<description>Filter out notes not in the score / use scored velocities </description>
+		</attribute>
+
+		<attribute name='generate' get='1' set='1' type='long' size='1' >
+			<digest>Generate hits on the fly, not reading from the score </digest>
+			<description>Generate hits on the fly, not reading from the score </description>
+		</attribute>
+
+		<attribute name='generate_vels' get='1' set='1' type='float64' size='1' >
+			<digest>Min and max probabilities/velocities accepted from the generator </digest>
+			<description>Min and max probabilities/velocities accepted from the generator </description>
+		</attribute>
+
+		<attribute name='out_signal' get='1' set='1' type='long' size='1' >
+			<digest>Output note signals </digest>
+			<description>Output note signals </description>
+		</attribute>
+
 		<attribute name='out_message' get='1' set='1' type='long' size='1' >
 			<digest>Output note messages </digest>
 			<description>Output note messages </description>
-		</attribute>
-
-		<attribute name='enable' get='1' set='1' type='long' size='1' >
-			<digest>Enable / disable tensor computation </digest>
-			<description>Enable / disable tensor computation </description>
 		</attribute>
 
 	</attributelist>

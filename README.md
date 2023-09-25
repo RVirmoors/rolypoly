@@ -14,6 +14,7 @@ first install the [FluCoMa](https://www.flucoma.org/) package - you can find it 
 get the package from the [Releases](https://github.com/RVirmoors/rolypoly/releases) tab, and extract it into your `Documents/Max 8` directory
 
 - if using Windows, [download Libtorch (Release version)](https://pytorch.org/get-started/locally/) and extract all the .dll files from `libtorch/lib` to the `rolypoly/support` directory
+    - if you have an NVIDIA CUDA-enabled GPU, choose the CUDA version of LibTorch
 
 open the rolypoly~ overview patch from the `Extras` menu in Max
 
@@ -84,7 +85,7 @@ then run:
 - on Windows (64 bit): 
 
 ```
-cmake . -S ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release -A x64  -DTorch_DIR="..\..\libtorch\share\cmake\Torch"
+cmake ..\source\projects\rolypoly_tilde  -DCMAKE_BUILD_TYPE:STRING=Release -A x64  -DTorch_DIR="..\..\libtorch\share\cmake\Torch"
 ```
 
 - on MacOS (w/ M1 ARM arch)
@@ -104,6 +105,10 @@ and finally:
 ```
 cmake --build . --config Release
 ```
+
+Once the object is built, if it (and the torch .dll files, on Windows) are in Max's path, you should be able to see the object. You still need roly.pt from the release package (or your own pretraining, see above).
+
+Troubleshooting: if you get an Error 242 message, you might need to delete/rename a .dll file, as mentioned [here](https://stackoverflow.com/questions/62961170/why-do-i-get-the-error-the-ordinal-242-could-not-be-located-in-the-dynamic-link). I've also had to delete this one: `C:\Program Files (x86)\Common Files\Intel\Shared Files\cpp\Bin\Intel64`
 
 ## say hi
 
