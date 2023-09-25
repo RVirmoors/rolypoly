@@ -407,7 +407,7 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
   torch::Tensor non_zero_mask = (vel_hat != 0).to(torch::kFloat32);
   torch::Tensor non_zero_sum = (y_hat_offsets * non_zero_mask).sum(2);
   torch::Tensor non_zero_count = non_zero_mask.sum(2);
-  torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1);
+  torch::Tensor mean_offsets = non_zero_sum / non_zero_count.clamp_min(1).to(device);
   torch::Tensor tau_d = torch::where(
       tau_g != 0,
       mean_offsets,
@@ -416,7 +416,7 @@ torch::Tensor rolypoly::finetuneLoss(torch::Tensor out, torch::Tensor x) {
 
   if (DEBUG) cout << "tau out (D):\n" << tau_d[0] << endl << "real tau (G):\n" << tau_g[0] << endl;
 
-  torch::Tensor r = 0.25 * torch::zeros({1}); // TODO offset regularization vs GMD stats
+  torch::Tensor r = 0.25 * torch::zeros({1}).to(device); // TODO offset regularization vs GMD stats
   torch::Tensor v = 0.5  * train_ops[0] * torch::mse_loss(vel_hat, vel);
   torch::Tensor o = 0.02 * train_ops[1] * torch::mse_loss(tau_d, tau_g);
   torch::Tensor g = 0.02 * train_ops[2] * torch::mse_loss(tau_g_hat, tau_g);
@@ -432,15 +432,13 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
   torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(config.lr));
   double min_loss = std::numeric_limits<double>::infinity();
   torch::Tensor loss;
+  torch::Tensor losses = torch::zeros({0}).to(device);
   
   torch::AutoGradMode enable_grad(true);
   model->train();
-
   std::map<std::string, std::vector<torch::Tensor>> train_data;
   train_data["X"].push_back(score.clone().detach());
   train_data["Y"].push_back(score.clone().detach());
-
-  torch::Tensor losses = torch::zeros({0}).to(device);
 
   for (int epoch = 0; epoch < config.epochs; epoch++) {
     // torch::autograd::DetectAnomalyGuard detect_anomaly;
@@ -451,6 +449,7 @@ torch::Tensor rolypoly::finetune(backend::TrainConfig config) {
         config.batch_size, 
         config.block_size,
         x, y);
+    x = x.to(device);
 
     torch::Tensor out = model->forward(x);
 
