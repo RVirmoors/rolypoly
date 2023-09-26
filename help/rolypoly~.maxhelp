@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 349.0, 85.0, 947.0, 926.0 ],
+		"rect" : [ 408.0, -995.0, 947.0, 926.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -68,7 +68,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 27.5, 317.666667999999959, 113.832397000000128, 25.0 ],
+					"patching_rect" : [ 27.5, 317.666667999999959, 114.0, 25.0 ],
 					"text" : "save the model"
 				}
 
@@ -85,7 +85,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 27.5, 265.079677589256221, 115.832397000000128, 40.0 ],
-					"presentation_linecount" : 2,
 					"text" : "finetune the model"
 				}
 
@@ -117,7 +116,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 27.5, 169.079677589256221, 115.832397000000128, 40.0 ],
-					"presentation_linecount" : 6,
 					"text" : "read the score from s120.mid"
 				}
 
@@ -134,7 +132,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 449.541900750000082, 430.079677589256221, 88.916198499999837, 70.0 ],
-					"presentation_linecount" : 6,
 					"text" : "check that onsets are  detected OK"
 				}
 

@@ -376,7 +376,7 @@ sysbuild
 log.txt
 externals
 extensions
-support
+support/*.dll
 build/
 build-*/
 tests
