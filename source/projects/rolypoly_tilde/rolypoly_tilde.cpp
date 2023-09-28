@@ -1020,13 +1020,16 @@ void rolypoly::processLiveOnsets(audio_bundle input) {
     // if so, then we have a hit
     if (DEBUG) cout << "closest note is " << closest_note << " at " << closest_note_time << " ms" << endl;
   } else {
-    if (DEBUG) cout << "NOT within " << closest_note_duration/3 << " of " << closest_note_time << endl; 
+    if (DEBUG) cout << "NOT within " << closest_note_duration/3 << " of " << closest_note_time << endl;
+    dumpout("onset", -1); 
     return;
   }
 
   // add detected tau_g to score
-  score[closest_note][INX_TAU_G] = ms_to_bartime(tau_guitar, score[closest_note][INX_BPM], score[closest_note][INX_TSIG]);}
-  catch (const std::exception& e) {
+  score[closest_note][INX_TAU_G] = ms_to_bartime(tau_guitar, score[closest_note][INX_BPM], score[closest_note][INX_TSIG]);
+  dumpout("onset", score[closest_note][INX_TAU_G].item<double>());
+  
+  } catch (const std::exception& e) {
     std::cerr << "ONSET ERROR:" << e.what() << std::endl;
   }
 }
